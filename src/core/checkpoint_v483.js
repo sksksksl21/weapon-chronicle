@@ -24,25 +24,35 @@ v482CommitAction=function(){
 // If an app was killed after a successful final save but before deletion of the
 // checkpoint, use the committed save.  Otherwise roll back to action beginning.
 v482RecoverPendingAction=function(){
-  const raw=localStorage.getItem(V482_CHECKPOINT_KEY);if(!raw)return false;
+  let raw,cp;
+  try{raw=localStorage.getItem(V482_CHECKPOINT_KEY);}catch(e){
+    console.warn('v4.8.3 checkpoint read deferred',e);return false;
+  }
+  if(!raw)return false;
+  // Only malformed payloads belong in quarantine. Storage failures are retryable.
   try{
-    const cp=JSON.parse(raw);
-    if(cp.version!==482 || !cp.state)throw new Error('Unexpected checkpoint version');
+    cp=JSON.parse(raw);
+    if(!cp || cp.version!==482 || !cp.state)throw new Error('Unexpected checkpoint version');
     v48ValidateLoadedData(cp.state);
+  }catch(e){
+    console.error('v4.8.3 checkpoint invalid; preserved last saved state',e);
+    try{localStorage.setItem(V482_CHECKPOINT_KEY+'.invalid',raw);localStorage.removeItem(V482_CHECKPOINT_KEY);}catch(_){}
+    return false;
+  }
+  try{
     let committed=null;
     try{committed=v483LoadJson(SAVE_KEY);}catch(_){}
     if(v483IsDurablyCommitted(committed,cp)){
       localStorage.removeItem(V482_CHECKPOINT_KEY);
       return false;
     }
-    // Idempotent: if interrupted here, the same checkpoint is replayed again.
+    // All required writes precede cleanup. Replaying the same snapshot is idempotent.
     localStorage.setItem(SAVE_KEY,JSON.stringify(cp.state));
     localStorage.setItem(V482_RECOVERY_NOTICE_KEY,JSON.stringify({year:cp.year,month:cp.month,policy:cp.policy}));
     localStorage.removeItem(V482_CHECKPOINT_KEY);
     return true;
   }catch(e){
-    console.error('v4.8.3 checkpoint invalid; preserved last saved state',e);
-    try{localStorage.setItem(V482_CHECKPOINT_KEY+'.invalid',raw);localStorage.removeItem(V482_CHECKPOINT_KEY);}catch(_){}
+    console.warn('v4.8.3 checkpoint recovery deferred',e);
     return false;
   }
 };
