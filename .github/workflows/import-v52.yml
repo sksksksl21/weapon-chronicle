@@ -2,7 +2,7 @@ name: Import Weapon Chronicle v5.2 baseline
 on:
   push:
     branches: [main]
-    paths: ['weapon_chronicle_codex_baseline_v52.zip']
+    paths: ['weapon_chronicle_codex_baseline_v52.zip', '.github/workflows/import-v52.yml']
   workflow_dispatch:
 
 permissions:
@@ -83,6 +83,12 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # The workflow's GITHUB_TOKEN cannot create NEW workflow files on main.
+          # Preserve the imported CI definition as a template; publish CI separately.
+          if test -f .github/workflows/ci.yml; then
+            mkdir -p docs
+            mv .github/workflows/ci.yml docs/CI_WORKFLOW_TEMPLATE.yml
+          fi
           git add -A
           if git diff --cached --quiet; then exit 0; fi
           git commit -m "chore: import verified Weapon Chronicle v5.2 Codex baseline"
