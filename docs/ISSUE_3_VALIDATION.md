@@ -4,12 +4,15 @@ PR #2 was merged before branching from `74e4727`. The accepted change is limited
 
 `checkpoint_v483.js` now quarantines only parse/validation failures. A valid checkpoint remains byte-for-byte under its live key when recovery save/notice writes or checkpoint removal fail. All required writes precede cleanup. Notice removal remains independently retryable through the existing load wrapper. No migration is required.
 
-## Validation (2026-10-16 KST)
+The follow-up P1 fix distinguishes blocked recovery (`null`) from normal startup (`false`) and recovered startup (`true`). An unreadable checkpoint or SAVE_KEY blocks startup; SAVE_KEY read errors cannot prove whether a later-month save was already committed. A failed rollback write permits loading only if a readback proves the action-start snapshot or an already committed save is present. Otherwise neither the partial save nor a fresh month is loaded. The recovery dialog has no close button or backdrop dismissal, underlying controls are inert to pointer/keyboard input, and Retry reloads the app to attempt durable recovery again. Notice/cleanup failures remain non-blocking only when safe durable data can be verified. The normal game UI is unchanged.
+
+## Validation (2026-10-17 KST)
 
 - A Node VM fault probe against `origin/main` reproduced loss of the live checkpoint on SAVE_KEY write failure; the same assertion passes against the fix.
+- A second Node VM probe compares the original PR #4 (`a61914c`) with this follow-up: before, rollback write failure still invokes the underlying loader and exposes transient GOLD 845; after, that loader is not called, no month is generated, original GOLD 68 remains, and the checkpoint is preserved.
 - `npm run build`, `npm run check`: PASS; generated index matches source and JavaScript syntax passes.
 - `npm run test:smoke`: PASS; actual rest choice completes a month, existing menus load without page errors.
-- `npm run test:regression`: 20/20 PASS. Includes the prior 13 checks plus recovery SAVE_KEY/notice/removal faults during boot, exact live payload preservation, no invalid quarantine of valid data, unchanged old save when SAVE_KEY write fails, retry to action-start snapshot, synthetic month/quest reward settlement once across repeated reloads, notice removal failure/retry, three invalid payload shapes with quarantine write/removal failure/retry.
+- `npm run test:regression`: 23/23 PASS. Includes the prior 20 checks plus blocked startup after rollback write failure (no partial rewards loaded, no fresh month, no close/backdrop/Escape dismissal), an actual Retry-button reload into the action-start snapshot, and separate SAVE_KEY/checkpoint read-failure cases preserving an already committed save until retry. Existing cases cover exact live payload preservation, no invalid quarantine of valid data, unchanged old save on write failure, synthetic month/quest reward settlement once across repeated reloads, notice write/removal faults, cleanup failure, three invalid payload shapes and quarantine write/removal failure/retry.
 - `npm run test:story`: seven files, 177/177 PASS, including actual followup quest completion/reload/replay protection and two 40-chapter simulations. Existing legacy-history, combat/debate story paths, death/succession, terminal save, annual confirmation and mobile hub checks remain in their suites.
 - `git diff --check`: PASS. Frozen baseline hash record and tags untouched.
 

@@ -23,13 +23,13 @@ probe="""window.__wcTest={
  checkpointCheck:(s,c)=>v483IsDurablyCommitted(s,c),
  goGameOver:()=>{state.storyCtx=null;state.activeStory=null;state.policy=null;state.subChoice=null;state.gameOver={type:'lost',year:state.year,month:state.month};return saveGame();}
 };"""
-needle='v48EnsureState();\nif(loadGame())'
+needle='v48EnsureState();\nconst v483Loaded=loadGame();'
 assert html.count(needle)==1
 instrument=html.replace(needle,probe+'\n'+needle)
 
 MEMORY='''
   Object.defineProperty(window,'localStorage',{configurable:true,value:{
-    getItem:(k)=>window.__xstore?.[k]??null,
+    getItem:(k)=>{if(k===window.__throwReadKey)throw Error('artificial keyed read failure');return window.__xstore?.[k]??null},
     setItem:(k,v)=>{if(k===window.__throwWriteKey)throw Error('artificial keyed write failure');if(window.__throwSave && k==='weaponChronicleLifeHubV30')throw Error('artificial save failure');window.__xstore=window.__xstore||{};window.__xstore[k]=String(v)},
     removeItem:(k)=>{if(k===window.__throwRemoveKey)throw Error('artificial keyed remove failure');if(window.__throwCleanup && k.includes('checkpoint-v482'))throw Error('artificial remove failure');delete window.__xstore[k]},
     clear:()=>{window.__xstore={}}
@@ -198,6 +198,64 @@ with sync_playwright() as p:
     assert_msg(not errs,repr(errs))
     record('복구 실패·원문 유지·재시도·월/퀘스트 보상 1회: '+fault)
     page.close()
+
+ # P1. A failed rollback must not expose the interrupted save or initialize a month.
+ page,errs=fresh();choose_start(page)
+ raw=page.evaluate('__wcTest.checkpoint()');snapshot=json.loads(raw)['state']
+ page.evaluate("()=>{const s=__wcTest.state();s.gold+=777;s.worldHistory.push({id:'test:blocked-reward'});__wcTest.save()}")
+ saved=page.evaluate('localStorage.getItem(__wcTest.saveKey)')
+ page.evaluate('window.__throwWriteKey=__wcTest.saveKey')
+ page.set_content(instrument,wait_until='load',timeout=30000)
+ assert_msg(page.locator('#retryCheckpointRecovery').count()==1,'rollback failure did not block startup')
+ assert_msg(page.locator('#closeModal').count()==0,'recovery dialog is dismissible')
+ assert_msg(page.evaluate('__wcTest.state().monthFacts.length')==0,'blocked startup generated a month')
+ assert_msg(inspect(page)['gold']!=snapshot['gold']+777,'interrupted rewards loaded into memory')
+ for _ in range(2):
+    page.locator('#overlay').click(position={'x':2,'y':2})
+    page.keyboard.press('Escape');page.keyboard.press('Tab')
+    assert_msg(page.locator('#overlay.show #retryCheckpointRecovery').count()==1,'blocked recovery dismissed')
+    assert_msg(page.evaluate('localStorage.getItem(__wcTest.saveKey)')==saved,'blocked input changed durable save')
+    assert_msg(page.evaluate('__wcTest.checkpoint()')==raw,'blocked input changed checkpoint')
+ # Exercise the actual retry button under a real routed-document reload.
+ store=page.evaluate('window.__xstore')
+ retry_calls=[]
+ def retry_route(route):
+    retry_calls.append(True)
+    fault='"weaponChronicleLifeHubV30"' if len(retry_calls)==1 else 'null'
+    setup=MEMORY+'\nwindow.__xstore='+json.dumps(store)+';window.__throwWriteKey='+fault+';'
+    route.fulfill(status=200,content_type='text/html',body=instrument.replace('<script>','<script>'+setup,1))
+ retry_page=browser.new_page(viewport={'width':390,'height':844})
+ retry_page.route('http://checkpoint.test/',retry_route)
+ retry_page.goto('http://checkpoint.test/')
+ assert_msg(retry_page.locator('#retryCheckpointRecovery').count()==1,'retry fixture not blocked')
+ with retry_page.expect_navigation():retry_page.locator('#retryCheckpointRecovery').click()
+ assert_msg(len(retry_calls)==2,'retry did not reload')
+ assert_msg(retry_page.locator('#retryCheckpointRecovery').count()==0,'retry stayed blocked')
+ assert_msg(inspect(retry_page)['gold']==snapshot['gold'],'retry did not restore action-start gold')
+ assert_msg(not ck(retry_page),'successful retry retained checkpoint')
+ assert_msg(not retry_page.evaluate('__wcTest.state().worldHistory.some(x=>x.id==="test:blocked-reward")'),'retry retained interrupted reward')
+ record('P1 복구 실패 진행 차단·닫기 방지·실제 재시도');retry_page.close();page.close()
+
+ # A read error cannot establish commit status. Preserve a completed save as
+ # well as the pending checkpoint until the next successful read.
+ for read_key in ['saveKey','checkpointKey']:
+    page,errs=fresh();choose_start(page)
+    page.evaluate('window.__throwCleanup=true')
+    page.evaluate('''()=>{const s=__wcTest.state();s.gold+=210;s.storyCtx=null;s.activeStory=null;s.policy=null;s.subChoice=null;__wcTest.advance()}''')
+    committed=inspect(page)
+    raw=page.evaluate('__wcTest.checkpoint()')
+    saved=page.evaluate('localStorage.getItem(__wcTest.saveKey)')
+    page.evaluate('(key)=>window.__throwReadKey=__wcTest[key]',read_key)
+    page.set_content(instrument,wait_until='load',timeout=30000)
+    assert_msg(page.locator('#retryCheckpointRecovery').count()==1,'SAVE_KEY read failure did not block')
+    assert_msg(page.evaluate('window.__xstore[__wcTest.saveKey]')==saved,'unreadable committed save overwritten')
+    assert_msg(page.evaluate('window.__xstore[__wcTest.checkpointKey]')==raw,'read failure changed checkpoint')
+    assert_msg(page.evaluate('__wcTest.state().monthFacts.length')==0,'read failure generated a month')
+    page.evaluate('window.__throwReadKey=null;window.__throwCleanup=false')
+    restart_view(page)
+    assert_msg(inspect(page)==committed,'read retry rolled back committed progress')
+    assert_msg(not errs,repr(errs))
+    record('P1 읽기 실패 차단·확정 저장 보존·재시도: '+read_key);page.close()
 
  # K. A notice removal failure is cosmetic and cannot roll back a durable save.
  page,errs=fresh();choose_start(page)

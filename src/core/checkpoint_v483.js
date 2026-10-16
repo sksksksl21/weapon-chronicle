@@ -9,6 +9,17 @@ function v483IsDurablyCommitted(snapshot, checkpoint) {
     (!!snapshot.gameOver && snapshot.gameOver.year===cy && snapshot.gameOver.month===cm);
 }
 function v483LoadJson(key){const str=localStorage.getItem(key);return str?JSON.parse(str):null;}
+// null is a blocked startup, distinct from false (no rollback needed).
+function v483BlockRecovery(error){
+  console.warn('v4.8.3 checkpoint recovery blocked',error);
+  openModal('<div class="modalHead"><b>진행 복구 대기</b></div><div class="modalDesc">행동 시작 지점으로 안전하게 복구하지 못했습니다. 저장 공간과 저장 권한을 확인한 뒤 다시 시도하세요. 복구가 완료될 때까지 게임 진행을 멈춥니다.</div><button id="retryCheckpointRecovery" type="button">복구 다시 시도</button>');
+  // Keep the existing game controls inert, including keyboard navigation.
+  for(const child of document.body.children){if(child!==$('overlay'))child.inert=true;}
+  $('overlay').onclick=null;
+  $('retryCheckpointRecovery').onclick=()=>location.reload();
+  $('retryCheckpointRecovery').focus();
+  return null;
+}
 // Replaces the old unconditional checkpoint cleanup.  A write that failed MUST
 // leave the original checkpoint intact, even if the runtime state advanced.
 v482CommitAction=function(){
@@ -26,7 +37,7 @@ v482CommitAction=function(){
 v482RecoverPendingAction=function(){
   let raw,cp;
   try{raw=localStorage.getItem(V482_CHECKPOINT_KEY);}catch(e){
-    console.warn('v4.8.3 checkpoint read deferred',e);return false;
+    return v483BlockRecovery(e);
   }
   if(!raw)return false;
   // Only malformed payloads belong in quarantine. Storage failures are retryable.
@@ -39,21 +50,32 @@ v482RecoverPendingAction=function(){
     try{localStorage.setItem(V482_CHECKPOINT_KEY+'.invalid',raw);localStorage.removeItem(V482_CHECKPOINT_KEY);}catch(_){}
     return false;
   }
+  let savedRaw;
+  try{savedRaw=localStorage.getItem(SAVE_KEY);}catch(e){return v483BlockRecovery(e);}
+  let committed=null;
+  // A malformed save is different from an unreadable save: a valid checkpoint
+  // can replace malformed bytes, but must not overwrite an unknown commit.
+  try{committed=savedRaw?JSON.parse(savedRaw):null;}catch(_){}
+  const restored=JSON.stringify(cp.state);
   try{
-    let committed=null;
-    try{committed=v483LoadJson(SAVE_KEY);}catch(_){}
     if(v483IsDurablyCommitted(committed,cp)){
       localStorage.removeItem(V482_CHECKPOINT_KEY);
       return false;
     }
     // All required writes precede cleanup. Replaying the same snapshot is idempotent.
-    localStorage.setItem(SAVE_KEY,JSON.stringify(cp.state));
+    localStorage.setItem(SAVE_KEY,restored);
     localStorage.setItem(V482_RECOVERY_NOTICE_KEY,JSON.stringify({year:cp.year,month:cp.month,policy:cp.policy}));
     localStorage.removeItem(V482_CHECKPOINT_KEY);
     return true;
   }catch(e){
     console.warn('v4.8.3 checkpoint recovery deferred',e);
-    return false;
+    // Notice/cleanup failures are safe only after a verified durable save.
+    // Otherwise do not expose the existing mid-action save to loadGame().
+    try{
+      const saved=localStorage.getItem(SAVE_KEY);
+      if(saved===restored || (saved && v483IsDurablyCommitted(JSON.parse(saved),cp)))return true;
+    }catch(_){}
+    return v483BlockRecovery(e);
   }
 };
 // Reset must discard the pending rollback before deleting the active save:

@@ -2,9 +2,9 @@ from pathlib import Path
 from playwright.sync_api import sync_playwright
 h=Path(__file__).resolve().parents[1]/'index.html'
 s=h.read_text()
-s=s.replace('v48EnsureState();\nif(loadGame())', '''window.__wcUI={s:()=>({month:state.month,year:state.year,gold:state.gold}),rest:()=>{const a=actionCandidatesForPolicy('rest')[0];chooseActionCandidate('rest',a.key);startStory();return a.key;},debate:()=>startDebateV32('항구 상인과의 협상')};
+s=s.replace('v48EnsureState();\nconst v483Loaded=loadGame();', '''window.__wcUI={s:()=>({month:state.month,year:state.year,gold:state.gold}),rest:()=>{const a=actionCandidatesForPolicy('rest')[0];chooseActionCandidate('rest',a.key);startStory();return a.key;},debate:()=>startDebateV32('항구 상인과의 협상')};
 v48EnsureState();
-if(loadGame())''')
+const v483Loaded=loadGame();''')
 with sync_playwright() as p:
  b=p.chromium.launch(headless=True,executable_path='/usr/bin/chromium' if Path('/usr/bin/chromium').exists() else None,args=['--no-sandbox','--disable-dev-shm-usage','--disable-gpu'])
  page=b.new_page(viewport={'width':390,'height':844})
