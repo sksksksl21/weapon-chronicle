@@ -1,35 +1,50 @@
-# Weapon Chronicle — Codex / GitHub Codespaces
+# Weapon Chronicle — Codex / GitHub Codespaces baseline (v5.2)
 
-Android-first Odyssey-inspired sword succession RPG. **Migration baseline: v5.2**, maintained in a private repository.
+This repository preserves the **v5.2 playable web baseline** while establishing Git/Codex/Codespaces development. This migration does not rewrite battle, story, or save rules.
 
-## Status
-
-- GitHub repository initialized and Codex rules committed (`AGENTS.md`).
-- One-time import workflow committed (`.github/workflows/import-v52.yml`).
-- **Full playable source has not yet been imported**: upload the pinned baseline ZIP to begin.
-
-## One-time source import from mobile or desktop
-
-1. Download **`weapon_chronicle_codex_baseline_v52.zip`** from the ChatGPT conversation.
-2. Open this repository's **Code** tab on GitHub. Choose **Add file → Upload files** (mobile browsers may need **Desktop site**).
-3. Upload the ZIP **as-is to the repository root**. Filename must be exactly `weapon_chronicle_codex_baseline_v52.zip`; commit to `main`.
-4. Open **Actions → Import Weapon Chronicle v5.2 baseline**. Wait for a successful run. It verifies ZIP SHA256, safely extracts source, recreates the game HTML, checks JavaScript, compares its frozen checksum, removes the ZIP from Git tracking, and commits the full project.
-5. Confirm `src/`, `tests/`, `docs/`, `index.html`, `package.json` and `.devcontainer/` appear in the root.
-6. In GitHub choose **Code → Codespaces → Create codespace on main** and run:
+## Quick start (Codespaces)
+Open **Code → Codespaces → Create codespace on main**. The container setup installs the Python Playwright testing dependency and a browser. From the Codespaces terminal:
 
 ```bash
+npm run build
+npm run check
+npm run dev
+```
+
+Open the forwarded **port 5173** in the browser to play. The served file is the generated root `index.html`. If the startup script reports an installation issue, run `bash scripts/setup.sh`.
+
+## Local workflow
+Requires Node.js 22+, Python 3.11+, and for browser tests Playwright Chromium (`python -m playwright install chromium`).
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -r requirements-dev.txt
+python -m playwright install chromium
 npm run build
 npm run check
 npm run test:smoke
 npm run dev
 ```
 
-Open forwarded port 5173 to play in the browser. If the Actions workflow fails, **do not** begin Codex feature work; share the failed job log.
+When tests cannot find `/usr/bin/chromium`, they automatically use Playwright's installed Chromium.
 
-## Development policy
+## Single source of truth
+- `src/legacy/game_runtime.js`: current legacy game. Refactor gradually, with behavior tests.
+- `src/core/`: save ledger/checkpoint code in fixed build order.
+- `src/story/`: v5.0–5.2 historical divergence, aftermath, act-one integration.
+- `src/legacy/html_before_script.html`: page structure, styles, embedded assets.
+- `src/legacy/html_after_script.html`: trailing document markup.
+- `src/legacy/bootstrap.js`: startup logic.
+- `tools/build.py`: concatenates the above in established order to produce root `index.html` (offline-capable).
+- `tests/`: inherited browser/regression tests. Some tests use simulations and do not represent complete human playthroughs.
+- `docs/`: binding design decisions, migration checklist, compatibility, and future tasks.
 
-`AGENTS.md` documents frozen game decisions, minimal-change code review, internal roundtable checks and regression requirements. Codex can propose branches/PRs for future work. Source-of-truth is GitHub, not ZIP attachments after import.
+## Commands
+`npm run build`: regenerate the bundled HTML.  `npm run check`: syntax plus generated build integrity; `npm run test:smoke`: UI/menu/one monthly action; `npm run test:story`: historical branches/aftereffects/act-one tests. `npm run test:regression`: save/recovery boundary tests. `npm run dev`: local server on port 5173.
 
-Historical world conclusions are distinct from future 12 sword-life endings. Interrupted actions use checkpoint **A** recovery; no duplicate rewards. Save compatibility, 40-chapter progression, inheritance and Android-first packaging remain fixed.
+## Android plan
+Keep web development and browser tests primary; add Capacitor after this repository baseline is reproducible and old save portability has a clear implementation/test plan. Android storage is **not automatically the same as browser localStorage**. Ship APK for field test, generate AAB only for Play submission.
 
-The importer is only a bootstrap tool. Subsequent work uses normal Git commits and pull requests.
+## Baseline status
+This repo is an **engineering baseline**, not a declaration that the entire game, final pixel art, 12 sword endings or Android wrapper have shipped. For frozen original SHA and checks see docs/BASELINE.md.

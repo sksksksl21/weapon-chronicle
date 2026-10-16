@@ -1,0 +1,151 @@
+{
+  "results": [
+    {
+      "name": "harness visible",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "no retroactive tasks",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "winds followup available",
+      "passed": true,
+      "detail": "['wc51_winds']"
+    },
+    {
+      "name": "winds history news changes",
+      "passed": true,
+      "detail": "항해 소식: 이타카 접근 항로 보존"
+    },
+    {
+      "name": "side quest launch",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "first scene has 2 choices",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "branch specific resolution",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "aftermath persisted",
+      "passed": true,
+      "detail": "{'winds': {'path': 'a', 'text': '표류의 경위가 기록되어 다음 항구에서도 항해사들의 증언을 들을 수 있게 됐다.', 'year': 1, 'month': 1, 'owner': '이름 없는 선원'}}"
+    },
+    {
+      "name": "aftermath completed removed from candidates",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "aftermath ledger unique",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "NPC rumor on contact list",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "NPC can discuss changed world",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "NPC reply reflects history",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "normal quest test no JS error",
+      "passed": true,
+      "detail": "[]"
+    },
+    {
+      "name": "a 8 pivots",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "a ending preserved",
+      "passed": true,
+      "detail": "council"
+    },
+    {
+      "name": "a unique ending followup",
+      "passed": true,
+      "detail": "['wc51_post_council', 'wc51_circe']"
+    },
+    {
+      "name": "a no incorrect postgame",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "a stage 41 history banner",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "a no JS exceptions",
+      "passed": true,
+      "detail": "[]"
+    },
+    {
+      "name": "b 8 pivots",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "b ending preserved",
+      "passed": true,
+      "detail": "fracture"
+    },
+    {
+      "name": "b unique ending followup",
+      "passed": true,
+      "detail": "['wc51_post_fracture', 'wc51_fleet']"
+    },
+    {
+      "name": "b no incorrect postgame",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "b stage 41 history banner",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "b no JS exceptions",
+      "passed": true,
+      "detail": "[]"
+    },
+    {
+      "name": "legacy no fabricated aftermath",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "small mobile no horizontal overflow",
+      "passed": true,
+      "detail": "None"
+    },
+    {
+      "name": "legacy no JS exceptions",
+      "passed": true,
+      "detail": "[]"
+    }
+  ],
+  "passed": 29,
+  "total": 29
+}

@@ -1,0 +1,91 @@
+{
+  "results": [
+    {
+      "name": "council harness",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "council 32 chapter records",
+      "passed": true,
+      "details": "32"
+    },
+    {
+      "name": "council 8 historical pivots",
+      "passed": true,
+      "details": "{'winds': 'sealed', 'fleet': 'evacuated', 'circe': 'allied', 'prophecy': 'heeded', 'cattle': 'spared', 'testimony': 'truth', 'palace': 'parley', 'suitors': 'mercy'}"
+    },
+    {
+      "name": "council ending",
+      "passed": true,
+      "details": "{'key': 'council', 'title': '이타카의 새 맹약', 'subtitle': '왕권 공유 · 시민과 가문의 합의', 'body': '구혼자를 죽이는 대신 재판에 세운 결과, 이타카는 예전과 같은 왕국으로 돌아가지 않았다. 오디세우스와 텔레마코스는 각 가문의 대표 앞에서 새로운 통치의 맹약을 받아들였다.'}"
+    },
+    {
+      "name": "council history ledger",
+      "passed": true,
+      "details": "9"
+    },
+    {
+      "name": "council no JS errors",
+      "passed": true,
+      "details": "[]"
+    },
+    {
+      "name": "fracture harness",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "fracture 32 chapter records",
+      "passed": true,
+      "details": "32"
+    },
+    {
+      "name": "fracture 8 historical pivots",
+      "passed": true,
+      "details": "{'winds': 'opened', 'fleet': 'devastated', 'circe': 'hostile', 'prophecy': 'defied', 'cattle': 'slaughtered', 'testimony': 'silence', 'palace': 'assault', 'suitors': 'vengeance'}"
+    },
+    {
+      "name": "fracture ending",
+      "passed": true,
+      "details": "{'key': 'fracture', 'title': '끝나지 않은 이타카의 피', 'subtitle': '복위 후 내분 · 대립하는 가문', 'body': '궁전은 탈환됐지만 복수는 끝나지 않았다. 구혼자 가문의 원한과 서로 다른 증언이 이타카를 갈랐다. 누가 왕인가보다 누가 살아남았는지가 후세의 기록이 됐다.'}"
+    },
+    {
+      "name": "fracture history ledger",
+      "passed": true,
+      "details": "9"
+    },
+    {
+      "name": "fracture no JS errors",
+      "passed": true,
+      "details": "[]"
+    },
+    {
+      "name": "pivot presents distinct choices",
+      "passed": true,
+      "details": ""
+    },
+    {
+      "name": "choice buttons available",
+      "passed": true,
+      "details": "2"
+    },
+    {
+      "name": "pivot changes next scene",
+      "passed": true,
+      "details": "MAIN STREAM · 제2장 「바람과 마술의 섬」 · CHAPTER 2/8\n가까워진 등불\n1년차 1월\nHP\n74\n정신\n52\n공명\n70/70\n검 내구\n68\n보급\n3\n함선\n100%\n선원\n18\n현재 장\n2장 CH.2\n제2장 · 이타카 앞바다\n선택 이후 달라진 상황\n주머니"
+    },
+    {
+      "name": "followup replaces historical chapter",
+      "passed": true,
+      "details": "MAIN STREAM · 제2장 「바람과 마술의 섬」 · CHAPTER 3/8\n이타카 앞바다의 마지막 저항\n1년차 1월\nHP\n74\n정신\n52\n공명\n70/70\n검 내구\n68\n보급\n4\n함선\n100%\n선원\n18\n현재 장\n2장 CH.3\n제2장 · 이타카 앞바다\n이타카 앞바다의 마지막 저항\n이타"
+    },
+    {
+      "name": "UI no errors",
+      "passed": true,
+      "details": "[]"
+    }
+  ],
+  "passed": 17,
+  "total": 17
+}

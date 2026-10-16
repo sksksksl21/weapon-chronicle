@@ -1,0 +1,119 @@
+{
+  "checks": [
+    {
+      "name": "앱 부팅·기존 상태 화면",
+      "result": "PASS",
+      "detail": {
+        "year": 1,
+        "month": 1,
+        "generation": 1,
+        "gold": 68,
+        "owner": "이름 없는 선원",
+        "policy": null,
+        "subChoice": null
+      }
+    },
+    {
+      "name": "허브 모바일 390x844",
+      "result": "PASS",
+      "detail": {
+        "overflow_px": 0
+      }
+    },
+    {
+      "name": "허브 모바일 360x740",
+      "result": "PASS",
+      "detail": {
+        "overflow_px": 0
+      }
+    },
+    {
+      "name": "허브 모바일 320x568",
+      "result": "PASS",
+      "detail": {
+        "overflow_px": 0
+      }
+    },
+    {
+      "name": "중단 복구·GOLD 중복 방지",
+      "result": "PASS",
+      "detail": {
+        "before": 68,
+        "after": 68
+      }
+    },
+    {
+      "name": "다음 달 확정 후 복구하지 않음",
+      "result": "PASS",
+      "detail": {
+        "year": 1,
+        "month": 2,
+        "generation": 1,
+        "gold": 143,
+        "owner": "이름 없는 선원",
+        "policy": null,
+        "subChoice": null
+      }
+    },
+    {
+      "name": "저장 실패 시 체크포인트 유지·복구",
+      "result": "PASS",
+      "detail": null
+    },
+    {
+      "name": "확정 저장 후 체크포인트 삭제 실패 → 최신 상태 유지",
+      "result": "PASS",
+      "detail": {
+        "year": 1,
+        "month": 2,
+        "generation": 1,
+        "gold": 278,
+        "owner": "이름 없는 선원",
+        "policy": null,
+        "subChoice": null
+      }
+    },
+    {
+      "name": "12월 연말 결산에서는 체크포인트 유지",
+      "result": "PASS",
+      "detail": null
+    },
+    {
+      "name": "연말 결산 확정·차년도 정상 복원",
+      "result": "PASS",
+      "detail": {
+        "year": 2,
+        "month": 1,
+        "generation": 1,
+        "gold": 68,
+        "owner": "이름 없는 선원",
+        "policy": null,
+        "subChoice": null
+      }
+    },
+    {
+      "name": "검 단절·게임오버 저장 확정",
+      "result": "PASS",
+      "detail": null
+    },
+    {
+      "name": "사망·계승·검 부품·복원",
+      "result": "PASS",
+      "detail": {
+        "year": 1,
+        "month": 2,
+        "generation": 2,
+        "gold": 26,
+        "owner": "칼리스",
+        "policy": null,
+        "subChoice": null
+      }
+    },
+    {
+      "name": "체크포인트 손상 격리",
+      "result": "PASS",
+      "detail": null
+    }
+  ],
+  "passed": 13
+}

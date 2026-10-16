@@ -1,0 +1,231 @@
+{
+  "checks": [
+    {
+      "case": "winds opened",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "winds alternatives",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "winds outcome scene",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "winds committed once",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "winds cannot replay",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "fleet opened",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "fleet alternatives",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "fleet outcome scene",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "fleet committed once",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "fleet cannot replay",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "circe opened",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "circe alternatives",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "circe outcome scene",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "circe committed once",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "circe cannot replay",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "prophecy opened",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "prophecy alternatives",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "prophecy outcome scene",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "prophecy committed once",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "prophecy cannot replay",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "cattle opened",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "cattle alternatives",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "cattle outcome scene",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "cattle committed once",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "cattle cannot replay",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "testimony opened",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "testimony alternatives",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "testimony outcome scene",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "testimony committed once",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "testimony cannot replay",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "palace opened",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "palace alternatives",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "palace outcome scene",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "palace committed once",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "palace cannot replay",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "suitors opened",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "suitors alternatives",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "suitors outcome scene",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "suitors committed once",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "suitors cannot replay",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "all region consequences persisted",
+      "pass": true,
+      "detail": "['aegean', 'laestrygonia', 'aeaea', 'underworld', 'thrinacia', 'phaeacia', 'ithaca']"
+    },
+    {
+      "case": "8 unique aftermath records",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "postgame council playable",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "postgame committed",
+      "pass": true,
+      "detail": ""
+    },
+    {
+      "case": "no JS exceptions after full quest suite",
+      "pass": true,
+      "detail": "[]"
+    }
+  ],
+  "passed": 45,
+  "total": 45
+}

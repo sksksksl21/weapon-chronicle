@@ -1,0 +1,3 @@
+# Approved visual direction
+
+Target art: coherent, polished high-resolution pixel art evoking 16/32-bit games while respecting ancient Mediterranean/Odyssey costumes, environments and chronology. Transparent item/monster sprites are separate from scenery. Avoid mixing painterly realism with pixel characters. Do not crop sword parts out of cutscenes; create aligned part assets with shared anchors so assembled sword changes when equipped parts change. Keep layout and character scale fixed during hits/debate; overlay visual effects instead of scaling or relocating actors. Current v5.2 images are **legacy transitional material**, not signed-off final assets. Replace assets incrementally with explicit compare renders and device checks.

@@ -1,0 +1,181 @@
+{
+  "passed": 35,
+  "total": 35,
+  "results": [
+    {
+      "name": "all act1 events 8",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "positive ACT I influences support",
+      "passed": true,
+      "details": "2"
+    },
+    {
+      "name": "act1_departure available",
+      "passed": true,
+      "details": "['wc51_act1_departure']"
+    },
+    {
+      "name": "act1_departure start",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_departure choice A/B",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_departure outcome",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_departure completion persistent",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_departure cannot repeat",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_departure month result button",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_ismaros available",
+      "passed": true,
+      "details": "['wc51_act1_ismaros', 'wc51_act1_identity']"
+    },
+    {
+      "name": "act1_ismaros start",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_ismaros choice A/B",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_ismaros outcome",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_ismaros completion persistent",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_ismaros cannot repeat",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_ismaros month result button",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_lotus available",
+      "passed": true,
+      "details": "['wc51_act1_lotus']"
+    },
+    {
+      "name": "act1_lotus start",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_lotus choice A/B",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_lotus outcome",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_lotus completion persistent",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_lotus cannot repeat",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_lotus month result button",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_identity available",
+      "passed": true,
+      "details": "['wc51_act1_identity']"
+    },
+    {
+      "name": "act1_identity start",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_identity choice A/B",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_identity outcome",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_identity completion persistent",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_identity cannot repeat",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "act1_identity month result button",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "four aftermath ledgers written",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "no JS errors after 4 quests",
+      "passed": true,
+      "details": "[]"
+    },
+    {
+      "name": "act1 records survive reboot",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "sidequests remain completed across reboot",
+      "passed": true,
+      "details": "None"
+    },
+    {
+      "name": "rebuilt screen no errors",
+      "passed": true,
+      "details": "[]"
+    }
+  ]
+}

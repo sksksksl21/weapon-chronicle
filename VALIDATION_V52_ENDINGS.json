@@ -1,0 +1,36 @@
+{
+  "passed": 6,
+  "total": 6,
+  "results": [
+    {
+      "name": "both stories complete through 40 chapters",
+      "passed": true,
+      "details": "(32, 32)"
+    },
+    {
+      "name": "positive ACT I leads to new Ithaca pact",
+      "passed": true,
+      "details": "{'ending': 'council', 'support': 3, 'act1': {'departure': 'sheltered', 'ismaros': 'documented', 'counterattack': 'rearguard', 'lotus': 'awakened', 'missing': 'escorted', 'goatpath': 'detour', 'cyclops': 'blindspot', 'identity': 'silent'}, 'chapters': 32, 'errors': []}"
+    },
+    {
+      "name": "negative ACT I leads to civil fracture",
+      "passed": true,
+      "details": "{'ending': 'fracture', 'support': 0, 'act1': {'departure': 'dispersed', 'ismaros': 'covert', 'counterattack': 'barricade', 'lotus': 'windward', 'missing': 'diverted', 'goatpath': 'held', 'cyclops': 'herd', 'identity': 'true'}, 'chapters': 32, 'errors': []}"
+    },
+    {
+      "name": "same later decisions, different ending",
+      "passed": true,
+      "details": "('council', 'fracture')"
+    },
+    {
+      "name": "support difference from ACT I is material",
+      "passed": true,
+      "details": "(3, 0)"
+    },
+    {
+      "name": "no JS errors in both 40-chapter simulations",
+      "passed": true,
+      "details": "([], [])"
+    }
+  ]
+}

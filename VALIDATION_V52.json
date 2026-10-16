@@ -1,0 +1,201 @@
+{
+  "passed": 39,
+  "total": 39,
+  "results": [
+    {
+      "name": "v52 harness",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "fresh ACT I has no invented history",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ACT I CH1 committed",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ACT I CH2 committed",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ACT I CH3 committed",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ACT I CH4 committed",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ACT I CH5 committed",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ACT I CH6 committed",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ACT I CH7 committed",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ACT I CH8 committed",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "eight first-act pivots",
+      "passed": true,
+      "detail": "{'departure': 'sheltered', 'ismaros': 'documented', 'counterattack': 'rearguard', 'lotus': 'awakened', 'missing': 'escorted', 'goatpath': 'detour', 'cyclops': 'blindspot', 'identity': 'silent'}"
+    },
+    {
+      "name": "eight unique historical events",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "initial CH1 resource effect",
+      "passed": true,
+      "detail": "{'crew': 1, 'supplies': -1}"
+    },
+    {
+      "name": "last CH8 anonymous route",
+      "passed": true,
+      "detail": "silent"
+    },
+    {
+      "name": "repeat ACT I commit refused",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "late path cannot change finalized identity",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "world in subsequent CH9 changes",
+      "passed": true,
+      "detail": "폴리페모스의 절벽을 벗어난 뒤 바람은 예고 없이 방향을 바꿨다. 먼 바다의 섬에는 청동문보다 높은 성벽과 하늘을 올려다보는 사람이 있었다. 아이올로스는 손님을 맞았지만 바람을 다루는 법은 알려주지 않았다.\n\n누가 거인의 눈을 다치게 했는지 항구에는 알려지지 않았다."
+    },
+    {
+      "name": "world in subsequent CH31 changes",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "later chapter history echoes first act",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ACT I postgame quests unlocked",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "first-act completion unlocks subsequent story",
+      "passed": true,
+      "detail": "9"
+    },
+    {
+      "name": "NPC sees first-act consequences",
+      "passed": true,
+      "detail": "절벽에서 이름을 숨긴 선원들"
+    },
+    {
+      "name": "chapter variants no JavaScript errors",
+      "passed": true,
+      "detail": "[]"
+    },
+    {
+      "name": "ACT I actual scene records earlier choice",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ACT I scene no JS errors",
+      "passed": true,
+      "detail": "[]"
+    },
+    {
+      "name": "alternative route recorded",
+      "passed": true,
+      "detail": "{'departure': 'dispersed', 'ismaros': 'covert', 'counterattack': 'barricade', 'lotus': 'forgotten', 'missing': 'diverted', 'goatpath': 'held', 'cyclops': 'herd', 'identity': 'true'}"
+    },
+    {
+      "name": "defeat does not grant rescued sailors",
+      "passed": true,
+      "detail": "{'departure': 'dispersed', 'ismaros': 'covert', 'counterattack': 'barricade', 'lotus': 'forgotten', 'missing': 'diverted', 'goatpath': 'held', 'cyclops': 'herd', 'identity': 'true'}"
+    },
+    {
+      "name": "route survives ACT II chapter simulation",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ACT I support can be negative",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "no exceptions for alternate route",
+      "passed": true,
+      "detail": "[]"
+    },
+    {
+      "name": "imported chapter has no inferred pivot",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "cannot retroactively change imported chapter",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "mobile no horizontal overflow",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "legacy no JS exceptions",
+      "passed": true,
+      "detail": "[]"
+    },
+    {
+      "name": "ACT I first scene contains chapter intro",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ACT I path buttons shown",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ACT I actual click sets path",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "ACT I boss context ready",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "real click no JS exceptions",
+      "passed": true,
+      "detail": "[]"
+    }
+  ]
+}

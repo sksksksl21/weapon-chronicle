@@ -1,0 +1,15 @@
+{
+  "name": "weapon-chronicle",
+  "version": "5.2.0-codex-baseline",
+  "private": true,
+  "description": "Weapon Chronicle — Codex managed Odyssey life simulator",
+  "scripts": {
+    "build": "python3 tools/build.py",
+    "check": "python3 tools/verify_baseline.py",
+    "dev": "python3 -m http.server 5173 --bind 0.0.0.0",
+    "test:smoke": "python3 tests/ui_smoke.py",
+    "test:regression": "python3 tests/regression.py",
+    "test:story": "bash scripts/test-story.sh"
+  },
+  "engines": {"node": ">=22"}
+}

@@ -1,0 +1,13 @@
+{
+  "name": "Weapon Chronicle — Codex",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {"version": "3.11"}
+  },
+  "postCreateCommand": "bash scripts/setup.sh",
+  "forwardPorts": [5173],
+  "portsAttributes": {
+    "5173": {"label": "Weapon Chronicle Web Preview", "onAutoForward": "openPreview"}
+  },
+  "remoteUser": "node"
+}
