@@ -1,0 +1,396 @@
+{
+  "audited_commit": "9ce44c1319a8ec4cb66e611aa3a36324bbe0cdc8",
+  "observed_at": "2026-10-18",
+  "method": "Read-only injected closures in Chromium; synthetic in-memory localStorage; menu-open layout probes; deterministic 100-bin fate sampling; isolated combat recycle and overdrive probes. Not full gameplay or Android QA.",
+  "main_ci_run": 39089346517,
+  "embedded_combat_git_blob": "2c19273d555cab4fbb8c97b1d4023a9ea9db4fe6",
+  "menus": [
+    {
+      "width": 320,
+      "menu": "status",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "상태 정보\n닫기\n이름 없는 선원과 검의 성장 구조\n소유자\n장비\n무기\n전투\n소유자\n현재 소유",
+      "tradeColumns": null
+    },
+    {
+      "width": 320,
+      "menu": "inventory",
+      "bodyOverflow": 0,
+      "modalOverflow": 1,
+      "heading": "인벤토리\n닫기\n종류마다 독립된 가방. 장착품은 보관칸을 차지하지 않는다.\n소모품\n0/12\n",
+      "tradeColumns": null
+    },
+    {
+      "width": 320,
+      "menu": "market",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "시장\n닫기\n검 부품은 시장에서 거래하지 않는다. 사람의 몸과 생활에 필요한 물건만 취급한다",
+      "tradeColumns": null
+    },
+    {
+      "width": 320,
+      "menu": "armorMarket",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "시장 · 방어구\n닫기\nGOLD 68G · 방어구 보관함 0/12\n회복약 상인\n방어구 상인\n",
+      "tradeColumns": "151.312px 139.688px"
+    },
+    {
+      "width": 320,
+      "menu": "smith",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "대장간\n닫기\n검에 관련된 거래와 작업은 이곳에서만 한다. 소유자의 방어구와 생활용품은 시장",
+      "tradeColumns": null
+    },
+    {
+      "width": 320,
+      "menu": "smithBuy",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "대장간 · 구매\n닫기\n완성 검 부품은 시장이 아니라 대장간을 통해 유통된다. 우측 장착 파",
+      "tradeColumns": "151.312px 139.688px"
+    },
+    {
+      "width": 320,
+      "menu": "smithCraft",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "대장간 · 제작\n닫기\n발견했거나 기억으로 알아낸 제작법만 나타난다. 우측의 장착 파츠를 누",
+      "tradeColumns": "151.312px 139.688px"
+    },
+    {
+      "width": 320,
+      "menu": "temple",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "신전 · 치료실\n닫기\n이번 달 1회 이용 · GOLD 68G · 현재 HP 74/90 · ",
+      "tradeColumns": null
+    },
+    {
+      "width": 320,
+      "menu": "visit",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "방문 · 인물 대화\n닫기\n공명 메뉴 없이 거점에 있는 인물과 직접 이야기를 나눈다.\n미라\n",
+      "tradeColumns": null
+    },
+    {
+      "width": 320,
+      "menu": "weapon",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "무기 관리\n닫기\n현재 검의 실제 조립 상태 · 부품 교체는 즉시 반영된다.\n단조 철 장검날",
+      "tradeColumns": null
+    },
+    {
+      "width": 360,
+      "menu": "status",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "상태 정보\n닫기\n이름 없는 선원과 검의 성장 구조\n소유자\n장비\n무기\n전투\n소유자\n현재 소유",
+      "tradeColumns": null
+    },
+    {
+      "width": 360,
+      "menu": "inventory",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "인벤토리\n닫기\n종류마다 독립된 가방. 장착품은 보관칸을 차지하지 않는다.\n소모품\n0/12\n",
+      "tradeColumns": null
+    },
+    {
+      "width": 360,
+      "menu": "market",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "시장\n닫기\n검 부품은 시장에서 거래하지 않는다. 사람의 몸과 생활에 필요한 물건만 취급한다",
+      "tradeColumns": null
+    },
+    {
+      "width": 360,
+      "menu": "armorMarket",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "시장 · 방어구\n닫기\nGOLD 68G · 방어구 보관함 0/12\n회복약 상인\n방어구 상인\n",
+      "tradeColumns": "176.578px 150.422px"
+    },
+    {
+      "width": 360,
+      "menu": "smith",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "대장간\n닫기\n검에 관련된 거래와 작업은 이곳에서만 한다. 소유자의 방어구와 생활용품은 시장",
+      "tradeColumns": null
+    },
+    {
+      "width": 360,
+      "menu": "smithBuy",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "대장간 · 구매\n닫기\n완성 검 부품은 시장이 아니라 대장간을 통해 유통된다. 우측 장착 파",
+      "tradeColumns": "176.578px 150.422px"
+    },
+    {
+      "width": 360,
+      "menu": "smithCraft",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "대장간 · 제작\n닫기\n발견했거나 기억으로 알아낸 제작법만 나타난다. 우측의 장착 파츠를 누",
+      "tradeColumns": "176.578px 150.422px"
+    },
+    {
+      "width": 360,
+      "menu": "temple",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "신전 · 치료실\n닫기\n이번 달 1회 이용 · GOLD 68G · 현재 HP 74/90 · ",
+      "tradeColumns": null
+    },
+    {
+      "width": 360,
+      "menu": "visit",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "방문 · 인물 대화\n닫기\n공명 메뉴 없이 거점에 있는 인물과 직접 이야기를 나눈다.\n미라\n",
+      "tradeColumns": null
+    },
+    {
+      "width": 360,
+      "menu": "weapon",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "무기 관리\n닫기\n현재 검의 실제 조립 상태 · 부품 교체는 즉시 반영된다.\n단조 철 장검날",
+      "tradeColumns": null
+    },
+    {
+      "width": 390,
+      "menu": "status",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "상태 정보\n닫기\n이름 없는 선원과 검의 성장 구조\n소유자\n장비\n무기\n전투\n소유자\n현재 소유",
+      "tradeColumns": null
+    },
+    {
+      "width": 390,
+      "menu": "inventory",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "인벤토리\n닫기\n종류마다 독립된 가방. 장착품은 보관칸을 차지하지 않는다.\n소모품\n0/12\n",
+      "tradeColumns": null
+    },
+    {
+      "width": 390,
+      "menu": "market",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "시장\n닫기\n검 부품은 시장에서 거래하지 않는다. 사람의 몸과 생활에 필요한 물건만 취급한다",
+      "tradeColumns": null
+    },
+    {
+      "width": 390,
+      "menu": "armorMarket",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "시장 · 방어구\n닫기\nGOLD 68G · 방어구 보관함 0/12\n회복약 상인\n방어구 상인\n",
+      "tradeColumns": "192.766px 164.234px"
+    },
+    {
+      "width": 390,
+      "menu": "smith",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "대장간\n닫기\n검에 관련된 거래와 작업은 이곳에서만 한다. 소유자의 방어구와 생활용품은 시장",
+      "tradeColumns": null
+    },
+    {
+      "width": 390,
+      "menu": "smithBuy",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "대장간 · 구매\n닫기\n완성 검 부품은 시장이 아니라 대장간을 통해 유통된다. 우측 장착 파",
+      "tradeColumns": "192.766px 164.234px"
+    },
+    {
+      "width": 390,
+      "menu": "smithCraft",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "대장간 · 제작\n닫기\n발견했거나 기억으로 알아낸 제작법만 나타난다. 우측의 장착 파츠를 누",
+      "tradeColumns": "192.766px 164.234px"
+    },
+    {
+      "width": 390,
+      "menu": "temple",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "신전 · 치료실\n닫기\n이번 달 1회 이용 · GOLD 68G · 현재 HP 74/90 · ",
+      "tradeColumns": null
+    },
+    {
+      "width": 390,
+      "menu": "visit",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "방문 · 인물 대화\n닫기\n공명 메뉴 없이 거점에 있는 인물과 직접 이야기를 나눈다.\n미라\n",
+      "tradeColumns": null
+    },
+    {
+      "width": 390,
+      "menu": "weapon",
+      "bodyOverflow": 0,
+      "modalOverflow": 0,
+      "heading": "무기 관리\n닫기\n현재 검의 실제 조립 상태 · 부품 교체는 즉시 반영된다.\n단조 철 장검날",
+      "tradeColumns": null
+    }
+  ],
+  "runtime": {
+    "chapters": {
+      "first": 8,
+      "later": 32,
+      "laterNumbers": [
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40
+      ]
+    },
+    "parts": [
+      "blade",
+      "guard",
+      "tang",
+      "grip",
+      "wrap",
+      "pommel",
+      "seat",
+      "scabbard"
+    ],
+    "armor": [
+      "helmet",
+      "armor",
+      "gloves",
+      "boots"
+    ],
+    "mentalMax": 100,
+    "ownerStatKeys": [
+      "martial",
+      "survival",
+      "social"
+    ],
+    "routines": {
+      "contract": 6,
+      "explore": 6,
+      "investigate": 6,
+      "rest": 3
+    },
+    "odysseyIncidents": 180,
+    "worldEndings": [
+      "restored",
+      "council",
+      "fracture",
+      "exile",
+      "legacy"
+    ],
+    "debatableSkills": [
+      "break",
+      "press",
+      "calm",
+      "reset"
+    ],
+    "bags": {
+      "consumable": {
+        "name": "소모품 가방",
+        "cap": 12,
+        "icon": "✚"
+      },
+      "material": {
+        "name": "재료 주머니",
+        "cap": 20,
+        "icon": "◆"
+      },
+      "armor": {
+        "name": "방어구 보관함",
+        "cap": 12,
+        "icon": "⛨"
+      },
+      "part": {
+        "name": "검 부품 보관함",
+        "cap": 16,
+        "icon": "⚒"
+      }
+    },
+    "visualParts": [
+      "scabbard",
+      "blade",
+      "guard",
+      "grip",
+      "pommel"
+    ]
+  },
+  "fatePercent": {
+    "shatter": 10,
+    "lost": 20,
+    "inherit": 30,
+    "escape": 40
+  },
+  "voluntarySuccession": {
+    "result": false,
+    "unchanged": true
+  },
+  "debate": {
+    "hp": 80,
+    "enemyAttack": 19,
+    "skillCount": 4
+  },
+  "pageErrors": [],
+  "combat": {
+    "initial": {
+      "baseDeck": 12,
+      "initialHand": 4,
+      "maxCardUses": 1,
+      "deck": 8
+    },
+    "recycleProbe": {
+      "hand": [
+        "aim1"
+      ],
+      "deck": 0,
+      "discard": 0
+    },
+    "overdriveProbe": {
+      "before": 1,
+      "after": 2
+    },
+    "pageErrors": []
+  }
+}
