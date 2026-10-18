@@ -20,6 +20,7 @@ probe="""window.__wcTest={
  checkpointKey:V482_CHECKPOINT_KEY,
  noticeKey:V482_RECOVERY_NOTICE_KEY,
  recover:()=>v482RecoverPendingAction(),
+ commit:()=>v482CommitAction(),
  checkpointCheck:(s,c)=>v483IsDurablyCommitted(s,c),
  goGameOver:()=>{state.storyCtx=null;state.activeStory=null;state.policy=null;state.subChoice=null;state.gameOver={type:'lost',year:state.year,month:state.month};return saveGame();}
 };"""
@@ -256,6 +257,30 @@ with sync_playwright() as p:
     assert_msg(inspect(page)==committed,'read retry rolled back committed progress')
     assert_msg(not errs,repr(errs))
     record('P1 읽기 실패 차단·확정 저장 보존·재시도: '+read_key);page.close()
+
+ # P1. A later date alone cannot prove a structurally invalid save is committed.
+ for write_fault in [False,True]:
+    page,errs=fresh()
+    page.evaluate('__wcTest.state().gold=345')
+    choose_start(page)
+    raw=page.evaluate('__wcTest.checkpoint()')
+    snapshot=json.loads(raw)['state']
+    page.evaluate('''()=>{const s=__wcTest.state();localStorage.setItem(__wcTest.saveKey,JSON.stringify({year:s.year+1,month:s.month,generation:s.generation}));}''')
+    invalid_save=page.evaluate('localStorage.getItem(__wcTest.saveKey)')
+    assert_msg(not page.evaluate('__wcTest.commit()'),'invalid future save accepted as committed')
+    assert_msg(page.evaluate('__wcTest.checkpoint()')==raw,'commit deleted valid rollback for invalid save')
+    if write_fault:page.evaluate('window.__throwWriteKey=__wcTest.saveKey')
+    page.set_content(instrument,wait_until='load',timeout=30000)
+    if write_fault:
+       assert_msg(page.locator('#retryCheckpointRecovery').count()==1,'invalid future save allowed failed rollback to continue')
+       assert_msg(page.evaluate('__wcTest.checkpoint()')==raw,'failed rollback deleted valid checkpoint')
+       assert_msg(page.evaluate('localStorage.getItem(__wcTest.saveKey)')==invalid_save,'failed rollback changed save')
+       page.evaluate('window.__throwWriteKey=null')
+       restart_view(page)
+    assert_msg(not ck(page),'successful recovery retained checkpoint')
+    assert_msg(inspect(page)['gold']==snapshot['gold'],'invalid future save lost recoverable campaign')
+    assert_msg(not errs,repr(errs))
+    record('P1 미래 날짜 손상 저장의 확정 판정 거부·복구: '+str(write_fault));page.close()
 
  # K. A notice removal failure is cosmetic and cannot roll back a durable save.
  page,errs=fresh();choose_start(page)

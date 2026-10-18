@@ -1,6 +1,8 @@
 /* v4.8.3: commit proof and interrupted-write recovery. No gameplay rebalance. */
 function v483IsDurablyCommitted(snapshot, checkpoint) {
   if(!snapshot || !checkpoint || !checkpoint.state) return false;
+  // The normal loader must accept this save before it can supersede rollback.
+  try{v48ValidateLoadedData(snapshot);}catch(_){return false;}
   const sy=Number(snapshot.year), sm=Number(snapshot.month), sg=Number(snapshot.generation);
   const cy=Number(checkpoint.year), cm=Number(checkpoint.month), cg=Number(checkpoint.generation);
   if(![sy,sm,sg,cy,cm,cg].every(Number.isFinite)) return false;
