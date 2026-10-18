@@ -18,18 +18,21 @@ probe="""window.__wcTest={
  inspect:()=>({year:state.year,month:state.month,generation:state.generation,gold:state.gold,owner:state.owner.name,policy:state.policy,subChoice:state.subChoice}),
  saveKey:SAVE_KEY,
  checkpointKey:V482_CHECKPOINT_KEY,
+ noticeKey:V482_RECOVERY_NOTICE_KEY,
+ recover:()=>v482RecoverPendingAction(),
+ commit:()=>v482CommitAction(),
  checkpointCheck:(s,c)=>v483IsDurablyCommitted(s,c),
  goGameOver:()=>{state.storyCtx=null;state.activeStory=null;state.policy=null;state.subChoice=null;state.gameOver={type:'lost',year:state.year,month:state.month};return saveGame();}
 };"""
-needle='v48EnsureState();\nif(loadGame())'
+needle='v48EnsureState();\nconst v483Loaded=loadGame();'
 assert html.count(needle)==1
 instrument=html.replace(needle,probe+'\n'+needle)
 
 MEMORY='''
   Object.defineProperty(window,'localStorage',{configurable:true,value:{
-    getItem:(k)=>window.__xstore?.[k]??null,
-    setItem:(k,v)=>{if(window.__throwSave && k==='weaponChronicleLifeHubV30')throw Error('artificial save failure');window.__xstore=window.__xstore||{};window.__xstore[k]=String(v)},
-    removeItem:(k)=>{if(window.__throwCleanup && k.includes('checkpoint-v482'))throw Error('artificial remove failure');delete window.__xstore[k]},
+    getItem:(k)=>{if(k===window.__throwReadKey)throw Error('artificial keyed read failure');return window.__xstore?.[k]??null},
+    setItem:(k,v)=>{if(k===window.__throwWriteKey)throw Error('artificial keyed write failure');if(window.__throwSave && k==='weaponChronicleLifeHubV30')throw Error('artificial save failure');window.__xstore=window.__xstore||{};window.__xstore[k]=String(v)},
+    removeItem:(k)=>{if(k===window.__throwRemoveKey)throw Error('artificial keyed remove failure');if(window.__throwCleanup && k.includes('checkpoint-v482'))throw Error('artificial remove failure');delete window.__xstore[k]},
     clear:()=>{window.__xstore={}}
   }});
 '''
@@ -165,6 +168,149 @@ with sync_playwright() as p:
  assert_msg(page.evaluate('!!localStorage.getItem(__wcTest.checkpointKey+".invalid")'),'invalid checkpoint not quarantined')
  record('체크포인트 손상 격리')
  page.close()
+
+ # J. Recovery I/O failures must never quarantine a valid checkpoint.
+ for fault in ['save', 'notice', 'cleanup']:
+    page,errs=fresh();choose_start(page)
+    raw=page.evaluate('__wcTest.checkpoint()')
+    snapshot=json.loads(raw)['state']
+    page.evaluate("()=>{const s=__wcTest.state();s.gold+=777;s.worldHistory.push({id:'test:quest-reward'});__wcTest.save()}")
+    saved=page.evaluate('localStorage.getItem(__wcTest.saveKey)')
+    page.evaluate("(fault)=>{if(fault==='save')window.__throwWriteKey=__wcTest.saveKey;if(fault==='notice')window.__throwWriteKey=__wcTest.noticeKey;if(fault==='cleanup')window.__throwRemoveKey=__wcTest.checkpointKey}",fault)
+    # Reboot with the fault still enabled (the original missing regression).
+    page.set_content(instrument,wait_until='load',timeout=30000)
+    assert_msg(page.evaluate('__wcTest.checkpoint()')==raw, fault+': live checkpoint changed')
+    assert_msg(not page.evaluate('localStorage.getItem(__wcTest.checkpointKey+".invalid")'),fault+': valid payload quarantined')
+    durable=page.evaluate('localStorage.getItem(__wcTest.saveKey)')
+    assert_msg(durable==(saved if fault=='save' else json.dumps(snapshot,ensure_ascii=False,separators=(',',':'))),fault+': unexpected durable data')
+    page.evaluate('window.__throwWriteKey=null;window.__throwRemoveKey=null')
+    restart_view(page)
+    assert_msg(inspect(page)['gold']==snapshot['gold'],fault+': retry kept transient reward')
+    assert_msg(not page.evaluate('__wcTest.state().worldHistory.some(x=>x.id==="test:quest-reward")'),fault+': quest reward survived rollback')
+    # Replay and settle once; repeated launches must keep exactly one reward.
+    choose_start(page)
+    page.evaluate("()=>{const s=__wcTest.state();s.gold+=777;s.worldHistory.push({id:'test:quest-reward'});s.storyCtx=null;s.activeStory=null;s.policy=null;s.subChoice=null;__wcTest.advance()}")
+    committed=inspect(page)
+    for _ in range(2):
+       restart_view(page)
+       assert_msg(inspect(page)==committed,fault+': repeated load changed settlement')
+       assert_msg(page.evaluate('__wcTest.state().worldHistory.filter(x=>x.id==="test:quest-reward").length')==1,fault+': duplicate quest reward')
+    assert_msg(committed['gold']==snapshot['gold']+777,fault+': reward paid more than once')
+    assert_msg(not errs,repr(errs))
+    record('복구 실패·원문 유지·재시도·월/퀘스트 보상 1회: '+fault)
+    page.close()
+
+ # P1. A failed rollback must not expose the interrupted save or initialize a month.
+ page,errs=fresh();choose_start(page)
+ raw=page.evaluate('__wcTest.checkpoint()');snapshot=json.loads(raw)['state']
+ page.evaluate("()=>{const s=__wcTest.state();s.gold+=777;s.worldHistory.push({id:'test:blocked-reward'});__wcTest.save()}")
+ saved=page.evaluate('localStorage.getItem(__wcTest.saveKey)')
+ page.evaluate('window.__throwWriteKey=__wcTest.saveKey')
+ page.set_content(instrument,wait_until='load',timeout=30000)
+ assert_msg(page.locator('#retryCheckpointRecovery').count()==1,'rollback failure did not block startup')
+ assert_msg(page.locator('#closeModal').count()==0,'recovery dialog is dismissible')
+ assert_msg(page.evaluate('__wcTest.state().monthFacts.length')==0,'blocked startup generated a month')
+ assert_msg(inspect(page)['gold']!=snapshot['gold']+777,'interrupted rewards loaded into memory')
+ for _ in range(2):
+    page.locator('#overlay').click(position={'x':2,'y':2})
+    page.keyboard.press('Escape');page.keyboard.press('Tab')
+    assert_msg(page.locator('#overlay.show #retryCheckpointRecovery').count()==1,'blocked recovery dismissed')
+    assert_msg(page.evaluate('localStorage.getItem(__wcTest.saveKey)')==saved,'blocked input changed durable save')
+    assert_msg(page.evaluate('__wcTest.checkpoint()')==raw,'blocked input changed checkpoint')
+ # Exercise the actual retry button under a real routed-document reload.
+ store=page.evaluate('window.__xstore')
+ retry_calls=[]
+ def retry_route(route):
+    retry_calls.append(True)
+    fault='"weaponChronicleLifeHubV30"' if len(retry_calls)==1 else 'null'
+    setup=MEMORY+'\nwindow.__xstore='+json.dumps(store)+';window.__throwWriteKey='+fault+';'
+    route.fulfill(status=200,content_type='text/html',body=instrument.replace('<script>','<script>'+setup,1))
+ retry_page=browser.new_page(viewport={'width':390,'height':844})
+ retry_page.route('http://checkpoint.test/',retry_route)
+ retry_page.goto('http://checkpoint.test/')
+ assert_msg(retry_page.locator('#retryCheckpointRecovery').count()==1,'retry fixture not blocked')
+ with retry_page.expect_navigation():retry_page.locator('#retryCheckpointRecovery').click()
+ assert_msg(len(retry_calls)==2,'retry did not reload')
+ assert_msg(retry_page.locator('#retryCheckpointRecovery').count()==0,'retry stayed blocked')
+ assert_msg(inspect(retry_page)['gold']==snapshot['gold'],'retry did not restore action-start gold')
+ assert_msg(not ck(retry_page),'successful retry retained checkpoint')
+ assert_msg(not retry_page.evaluate('__wcTest.state().worldHistory.some(x=>x.id==="test:blocked-reward")'),'retry retained interrupted reward')
+ record('P1 복구 실패 진행 차단·닫기 방지·실제 재시도');retry_page.close();page.close()
+
+ # A read error cannot establish commit status. Preserve a completed save as
+ # well as the pending checkpoint until the next successful read.
+ for read_key in ['saveKey','checkpointKey']:
+    page,errs=fresh();choose_start(page)
+    page.evaluate('window.__throwCleanup=true')
+    page.evaluate('''()=>{const s=__wcTest.state();s.gold+=210;s.storyCtx=null;s.activeStory=null;s.policy=null;s.subChoice=null;__wcTest.advance()}''')
+    committed=inspect(page)
+    raw=page.evaluate('__wcTest.checkpoint()')
+    saved=page.evaluate('localStorage.getItem(__wcTest.saveKey)')
+    page.evaluate('(key)=>window.__throwReadKey=__wcTest[key]',read_key)
+    page.set_content(instrument,wait_until='load',timeout=30000)
+    assert_msg(page.locator('#retryCheckpointRecovery').count()==1,'SAVE_KEY read failure did not block')
+    assert_msg(page.evaluate('window.__xstore[__wcTest.saveKey]')==saved,'unreadable committed save overwritten')
+    assert_msg(page.evaluate('window.__xstore[__wcTest.checkpointKey]')==raw,'read failure changed checkpoint')
+    assert_msg(page.evaluate('__wcTest.state().monthFacts.length')==0,'read failure generated a month')
+    page.evaluate('window.__throwReadKey=null;window.__throwCleanup=false')
+    restart_view(page)
+    assert_msg(inspect(page)==committed,'read retry rolled back committed progress')
+    assert_msg(not errs,repr(errs))
+    record('P1 읽기 실패 차단·확정 저장 보존·재시도: '+read_key);page.close()
+
+ # P1. A later date alone cannot prove a structurally invalid save is committed.
+ for write_fault in [False,True]:
+    page,errs=fresh()
+    page.evaluate('__wcTest.state().gold=345')
+    choose_start(page)
+    raw=page.evaluate('__wcTest.checkpoint()')
+    snapshot=json.loads(raw)['state']
+    page.evaluate('''()=>{const s=__wcTest.state();localStorage.setItem(__wcTest.saveKey,JSON.stringify({year:s.year+1,month:s.month,generation:s.generation}));}''')
+    invalid_save=page.evaluate('localStorage.getItem(__wcTest.saveKey)')
+    assert_msg(not page.evaluate('__wcTest.commit()'),'invalid future save accepted as committed')
+    assert_msg(page.evaluate('__wcTest.checkpoint()')==raw,'commit deleted valid rollback for invalid save')
+    if write_fault:page.evaluate('window.__throwWriteKey=__wcTest.saveKey')
+    page.set_content(instrument,wait_until='load',timeout=30000)
+    if write_fault:
+       assert_msg(page.locator('#retryCheckpointRecovery').count()==1,'invalid future save allowed failed rollback to continue')
+       assert_msg(page.evaluate('__wcTest.checkpoint()')==raw,'failed rollback deleted valid checkpoint')
+       assert_msg(page.evaluate('localStorage.getItem(__wcTest.saveKey)')==invalid_save,'failed rollback changed save')
+       page.evaluate('window.__throwWriteKey=null')
+       restart_view(page)
+    assert_msg(not ck(page),'successful recovery retained checkpoint')
+    assert_msg(inspect(page)['gold']==snapshot['gold'],'invalid future save lost recoverable campaign')
+    assert_msg(not errs,repr(errs))
+    record('P1 미래 날짜 손상 저장의 확정 판정 거부·복구: '+str(write_fault));page.close()
+
+ # K. A notice removal failure is cosmetic and cannot roll back a durable save.
+ page,errs=fresh();choose_start(page)
+ page.evaluate('window.__throwRemoveKey=__wcTest.noticeKey')
+ restart_view(page)
+ recovered=inspect(page)
+ assert_msg(page.evaluate('!!localStorage.getItem(__wcTest.noticeKey)'),'notice fault not exercised')
+ page.evaluate('window.__throwRemoveKey=null')
+ restart_view(page)
+ assert_msg(inspect(page)==recovered,'notice retry changed game state')
+ assert_msg(not page.evaluate('localStorage.getItem(__wcTest.noticeKey)'),'notice not cleared on retry')
+ record('복구 알림 삭제 실패·다음 로드 재시도');page.close()
+
+ # L. Invalid shapes, failed quarantine writes/removal: keep original until isolated.
+ for payload in ['null', '{"version":481,"state":{}}', '{"version":482,"state":{"owner":{},"weapon":{}}}']:
+    page,errs=fresh()
+    saved=page.evaluate('localStorage.getItem(__wcTest.saveKey)')
+    page.evaluate('(raw)=>localStorage.setItem(__wcTest.checkpointKey,raw)',payload)
+    page.evaluate('window.__throwWriteKey=__wcTest.checkpointKey+".invalid"')
+    assert_msg(not page.evaluate('__wcTest.recover()'),'invalid recovery succeeded')
+    assert_msg(page.evaluate('__wcTest.checkpoint()')==payload,'failed quarantine lost original')
+    page.evaluate('window.__throwWriteKey=null;window.__throwRemoveKey=__wcTest.checkpointKey')
+    page.evaluate('__wcTest.recover()')
+    assert_msg(page.evaluate('__wcTest.checkpoint()')==payload,'failed removal lost original')
+    page.evaluate('window.__throwRemoveKey=null')
+    page.evaluate('__wcTest.recover()')
+    assert_msg(not ck(page),'invalid checkpoint not removed after quarantine')
+    assert_msg(page.evaluate('localStorage.getItem(__wcTest.checkpointKey+".invalid")')==payload,'quarantine changed payload')
+    assert_msg(page.evaluate('localStorage.getItem(__wcTest.saveKey)')==saved,'invalid checkpoint changed save')
+    record('손상 데이터·격리 실패 재시도: '+payload);page.close()
 
  # J. single source build reproducibility already checked externally.
  print('TOTAL',len(checks),'PASS')

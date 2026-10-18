@@ -68,6 +68,6 @@ completeDeathSuccession=function(...args){const out=_v482Succession(...args);if(
 const _v482SaveGame=saveGame;
 saveGame=function(){const ok=_v482SaveGame();if(ok&&state.gameOver&&state.storyCtx==null)v482CommitAction();return ok;};
 const _v482LoadGame=loadGame;
-loadGame=function(){v482RecoverPendingAction();const loaded=_v482LoadGame();if(loaded){
+loadGame=function(){if(v482RecoverPendingAction()===null)return null;const loaded=_v482LoadGame();if(loaded){
   try{const rec=localStorage.getItem(V482_RECOVERY_NOTICE_KEY);if(rec){const r=JSON.parse(rec);addLog(`${r.year}년차 ${r.month}월 행동 시작 지점으로 복구했다.`);localStorage.removeItem(V482_RECOVERY_NOTICE_KEY);}}catch(_){}
  }return loaded;};
