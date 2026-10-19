@@ -1,0 +1,29 @@
+name: Restore frozen v5.2 tag
+on:
+  push:
+    branches: [chore/restore-legacy-v52-tag]
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: c11b2f171739fa242a7c6013393a8be31cdce609
+          fetch-depth: 0
+      - name: Verify original bytes and create missing tag only
+        shell: bash
+        run: |
+          set -euo pipefail
+          target=c11b2f171739fa242a7c6013393a8be31cdce609
+          test "$(git rev-parse HEAD)" = "$target"
+          echo '14afbff408f9ee68f7ae2f585a8dfe258ddffee2b309a701bf89dbfe496867f6  index.html' | sha256sum --check
+          existing=$(git ls-remote --refs origin refs/tags/legacy-v5.2)
+          if [ -n "$existing" ]; then
+            test "${existing%%[[:space:]]*}" = "$target"
+            echo 'Existing tag already matches; left untouched.'
+          else
+            git tag legacy-v5.2 "$target"
+            git push origin refs/tags/legacy-v5.2
+          fi
