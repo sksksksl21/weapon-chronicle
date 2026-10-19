@@ -8,7 +8,7 @@ BATTLE="""window.__battle={
  inspect:()=>({hand:[...hand],deck:[...deck],uses:cardUses,hp:hero.hp,maxResonance:hero.weapon.maxResonance,resonance,items:{...battleItems},turn,phase}),
  arrange:()=>{hand=['aim1','guard','reroll','counter'];deck=[];resonance=hero.weapon.maxResonance;phase='pre';cardUses=0;selectedPre=[];discardedThisTurn36=false;hero.hp=30;render();},
  use:useCard,commit:commitPreCard,discard:id=>{discardChoice36=id;discardBattleCard36();},
- canUse:canUseCard,canDiscard:canDiscardBattleCard36,reaction:()=>{phase='enemyReaction';render();},next:startTurn,toggle:toggleOverdrive,
+ canUse:canUseCard,canDiscard:canDiscardBattleCard36,reaction:()=>{phase='enemyReaction';render();},next:startTurn,toggle:toggleOverdrive,healthy:()=>{hero.hp=hero.maxHp;},
  grant:()=>{grantMoment('gritMemory','test');grantDonationCard();}};"""
 APP="""window.__action={state:()=>state,save:saveGame,
  start:policy=>{const a=actionCandidatesForPolicy(policy)[0];chooseActionCandidate(policy,a.key);startStory();},
@@ -49,7 +49,7 @@ with sync_playwright() as p:
  for card in ['aim1','guard','reroll','counter']:f.evaluate('id=>{__battle.next();__battle.discard(id)}',card)
  f.evaluate('__battle.next();__battle.grant()')
  assert f.evaluate('__battle.inspect().hand.length')==0 and f.evaluate('__battle.inspect().deck.length')==0 and not f.evaluate('__battle.canUse("aim1")')
- turn=f.evaluate('__battle.inspect().turn');f.locator('#execBtn').click();f.wait_for_function('__battle.inspect().turn>'+str(turn)+'||document.getElementById("overlay").classList.contains("show")')
+ f.evaluate('__battle.healthy()');turn=f.evaluate('__battle.inspect().turn');f.locator('#execBtn').click();f.wait_for_function('__battle.inspect().turn>'+str(turn)+'||document.getElementById("overlay").classList.contains("show")')
  assert not errors,errors;record('empty hands stay empty while owner auto-combat advances');page.close()
  for kind in ['battle','debate']:
   page,errors=fresh();page.evaluate('()=>{const s=__action.state();s.hp=30;s.prep.bandage=3;s.prep.rations=2;s.weapon.resonance=40;__action.save()}')
