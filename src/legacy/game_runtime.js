@@ -6002,7 +6002,7 @@ function wc44TalkEffect(id,n,topic){
 }
 openContacts=function(){
  ensureV26Progression();if(typeof ensureV30State==='function')ensureV30State();
- const visible=Object.entries(state.contacts||{}).filter(([,n])=>n&&n.alive!==false);
+ const visible=Object.entries(state.contacts||{}).filter(([,n])=>n&&n.alive!==false&&n.present!==false);
  const cards=visible.map(([id,n])=>{
   const aff=clamp(Math.round(Number(n.affinity)||0),0,100);
   return `<button class="wc44-npcCard" data-wc44-contact="${id}"><img src="${wc44PortraitFor(n,id)}" alt="${n.name} 초상화"><div><b>${n.name}</b><span>${n.status||''}</span><span>친밀도 ${aff} · ${typeof contactPlaceV28==='function'?contactPlaceV28(id,n):'항구'}</span></div><em>대화</em></button>`;
@@ -6011,7 +6011,7 @@ openContacts=function(){
  bindClose();document.querySelectorAll('[data-wc44-contact]').forEach(btn=>btn.onclick=()=>startVisit(btn.dataset.wc44Contact));
 };
 startVisit=function(id){
- ensureV26Progression();const n=state.contacts?.[id];if(!n||n.alive===false)return openContacts();
+ ensureV26Progression();const n=state.contacts?.[id];if(!n||n.alive===false||n.present===false)return openContacts();
  const topics=wc44TalkTopics(id,n);const img=wc44PortraitFor(n,id);
  const choices=topics.map(t=>`<button data-wc44-topic="${t.id}"><b>${t.q}</b><span>대화를 이어간다</span></button>`).join('');
  const intro=`${n.name}은(는) ${state.owner.name}을(를) 바라보며 말을 기다렸다.`;
