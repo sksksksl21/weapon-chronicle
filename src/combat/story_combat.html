@@ -1034,6 +1034,24 @@ let overdriveArmed=false, overdriveRolled=false, usedThisTurn=[], coreLockedTurn
 let memoryMods, memoriesTaken, rewardChoices=[];
 let comboAnnounced=null;
 let cardUseCount={}, upgradedFamilies=new Set(), momentGenerated={};
+function wcReadCardMastery(raw){
+  let v=raw;
+  if(typeof v==='string'){try{v=JSON.parse(v);}catch(e){return {};}}
+  if(!v||typeof v!=='object'||Array.isArray(v))return {};
+  const result={};
+  for(const family of Object.keys(UPGRADE_INFO)){
+    const count=v[family];
+    if(Number.isInteger(count)&&count>=0)result[family]=Math.min(3,count);
+  }
+  return result;
+}
+function wcStandaloneMastery(){
+  try{return wcReadCardMastery(localStorage.getItem('weaponCardMasteryV1'));}catch(e){return {};}
+}
+function wcSaveStandaloneMastery(){
+  if(STORY_MODE)return;
+  try{localStorage.setItem('weaponCardMasteryV1',JSON.stringify(cardUseCount));}catch(e){}
+}
 let ownerMind, heroDecisionReason="", heroDecisionMood="평정", heroDecisionBias=0, heroDecisionForced=false;
 let weaponChronicle=[],chronicleScore=0,chronicleSerial=0;
 
@@ -1336,7 +1354,8 @@ function growthText(id){
 function recordCardUse(id){
   const f=familyOf(id);
   if(!f || upgradedFamilies.has(f)) return;
-  cardUseCount[f]=(cardUseCount[f]||0)+1;
+  cardUseCount[f]=Math.min(3,(cardUseCount[f]||0)+1);
+  wcSaveStandaloneMastery();
   if(cardUseCount[f]>=3){
     upgradedFamilies.add(f);
     const u=UPGRADE_INFO[f];
@@ -2282,7 +2301,7 @@ function stageVictory(){
     phase='done';
     render();
     setTimeout(()=>{
-      window.parent.postMessage({type:'wc-story-combat',result:'win',hp:hero.hp,resonance:Math.round(resonance),enemy:stage().name,items:battleItems},'*');
+      window.parent.postMessage({type:'wc-story-combat',result:'win',hp:hero.hp,resonance:Math.round(resonance),enemy:stage().name,items:battleItems,cardMastery:{...cardUseCount}},'*');
     },650);
     return;
   }
@@ -2337,6 +2356,10 @@ function nextStage(){
   stageIndex++;
   enemy=makeEnemy();
   turn=1;
+  // A new encounter receives four cards; no card recycles inside a battle.
+  hand=shuffle(BASE_DECK.slice()).slice(0,4);
+  deck=[];discard=[];exhausted=[];selectedPre=[];usedThisTurn=[];
+  cardUses=0;discardChoice36=null;discardedThisTurn36=false;
   setScene();
   startTurn();
 }
@@ -2347,7 +2370,7 @@ function runEnd(){
     phase='done';
     render();
     setTimeout(()=>{
-      window.parent.postMessage({type:'wc-story-combat',result:'lose',hp:0,resonance:Math.round(resonance),enemy:stage().name,items:battleItems},'*');
+      window.parent.postMessage({type:'wc-story-combat',result:'lose',hp:0,resonance:Math.round(resonance),enemy:stage().name,items:battleItems,cardMastery:{...cardUseCount}},'*');
     },650);
     return;
   }
@@ -2412,8 +2435,10 @@ function resetRun(){
   rewardChoices=[];
   comboAnnounced=null;
 
-  cardUseCount={};
-  upgradedFamilies=new Set();
+  cardUseCount=STORY_MODE
+    ?wcReadCardMastery(STORY_FRAME?.dataset?.cardMastery||STORY_PARAMS.get('cardMastery'))
+    :wcStandaloneMastery();
+  upgradedFamilies=new Set(Object.keys(cardUseCount).filter(f=>cardUseCount[f]>=3));
   momentGenerated={};
 
   ownerMind={
