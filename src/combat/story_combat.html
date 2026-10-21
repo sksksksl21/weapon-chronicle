@@ -700,7 +700,7 @@ body.storyMode .actions #resetBtn{display:none!important}
     </div>
     <div class="overdriveBar">
       <button class="odBtn" id="overdriveBtn">OVERDRIVE · OFF</button>
-      <div class="odRisk" id="overdriveRisk">2장째 카드 허용 · 과부하 30%</div>
+      <div class="odRisk" id="overdriveRisk">사용/버림 합계 턴당 1장 · 보충 없음</div>
     </div>
     <details class="battleItemsFold361"><summary>전투 소모품 <span>붕대 · 응급약 · 해독약</span></summary>
       <div class="itemBar" id="itemBar">
@@ -1118,9 +1118,6 @@ function heroSprite(){ return $('heroSprite'); }
 function enemySprite(){ return $('enemySprite'); }
 
 function log(txt, cls=''){ const d=document.createElement('div'); d.className=cls; d.textContent=txt; $('log').appendChild(d); while($('log').children.length>5) $('log').removeChild($('log').firstChild); const latest=$('latestLog361'); if(latest) latest.textContent=txt; }
-function recycleIfNeeded(){ if(deck.length===0 && discard.length>0){ deck=shuffle(discard.splice(0)); log('버린 카드가 덱으로 돌아왔다.','muted'); } }
-function drawOne(){ if(hand.length>=4) return; recycleIfNeeded(); if(deck.length>0) hand.push(deck.shift()); }
-function refillHand(){ while(hand.length<4){ const before=hand.length; drawOne(); if(hand.length===before) break; } }
 function stage(){ return (STORY_MODE&&STORY_BOSS[STORY_ENEMY])?STORY_BOSS[STORY_ENEMY]:STAGES[stageIndex]; }
 function makeEnemy(){
   const s=stage();
@@ -1340,8 +1337,7 @@ function recordCardUse(id){
 function grantMoment(id,reason){
   if(momentGenerated[id]) return;
   momentGenerated[id]=true;
-  if(hand.length<4) hand.push(id);
-  else deck.unshift(id);
+  // Record a new memory in the chronicle; this battle never receives replacement cards.
   showBanner("MEMORY BORN · "+CARD_DB[id].name);
   log("순간기억 생성 — "+CARD_DB[id].name+" / "+reason,"good");
   addChronicle('memory',CARD_DB[id].name,reason,8);
@@ -1583,25 +1579,9 @@ function renderWeakness(){
   if(txt){s.textContent=txt;s.className='enemyState show';}
   else{s.textContent='';s.className='enemyState';}
 }
-function renderOverdrive(){ const btn=$('overdriveBtn'), risk=$('overdriveRisk'); if(coreLockedThisTurn){ btn.disabled=true; btn.className='odBtn'; btn.textContent='CORE LOCK'; risk.textContent='과부하 후유증 · 이번 턴 카드 사용 불가'; return; } btn.disabled=phase!=='pre'; btn.className='odBtn'+(overdriveArmed?' on':''); btn.textContent=overdriveArmed?'OVERDRIVE · ON':'OVERDRIVE · OFF'; risk.textContent='2장째 카드 허용 · 과부하 '+currentOverdriveRisk()+'%'; }
-function renderCombo(){
-  const b=$('comboBar'),c=currentCombo();
-  if(c){
-    b.className='comboBar live';
-    b.textContent='CHAIN · '+c.name+' — '+c.desc;
-    return;
-  }
-  const ids=comboCards(),possible=[];
-  if(ids.length===1){
-    COMBO_DB.forEach(x=>{
-      if((x.a.some(a=>ids.includes(a))||x.b.some(a=>ids.includes(a)))&&!comboMatch(x,ids))
-        possible.push(x.name);
-    });
-  }
-  b.className='comboBar';
-  b.textContent=possible.length?'연계 후보 · '+[...new Set(possible)].slice(0,2).join(' / '):'CHAIN · 두 장의 기억을 연계하면 추가 효과 발동';
-}
-function toggleOverdrive(){ if(phase!=='pre'||coreLockedThisTurn) return; overdriveArmed=!overdriveArmed; maxCardUses=overdriveArmed?2:1; if(!overdriveArmed&&selectedPre.length>1) selectedPre=selectedPre.slice(0,1); render(); }
+function renderOverdrive(){ $('overdriveBtn').hidden=true; $('overdriveRisk').textContent=hand.length?'한 턴에 기억카드 1장 사용 또는 버림 · 보충 없음':'손패 소진 · 소유자 자동전투 계속'; }
+function renderCombo(){ const b=$('comboBar'); b.className='comboBar'; b.textContent='MEMORY · 사용/버림 합계 턴당 1장 · 보충 없음'; }
+function toggleOverdrive(){ return; } // One intervention per turn has no two-card override.
 function exposeEnemy(){ if(enemy.exposed) return; enemy.exposed=true; showBanner(weakness().name+'!'); log(weakness().desc+` — 다음 ${hero.name} 행동에 약점 보너스.`,'warn'); render(); }
 function consumeExposure(){ if(enemy.exposed){enemy.exposed=false;log('약점 노출 종료.','muted');} }
 function checkOverdriveRisk(){ if(!overdriveArmed||overdriveRolled||cardUses<2) return; overdriveRolled=true; const risk=currentOverdriveRisk(),r=roll100(); if(r<=risk){coreLockedTurns=1;showBanner('CORE 과부하');log('OVERDRIVE 과부하 '+risk+'% 실패 ('+r+') — 다음 턴 Core LOCK.','bad');} else log('OVERDRIVE 안정화 ('+r+' > '+risk+').','good'); }
@@ -1623,12 +1603,12 @@ function spendResonance(id){
 }
 function resonanceMindFactor(){ return STORY_MIND>=70 ? 1.10 : STORY_MIND<30 ? .65 : STORY_MIND<50 ? .85 : 1; }
 function turnResonanceRecovery(){ return Math.max(1,Math.round(hero.weapon.resonanceRecovery*resonanceMindFactor())-(hasWeaponBuild('deep_core')?1:0)); }
-function canDiscardBattleCard36(id){return phase==='pre'&&!discardedThisTurn36&&!selectedPre.includes(id)&&hand.includes(id)&&!!CARD_DB[id];}
+function canDiscardBattleCard36(id){return phase==='pre'&&cardUses===0&&!discardedThisTurn36&&selectedPre.length===0&&hand.includes(id)&&!!CARD_DB[id];}
 function discardBattleCard36(){
  const id=discardChoice36;
  if(!canDiscardBattleCard36(id))return;
- removeHand(id);discard.push(id);discardedThisTurn36=true;discardChoice36=null;
- log('기억카드 「'+displayCardName(id)+'」를 버렸다. 다음 턴 보충된다.','warn');
+ removeHand(id);discard.push(id);cardUses=1;discardedThisTurn36=true;discardChoice36=null;
+ log('기억카드 「'+displayCardName(id)+'」를 버렸다. 이번 턴 개입 종료 · 보충 없음.','warn');
  showBanner('기억 정리');render();
 }
 function battleImpact36(label){
@@ -1641,7 +1621,7 @@ function renderBattleDiscard36(){
  if(!btn)return;
  btn.disabled=!canDiscardBattleCard36(discardChoice36);
  btn.textContent=discardedThisTurn36?'이번 턴 버리기 완료 (1/1)':(discardChoice36?'「'+displayCardName(discardChoice36)+'」 버리기':'카드를 길게 눌러 버릴 카드 지정 (0/1)');
- if(info)info.textContent=phase==='pre'?'손패를 길게 눌러 지정 → 버리기 · 공명 소모 없음 · 턴당 1장':'버리기는 다음 턴 준비 단계에서만 가능';
+ if(info)info.textContent=phase==='pre'?'손패를 길게 눌러 지정 → 버리기 · 공명 소모 없음 · 사용/버림 합계 1장':'버리기는 다음 턴 준비 단계에서만 가능';
 }
 function renderCards(){
   const box=$('cards'); box.innerHTML='';
@@ -1741,7 +1721,7 @@ function render(){
 }
 function canUseCard(id){
   const c=CARD_DB[id];
-  if(coreLockedThisTurn||!canAffordResonance(id)) return false;
+  if(!c||!hand.includes(id)||cardUses>=maxCardUses||discardedThisTurn36||coreLockedThisTurn||!canAffordResonance(id)) return false;
   if(c.timing==='pre'){
     if(phase!=='pre') return false;
     if(id==='last' && hero.hp/hero.maxHp>.30) return false;
@@ -1765,7 +1745,7 @@ function useCard(id){
     const idx=selectedPre.indexOf(id);
     if(idx>=0) selectedPre.splice(idx,1);
     else{
-      const limit=overdriveArmed?2:1;
+      const limit=1;
       if(selectedPre.length<limit) selectedPre.push(id);
       else if(limit===1) selectedPre=[id];
       else selectedPre[1]=id;
@@ -1853,7 +1833,8 @@ function useCard(id){
 }
 function commitPreCard(){
   if(!selectedPre.length) return;
-  selectedPre.slice().forEach(id=>{
+  selectedPre.slice(0,1).forEach(id=>{
+    if(!canUseCard(id)) return;
     const c=CARD_DB[id];
     if(!spendResonance(id)){ log(`공명 부족 — ${c.name}`, 'bad'); return; }
     cardUses++;usedThisTurn.push(id);recordCardUse(id);removeHand(id);
@@ -1867,7 +1848,7 @@ function commitPreCard(){
   });
   announceCombo();checkOverdriveRisk();
 }
-function grantDonationCard(){ const pool=['aim1','reroll','counter','guard']; const pick=pool[ri(0,pool.length-1)]; const id='donation_'+Date.now(); CARD_DB[id]={...CARD_DB[pick],base:pick,name:'DONATION · '+CARD_DB[pick].name,exhaust:true}; if(hand.length<4) hand.push(id); else deck.unshift(id); log('시청자 응원 — DONATION 카드 획득.', 'good'); }
+function grantDonationCard(){ log('시청자 응원 — 손패 추가 없이 전투를 지켜본다.', 'good'); }
 function addHeat(v){ if(!window.__heat) window.__heat=0; window.__heat=clamp(window.__heat+v,0,100); if(window.__heat>=100){ window.__heat=30; grantDonationCard(); } }
 function showBanner(t){ $('banner').style.display=''; $('banner').textContent=t; }
 function addDamage(x,y,txt,cls='red'){ if((cls==='red'||cls==='gold')&&Number(txt)>0){const arena=$('scene');if(arena){arena.classList.remove('impact36');void arena.offsetWidth;arena.classList.add('impact36');}} const d=document.createElement('div'); d.className='damage '+cls; d.style.left=x+'%'; d.style.top=y+'%'; d.textContent=txt; $('fxLayer').appendChild(d); setTimeout(()=>d.remove(),900); }
@@ -2007,7 +1988,6 @@ function startTurn(){
   if(coreLockedTurns>0) coreLockedTurns--;
   maxCardUses=coreLockedThisTurn?0:1;
   phase='pre';pending=null;
-  refillHand();
   showBanner(coreLockedThisTurn?'CORE LOCK':'전투 준비');
   render();
 }
@@ -2270,7 +2250,6 @@ function endTurn(){
   enemy.guarded=false;
   if(ownerMind.damageMemory>0) ownerMind.damageMemory--;
   turn++;
-  drawOne();
   startTurn();
 }
 function pickRewardChoices(){ const pool=Object.keys(MEMORY_POOL).filter(k=>!memoriesTaken.includes(k)); rewardChoices=shuffle(pool.slice()).slice(0,3); if(rewardChoices.length<3) shuffle(Object.keys(MEMORY_POOL).slice()).forEach(k=>{if(rewardChoices.length<3&&!rewardChoices.includes(k))rewardChoices.push(k);}); }
@@ -2391,7 +2370,7 @@ function resetRun(){
   enemy=makeEnemy();
   turn=1;
 
-  deck=shuffle(BASE_DECK.slice());
+  deck=[];
   discard=[];
   exhausted=[];
   hand=[];
@@ -2428,7 +2407,7 @@ function resetRun(){
   heroDecisionBias=0;
   heroDecisionForced=false;
 
-  for(let i=0;i<4;i++) drawOne();
+  hand=shuffle(BASE_DECK.slice()).slice(0,4);
   setScene();
   renderChronicleButton();
   log('v2.0 — UI 재배치 + 무기 연대기 기록 시스템 연결.','muted');
