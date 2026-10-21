@@ -2263,7 +2263,15 @@ function endTurn(){
   turn++;
   startTurn();
 }
-function pickRewardChoices(){ const pool=Object.keys(MEMORY_POOL).filter(k=>!memoriesTaken.includes(k)); rewardChoices=shuffle(pool.slice()).slice(0,3); if(rewardChoices.length<3) shuffle(Object.keys(MEMORY_POOL).slice()).forEach(k=>{if(rewardChoices.length<3&&!rewardChoices.includes(k))rewardChoices.push(k);}); }
+function pickRewardChoices(){
+  // Overdrive is disabled: keep its legacy definition but never offer a no-op reward.
+  const eligible=Object.keys(MEMORY_POOL).filter(k=>k!=='cooling');
+  const pool=eligible.filter(k=>!memoriesTaken.includes(k));
+  rewardChoices=shuffle(pool.slice()).slice(0,3);
+  if(rewardChoices.length<3)shuffle(eligible.slice()).forEach(k=>{
+    if(rewardChoices.length<3&&!rewardChoices.includes(k))rewardChoices.push(k);
+  });
+}
 function renderRewardChoices(){ const box=$('rewardChoices'); box.innerHTML=''; rewardChoices.forEach(k=>{const m=MEMORY_POOL[k],b=document.createElement('button'); b.className='rewardChoice'; b.innerHTML=`<b>${m.name}</b><span>${m.desc}</span>`; b.onclick=()=>chooseMemory(k); box.appendChild(b);}); }
 function chooseMemory(key){ const m=MEMORY_POOL[key]; if(!m)return; m.apply(); if(!memoriesTaken.includes(key))memoriesTaken.push(key); addChronicle('choice',m.name,'전투 뒤 Core에 남길 기억으로 선택했다. '+m.desc,4); $('rewardBox').className='rewardBox'; log('새 기억 획득 — '+m.name,'good'); nextStage(); }
 function stageVictory(){
