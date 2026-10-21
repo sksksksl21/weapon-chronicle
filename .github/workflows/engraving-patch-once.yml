@@ -4,6 +4,7 @@ on:
     branches: [fix/card-engraving-progress]
     paths:
       - .github/workflows/engraving-patch-once.yml
+      - tools/engraving_patch_once.py
 permissions:
   contents: write
 jobs:
