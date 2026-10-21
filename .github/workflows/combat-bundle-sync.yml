@@ -1,0 +1,39 @@
+name: Temporary combat bundle regeneration
+on:
+  push:
+    branches: [fix/combat-zero-resource-transfer]
+    paths:
+      - src/combat/story_combat.html
+      - .github/workflows/combat-bundle-sync.yml
+permissions:
+  contents: write
+concurrency:
+  group: combat-bundle-sync-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Rebuild both generated offline files
+        run: |
+          python3 tools/build.py
+          python3 tools/verify_baseline.py
+          git diff --name-only
+          git add -- index.html combat_story.html
+      - name: Commit only generated output
+        shell: bash
+        run: |
+          if git diff --cached --quiet; then
+            echo "Already synchronized"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "build: synchronize generated combat bundle"
+          git push origin HEAD:fix/combat-zero-resource-transfer

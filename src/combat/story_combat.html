@@ -781,7 +781,15 @@ const STORY_OWNER_NAME=(STORY_FRAME?.dataset?.ownerName)||STORY_PARAMS.get('owne
 const STORY_MAX_HP=Math.max(1,Number(STORY_FRAME?.dataset?.maxHp||STORY_PARAMS.get('maxHp'))||100);
 const STORY_MAX_MIND=Math.max(1,Number(STORY_FRAME?.dataset?.maxMind||STORY_PARAMS.get('maxMind'))||100);
 const STORY_HP=Math.max(1,Math.min(STORY_MAX_HP,Number(STORY_FRAME?.dataset?.hp || STORY_PARAMS.get('hp'))||STORY_MAX_HP));
-const STORY_MIND=Math.max(0,Math.min(STORY_MAX_MIND,Number(STORY_FRAME?.dataset?.mind || STORY_PARAMS.get('mind'))||Math.round(STORY_MAX_MIND*.6)));
+// Keep explicit zero; only missing, empty or nonnumeric legacy inputs use defaults.
+function storyResourceNumber(name, fallback){
+  const datasetValue=STORY_FRAME?.dataset?.[name];
+  const raw=datasetValue!==undefined&&datasetValue!==''?datasetValue:STORY_PARAMS.get(name);
+  if(raw===null||raw===undefined||raw==='')return fallback;
+  const value=Number(raw);
+  return Number.isFinite(value)?value:fallback;
+}
+const STORY_MIND=Math.max(0,Math.min(STORY_MAX_MIND,storyResourceNumber('mind',Math.round(STORY_MAX_MIND*.6))));
 const STORY_OWNER={
   martial:Number(STORY_FRAME?.dataset?.martial||STORY_PARAMS.get('martial'))||7,
   survival:Number(STORY_FRAME?.dataset?.survival||STORY_PARAMS.get('survival'))||6,
@@ -794,7 +802,7 @@ const STORY_WEAPON={
   handling:Number(STORY_FRAME?.dataset?.weaponHandling||STORY_PARAMS.get('weaponHandling'))||9,
   maxResonance:Number(STORY_FRAME?.dataset?.maxResonance||STORY_PARAMS.get('maxResonance'))||70,
   resonanceRecovery:Number(STORY_FRAME?.dataset?.resonanceRecovery||STORY_PARAMS.get('resonanceRecovery'))||9,
-  resonance:Number(STORY_FRAME?.dataset?.resonance||STORY_PARAMS.get('resonance'))||52,
+  resonance:Math.max(0,storyResourceNumber('resonance',52)),
   weight:Number(STORY_FRAME?.dataset?.weaponWeight||STORY_PARAMS.get('weaponWeight'))||1.30,
   length:Number(STORY_FRAME?.dataset?.weaponLength||STORY_PARAMS.get('weaponLength'))||92,
   firstHandling:Number(STORY_FRAME?.dataset?.firstHandling||STORY_PARAMS.get('firstHandling'))||0
