@@ -12,7 +12,7 @@ legacy formulas.** This PR does not claim A05 or the full battle redesign is com
   weaponParts and armor provide fixed/percentage contributions independently.
   The live adapter must prevent applying the old recalculated weapon or gear bonus twice.
 - Enemies use the same calculation with their own actor base and optional equipment.
-- HP belongs to owner plus armor max-HP bonuses; max resonance belongs to weapon.
+- HP belongs to owner plus armor max-HP bonuses; max resonance and resonance recovery belong to the sword base plus its eight component bonuses (and explicit passive buffs).
   Live HP/current resonance, mental state, wear and item inventory are **state**,
   not reinitialized by computing a stat preview.
 - Attack, defense, speed, crit, penetration are flat contributions.
