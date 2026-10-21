@@ -1052,6 +1052,13 @@ function wcSaveStandaloneMastery(){
   if(STORY_MODE)return;
   try{localStorage.setItem('weaponCardMasteryV1',JSON.stringify(cardUseCount));}catch(e){}
 }
+let pendingEngraveNames=[];
+function wcCommitCardMastery(){
+  if(!STORY_MODE)wcSaveStandaloneMastery();
+  for(const name of pendingEngraveNames)
+    addChronicle('engrave',name,'같은 기억을 세 번 반복 사용해 검의 습관으로 각인됐다.',12);
+  pendingEngraveNames=[];
+}
 let ownerMind, heroDecisionReason="", heroDecisionMood="평정", heroDecisionBias=0, heroDecisionForced=false;
 let weaponChronicle=[],chronicleScore=0,chronicleSerial=0;
 
@@ -1355,13 +1362,12 @@ function recordCardUse(id){
   const f=familyOf(id);
   if(!f || upgradedFamilies.has(f)) return;
   cardUseCount[f]=Math.min(3,(cardUseCount[f]||0)+1);
-  wcSaveStandaloneMastery();
   if(cardUseCount[f]>=3){
     upgradedFamilies.add(f);
     const u=UPGRADE_INFO[f];
     showBanner("ENGRAVE · "+u.name);
     log("기억 각인 — "+u.name+"으로 성장했다.","good");
-    addChronicle('engrave',u.name,'같은 기억을 세 번 반복 사용해 검의 습관으로 각인됐다.',12);
+    pendingEngraveNames.push(u.name);
   }
 }
 function grantMoment(id,reason){
@@ -2294,6 +2300,7 @@ function pickRewardChoices(){
 function renderRewardChoices(){ const box=$('rewardChoices'); box.innerHTML=''; rewardChoices.forEach(k=>{const m=MEMORY_POOL[k],b=document.createElement('button'); b.className='rewardChoice'; b.innerHTML=`<b>${m.name}</b><span>${m.desc}</span>`; b.onclick=()=>chooseMemory(k); box.appendChild(b);}); }
 function chooseMemory(key){ const m=MEMORY_POOL[key]; if(!m)return; m.apply(); if(!memoriesTaken.includes(key))memoriesTaken.push(key); addChronicle('choice',m.name,'전투 뒤 Core에 남길 기억으로 선택했다. '+m.desc,4); $('rewardBox').className='rewardBox'; log('새 기억 획득 — '+m.name,'good'); nextStage(); }
 function stageVictory(){
+  wcCommitCardMastery();
   showBanner('전투 승리');
   enemySprite().classList.add('defeat');
 
@@ -2364,6 +2371,7 @@ function nextStage(){
   startTurn();
 }
 function runEnd(){
+  wcCommitCardMastery();
   showBanner('패배');
 
   if(STORY_MODE){
@@ -2440,6 +2448,7 @@ function resetRun(){
     :wcStandaloneMastery();
   upgradedFamilies=new Set(Object.keys(cardUseCount).filter(f=>cardUseCount[f]>=3));
   momentGenerated={};
+  pendingEngraveNames=[];
 
   ownerMind={
     confidence:0,missStreak:0,hitStreak:0,damageMemory:0,lastDamage:0,

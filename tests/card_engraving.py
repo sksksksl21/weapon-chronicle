@@ -21,16 +21,19 @@ with sync_playwright() as p:
  page.evaluate(STORE)
  page.set_content(HTML,wait_until='load')
  for count in range(1,4):
-  page.evaluate("()=>{__engraveTest.setup();__engraveTest.use('aim1');__engraveTest.commit();}")
-  current=page.evaluate("__engraveTest.get()")
-  assert current['counts'].get('aim')==count,current
-  assert len(current['hand'])==3,current
-  assert current['deck']==[],current
-  page.evaluate("__engraveTest.reset()")
-  after=page.evaluate("__engraveTest.get()")
-  assert after['counts']['aim']==count,after
-  assert ('aim' in after['upgrades'])==(count==3),after
- print('PASS: three real pre-card uses, three separate battles, engraving persisted')
+  # Mid-encounter reset must discard all progress and any provisional engraving.
+  for abandoned in (True,False):
+   page.evaluate("()=>{__engraveTest.setup();__engraveTest.use('aim1');__engraveTest.commit();}")
+   current=page.evaluate("__engraveTest.get()")
+   assert current['counts'].get('aim')==count,current
+   assert len(current['hand'])==3 and current['deck']==[],current
+   if not abandoned:page.evaluate("__engraveTest.win()")
+   page.evaluate("__engraveTest.reset()")
+   after=page.evaluate("__engraveTest.get()")
+   expected=count-1 if abandoned else count
+   assert after['counts'].get('aim',0)==expected,after
+   assert ('aim' in after['upgrades'])==(expected==3),after
+ print('PASS: aborted encounters cannot farm engraving; completed battles persist')
  page.evaluate("__engraveTest.next()")
  next_one=page.evaluate("__engraveTest.get()")
  assert next_one['stage']==1 and len(next_one['hand'])==4,next_one
