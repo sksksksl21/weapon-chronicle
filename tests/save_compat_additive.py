@@ -84,7 +84,7 @@ with sync_playwright() as playwright:
             snapshot = page.evaluate('__compatAudit.snapshot()')
             assert snapshot['gold']==fixture['gold'],(case,iteration,snapshot)
             assert snapshot['owner']==fixture['owner']['name'],(case,iteration,snapshot)
-            assert snapshot['parts']==json.dumps(fixture['weapon']['parts'],separators=(',',':'),ensure_ascii=False),(case,iteration,'parts changed')
+            assert json.loads(snapshot['parts'])==fixture['weapon']['parts'],(case,iteration,'parts changed')
             assert page.evaluate('localStorage.getItem(__compatAudit.backupKey)')==original,(case,iteration,'original backup changed')
             if expects_chapter:
                 assert snapshot['chapter9']==1,(case,iteration,snapshot)
