@@ -34,7 +34,7 @@ change("  state.storyCtx.combatPending=null;\n   if(p?.mods?.v32SideEncounter)",
 p.write_text(s,encoding="utf8")
 pkg=Path("package.json")
 s=pkg.read_text(encoding="utf8")
-a="python3 tests/disabled_overdrive_reward.py"
+a="python3 tests/reward_pool.py"
 assert a in s and "tests/card_engraving.py" not in s
 pkg.write_text(s.replace(a,a+" && python3 tests/card_engraving.py"),encoding="utf8")
 print("patched existing battle bridge and registered engraving regression")
