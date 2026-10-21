@@ -36,7 +36,7 @@ SAVE_KEY = 'weaponChronicleLifeHubV30'
 
 
 def stable_fields(snapshot):
-    return {k:snapshot[k] for k in ('year','month','generation','gold','owner','parts')}
+    return {k:snapshot[k] for k in ('year','month','generation','gold','owner','parts','branchCount','endingCount')}
 
 
 with sync_playwright() as playwright:
@@ -52,6 +52,8 @@ with sync_playwright() as playwright:
     current_raw = seed.evaluate('localStorage.getItem(__compatAudit.key)')
     current = json.loads(current_raw)
     assert current['gold'] == 1234 and current.get('owner') and current.get('weapon')
+    seed_branch_count = seed.evaluate('__compatAudit.snapshot().branchCount')
+    seed_ending_count = seed.evaluate('__compatAudit.snapshot().endingCount')
     seed.close()
 
     additive = deepcopy(current)
@@ -90,8 +92,10 @@ with sync_playwright() as playwright:
             if expects_chapter:
                 assert snapshot['chapter9']==1,(case,iteration,snapshot)
             if case=='missing_additive_fields':
-                assert snapshot['branchCount']==0,(case,iteration,'fabricated branch')
-                assert snapshot['endingCount']==0,(case,iteration,'fabricated ending')
+                # The runtime initializes baseline branch flags even without a saved
+                # branchFlags key. Compare against that baseline, not zero.
+                assert snapshot['branchCount']==seed_branch_count,(case,iteration,'unexpected branch count')
+                assert snapshot['endingCount']==seed_ending_count,(case,iteration,'unexpected ending count')
             if expected is None:expected=stable_fields(snapshot)
             else:assert stable_fields(snapshot)==expected,(case,iteration,'repeated load drift',snapshot)
             assert not errors,(case,iteration,errors[:3])
