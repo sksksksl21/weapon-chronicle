@@ -14,6 +14,7 @@ HTML = (ROOT / 'index.html').read_text(encoding='utf8')
 MARKER = 'v48EnsureState();\nconst v483Loaded=loadGame();'
 PROBE = """window.__compatAudit={
  key:SAVE_KEY,backupKey:V48_BACKUP_KEY,
+ setGoldAndSave:value=>{state.gold=value;return saveGame();},
  save:()=>saveGame(),
  snapshot:()=>({
   year:state.year,month:state.month,generation:state.generation,
@@ -47,7 +48,7 @@ with sync_playwright() as playwright:
     seed = browser.new_page(viewport={'width':390,'height':844})
     seed.evaluate(STORAGE)
     seed.set_content(DOCUMENT, wait_until='load')
-    assert seed.evaluate("""()=>{state.gold=1234;return __compatAudit.save();}""")
+    assert seed.evaluate('__compatAudit.setGoldAndSave(1234)')
     current_raw = seed.evaluate('localStorage.getItem(__compatAudit.key)')
     current = json.loads(current_raw)
     assert current['gold'] == 1234 and current.get('owner') and current.get('weapon')
