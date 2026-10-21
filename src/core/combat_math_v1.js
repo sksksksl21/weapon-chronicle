@@ -35,15 +35,16 @@ const WC_COMBAT_MATH_V1 = (() => {
     return {sources, parts, gear};
   }
   function calculateActorStats(input = {}) {
-    const {sources} = components(input);
-    const {owner = {}, weapon = {}} = input;
+    const {sources, parts, gear} = components(input);
+    const {owner = {}, weapon = {}, buffs = {}} = input;
     const flat = Object.fromEntries(FLAT.map(k => [k, sumKey(sources, k)]));
     const pct = Object.fromEntries(PERCENT.map(k => [k, sumKey(sources, k)]));
     // Exactly one multiplier AFTER summing fixed additions and percentage points.
     const scaled = key => Math.max(0, flat[key] * Math.max(0, 1 + pct[key + "Pct"] / 100));
     return Object.freeze({
-      maxHp: Math.max(1, number(owner.maxHp, 1) + sumKey([...(Object.values(components(input).gear))], "maxHp")),
-      maxResonance: Math.max(0, number(weapon.maxResonance)),
+      maxHp: Math.max(1, number(owner.maxHp, 1) + sumKey(Object.values(gear), "maxHp")),
+      maxResonance: Math.max(0, number(weapon.maxResonance) + sumKey(Object.values(parts), "maxResonance") + number(buffs.maxResonance)),
+      resonanceRecovery: Math.max(0, number(weapon.resonanceRecovery) + sumKey(Object.values(parts), "resonanceRecovery") + number(buffs.resonanceRecovery)),
       attack: scaled("attack"),
       defense: scaled("defense"),
       attackSpeed: Math.max(1, (100 + flat.speed) * Math.max(0, 1 + pct.speedPct / 100)),
