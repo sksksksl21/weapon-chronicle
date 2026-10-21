@@ -8,7 +8,7 @@
     "check": "python3 tools/verify_baseline.py",
     "dev": "python3 -m http.server 5173 --bind 0.0.0.0",
     "test:smoke": "python3 tests/ui_smoke.py",
-    "test:regression": "python3 tests/regression.py && python3 tests/action_policy.py && python3 tests/combat_resource_transfer.py && python3 tests/owner_combat_personality.py && python3 tests/reward_pool.py",
+    "test:regression": "python3 tests/regression.py && python3 tests/action_policy.py && python3 tests/combat_resource_transfer.py && python3 tests/owner_combat_personality.py && python3 tests/reward_pool.py && python3 tests/card_engraving.py",
     "test:story": "bash scripts/test-story.sh"
   },
   "engines": {"node": ">=22"}

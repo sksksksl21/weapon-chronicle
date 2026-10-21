@@ -2183,11 +2183,18 @@ window.addEventListener("message",e=>{
   const frame=$("combatFrame");
   frame.removeAttribute("src");
   frame.srcdoc="";
-  ["storyMode","ownerName","enemy","enemyHpScale","enemyAttackDelta","enemyDefenseDelta","enemyEvasionDelta","hp","maxHp","mind","maxMind","martial","survival","social","aggression","caution","boldness","weaponPower","weaponPrecision","weaponToughness","weaponHandling","maxResonance","resonanceRecovery","resonance","weaponWeight","weaponLength","firstHandling","storySkills","medkit","bandage","antidote","armorDefense","armorEvasion","armorBlock","armorResist"].forEach(k=>delete frame.dataset[k]);
+  ["storyMode","ownerName","enemy","enemyHpScale","enemyAttackDelta","enemyDefenseDelta","enemyEvasionDelta","hp","maxHp","mind","maxMind","martial","survival","social","aggression","caution","boldness","weaponPower","weaponPrecision","weaponToughness","weaponHandling","maxResonance","resonanceRecovery","resonance","weaponWeight","weaponLength","firstHandling","storySkills","cardMastery","medkit","bandage","antidote","armorDefense","armorEvasion","armorBlock","armorResist"].forEach(k=>delete frame.dataset[k]);
 
   const p=state.storyCtx?.combatPending;
   if(!p)return;
   state.storyCtx.combatPending=null;
+  // Only committed encounter results add progress. Interrupted actions keep old values.
+  if(d.cardMastery&&typeof d.cardMastery==='object'){
+    const latest=wcCombatCardMastery(d.cardMastery);
+    const previous=wcCombatCardMastery(state.weapon.cardMastery);
+    for(const [family,count] of Object.entries(latest))previous[family]=Math.max(previous[family]||0,count);
+    state.weapon.cardMastery=previous;
+  }
    if(p?.mods?.v32SideEncounter)state.storyCtx.v32EncounterWin=d.result==="win";
 
   if(Number.isFinite(d.hp)&&d.result==="win") state.hp=clamp(d.hp,1,state.maxHp);
@@ -4074,9 +4081,19 @@ function openStatus(tab='owner'){
 /* retired duplicate makeNewContacts */
 
 function resetOwnerAssetsForSuccessor(profile,reason,legacyTitle){archiveCurrentOwner(reason,legacyTitle);state.generation++;state.owner={...profile,portrait:null,deeds:{martial:[],survival:[],social:[]}};state.ownerProgress={level:1,combatXp:0,lifeXp:0,reputation:0,eventCounts:{contract:0,explore:0,investigate:0,rest:0},eventWins:0,eventFails:0};state.gold=ri(18,42);state.prep={medkit:0,rations:0,antidote:0,bandage:0,tonic:0};state.ownerEquipment=blankOwnerEquipment();state.ownerGearOwned={};state.bagId='cloth_sack';state.foodBuff=null;state.weapon.materials={iron:0,shell:0,bronze:0,leather:0,wood:0,steel:0,silverWire:0,wax:0,cloth:0,horn:0};state.contacts=makeNewContacts(profile);state.contactTopics={mira:[],karon:[]};state.resonanceTopics=new Set();state.visitIntel=null;state.monthCandidateCache={};state.ownerDecisionResolved='';syncOwnerVitalCaps(false);state.hp=Math.round(state.maxHp*.88);state.mind=Math.round(state.maxMind*.68);}
+// Card progression belongs to the sword and survives owner succession.
+function wcCombatCardMastery(raw){
+  const result={};
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))return result;
+  for(const family of ['aim','guard','over','blood','feint','reroll','reverse','counter','endure']){
+    const count=raw[family];
+    if(Number.isInteger(count)&&count>=0)result[family]=Math.min(3,count);
+  }
+  return result;
+}
 function launchStoryCombat(enemy,label,nextWin,nextLose,mods={}){
   ensureV26Progression();const frame=$('combatFrame'),baseG=ownerGearBonuses(),g=applyFoodToCombat(baseG),eff=effectiveOwnerStats();$('combatRibbon').textContent=`STORY BATTLE · ${label}`;const tier=state.policy==='sail'?Math.max(2,clamp(Number(state.storyCtx?.difficulty)||2,1,4)):clamp(Number(state.storyCtx?.difficulty)||1,1,4),hpScale=(mods.hpScale||1)*(1+(tier-1)*.08),attackDelta=(mods.attackDelta||0)+(tier-1),defenseDelta=(mods.defenseDelta||0)+(tier>=3?1:0),evasionDelta=(mods.evasionDelta||0)+(tier>=4?1:0),combatMax=state.maxHp+(g.combatHp||0),combatHp=Math.min(combatMax,state.hp+(g.combatHp||0));
-  Object.assign(frame.dataset,{storyMode:'1',ownerName:state.owner.name,enemy,enemyHpScale:String(hpScale),enemyAttackDelta:String(attackDelta),enemyDefenseDelta:String(defenseDelta),enemyEvasionDelta:String(evasionDelta),hp:String(combatHp),maxHp:String(combatMax),mind:String(state.mind),maxMind:String(state.maxMind),martial:String(eff.martial),survival:String(eff.survival),social:String(eff.social),aggression:String(state.owner.aggression??''),caution:String(state.owner.caution??''),boldness:String(state.owner.boldness??''),weaponPower:String(state.weapon.power),weaponPrecision:String(state.weapon.precision),weaponToughness:String(state.weapon.toughness),weaponHandling:String(state.weapon.handling),maxResonance:String(state.weapon.maxResonance),resonanceRecovery:String(state.weapon.resonanceRecovery),resonance:String(state.weapon.resonance),weaponWeight:String(state.weapon.weight),weaponLength:String(state.weapon.length),firstHandling:String(state.weapon.firstHandling||0),storySkills:state.weapon.engravings.join(','),medkit:String(state.prep.medkit||0),bandage:String(state.prep.bandage||0),antidote:String(state.prep.antidote||0),armorDefense:String(g.defense||0),armorEvasion:String(g.evade||0),armorBlock:'0',armorResist:String(g.resist||0)});
+  Object.assign(frame.dataset,{storyMode:'1',ownerName:state.owner.name,enemy,enemyHpScale:String(hpScale),enemyAttackDelta:String(attackDelta),enemyDefenseDelta:String(defenseDelta),enemyEvasionDelta:String(evasionDelta),hp:String(combatHp),maxHp:String(combatMax),mind:String(state.mind),maxMind:String(state.maxMind),martial:String(eff.martial),survival:String(eff.survival),social:String(eff.social),aggression:String(state.owner.aggression??''),caution:String(state.owner.caution??''),boldness:String(state.owner.boldness??''),weaponPower:String(state.weapon.power),weaponPrecision:String(state.weapon.precision),weaponToughness:String(state.weapon.toughness),weaponHandling:String(state.weapon.handling),maxResonance:String(state.weapon.maxResonance),resonanceRecovery:String(state.weapon.resonanceRecovery),resonance:String(state.weapon.resonance),weaponWeight:String(state.weapon.weight),weaponLength:String(state.weapon.length),firstHandling:String(state.weapon.firstHandling||0),storySkills:state.weapon.engravings.join(','),cardMastery:JSON.stringify(wcCombatCardMastery(state.weapon.cardMastery)),medkit:String(state.prep.medkit||0),bandage:String(state.prep.bandage||0),antidote:String(state.prep.antidote||0),armorDefense:String(g.defense||0),armorEvasion:String(g.evade||0),armorBlock:'0',armorResist:String(g.resist||0)});
   frame.removeAttribute('src');frame.srcdoc=getCombatSrcdoc();$('combatLayer').classList.add('show');state.storyCtx.combatPending={enemy,label,nextWin,nextLose,mods,tier};saveGame();
 }
 function deathChanceForCombat(p){const e=effectiveOwnerStats(),g=ownerGearBonuses(),tier=clamp(Number(p?.tier)||Number(state.storyCtx?.difficulty)||2,1,4),boss=['ismaros','cyclops'].includes(p?.enemy)||String(p?.enemy||'').startsWith('v25_'),base=[0,10,22,38,56][tier]+(boss?12:0),survive=(e.survival-5)*3+(g.defense||0)*1.1+(g.resist||0)*.18;return clamp(Math.round(base-survive),4,boss?72:60);}
