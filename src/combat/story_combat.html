@@ -793,7 +793,10 @@ const STORY_MIND=Math.max(0,Math.min(STORY_MAX_MIND,storyResourceNumber('mind',M
 const STORY_OWNER={
   martial:Number(STORY_FRAME?.dataset?.martial||STORY_PARAMS.get('martial'))||7,
   survival:Number(STORY_FRAME?.dataset?.survival||STORY_PARAMS.get('survival'))||6,
-  social:Number(STORY_FRAME?.dataset?.social||STORY_PARAMS.get('social'))||4
+  social:Number(STORY_FRAME?.dataset?.social||STORY_PARAMS.get('social'))||4,
+  aggression:Math.max(0,Math.min(100,storyResourceNumber('aggression',68))),
+  caution:Math.max(0,Math.min(100,storyResourceNumber('caution',38))),
+  boldness:Math.max(0,Math.min(100,storyResourceNumber('boldness',62)))
 };
 const STORY_WEAPON={
   power:Number(STORY_FRAME?.dataset?.weaponPower||STORY_PARAMS.get('weaponPower'))||13,
@@ -897,7 +900,7 @@ const HERO_BASE={
   martial:STORY_MODE?STORY_OWNER.martial:7,
   survival:STORY_MODE?STORY_OWNER.survival:6,
   social:STORY_MODE?STORY_OWNER.social:4,
-  aggression:68,caution:38,boldness:62,
+  aggression:STORY_MODE?STORY_OWNER.aggression:68,caution:STORY_MODE?STORY_OWNER.caution:38,boldness:STORY_MODE?STORY_OWNER.boldness:62,
   armor:{defense:STORY_MODE?STORY_ARMOR.defense:0,evasion:STORY_MODE?STORY_ARMOR.evasion:0,block:STORY_MODE?STORY_ARMOR.block:0,resist:STORY_MODE?STORY_ARMOR.resist:0},
   weapon:{
     power:STORY_MODE?STORY_WEAPON.power:13,
