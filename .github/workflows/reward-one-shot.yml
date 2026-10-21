@@ -1,0 +1,51 @@
+name: One-time removal of inactive Overdrive reward
+on:
+  push:
+    branches: [fix/disabled-overdrive-reward]
+    paths: [.github/workflows/reward-one-shot.yml]
+permissions:
+  contents: write
+jobs:
+  patch-bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Patch only the reward choice filter and regenerate offline files
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('src/combat/story_combat.html')
+          text=p.read_text(encoding='utf8')
+          old="function pickRewardChoices(){ const pool=Object.keys(MEMORY_POOL).filter(k=>!memoriesTaken.includes(k)); rewardChoices=shuffle(pool.slice()).slice(0,3); if(rewardChoices.length<3) shuffle(Object.keys(MEMORY_POOL).slice()).forEach(k=>{if(rewardChoices.length<3&&!rewardChoices.includes(k))rewardChoices.push(k);}); }"
+          new="""function pickRewardChoices(){
+            // Overdrive is disabled: keep its legacy definition but never offer a no-op reward.
+            const eligible=Object.keys(MEMORY_POOL).filter(k=>k!=='cooling');
+            const pool=eligible.filter(k=>!memoriesTaken.includes(k));
+            rewardChoices=shuffle(pool.slice()).slice(0,3);
+            if(rewardChoices.length<3)shuffle(eligible.slice()).forEach(k=>{
+              if(rewardChoices.length<3&&!rewardChoices.includes(k))rewardChoices.push(k);
+            });
+          }"""
+          assert text.count(old)==1, 'expected reward selector not found uniquely'
+          p.write_text(text.replace(old,new),encoding='utf8')
+          PY
+          python3 tools/build.py
+          python3 tools/verify_baseline.py
+          git diff --stat
+          git add -- src/combat/story_combat.html combat_story.html index.html
+      - name: Commit updated source and matching generated artifacts
+        shell: bash
+        run: |
+          if git diff --cached --quiet; then
+            echo 'No change'
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: exclude nonfunctional cooling reward from selections'
+          git push origin HEAD:fix/disabled-overdrive-reward
