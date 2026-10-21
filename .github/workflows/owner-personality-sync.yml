@@ -1,0 +1,60 @@
+name: Temporary owner personality source patch
+on:
+  push:
+    branches: [fix/owner-combat-personality]
+    paths:
+      - .github/workflows/owner-personality-sync.yml
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Patch source, build, and verify
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          changes={
+            'src/legacy/game_runtime.js':[
+              ("martial:String(eff.martial),survival:String(eff.survival),social:String(eff.social),weaponPower:",
+               "martial:String(eff.martial),survival:String(eff.survival),social:String(eff.social),aggression:String(state.owner.aggression??''),caution:String(state.owner.caution??''),boldness:String(state.owner.boldness??''),weaponPower:"),
+              ('"martial","survival","social","weaponPower"',
+               '"martial","survival","social","aggression","caution","boldness","weaponPower"')
+            ],
+            'src/combat/story_combat.html':[
+              ("  social:Number(STORY_FRAME?.dataset?.social||STORY_PARAMS.get('social'))||4\n};",
+               "  social:Number(STORY_FRAME?.dataset?.social||STORY_PARAMS.get('social'))||4,\n  aggression:Math.max(0,Math.min(100,storyResourceNumber('aggression',68))),\n  caution:Math.max(0,Math.min(100,storyResourceNumber('caution',38))),\n  boldness:Math.max(0,Math.min(100,storyResourceNumber('boldness',62)))\n};"),
+              ("  aggression:68,caution:38,boldness:62,",
+               "  aggression:STORY_MODE?STORY_OWNER.aggression:68,caution:STORY_MODE?STORY_OWNER.caution:38,boldness:STORY_MODE?STORY_OWNER.boldness:62,")
+            ]
+          }
+          for path,patches in changes.items():
+              file=Path(path);source=file.read_text(encoding='utf8')
+              for before,after in patches:
+                  count=source.count(before)
+                  assert count==1,(path,before,count)
+                  source=source.replace(before,after,1)
+              file.write_text(source,encoding='utf8')
+          PY
+          python3 tools/build.py
+          python3 tools/verify_baseline.py
+          git add -- src/legacy/game_runtime.js src/combat/story_combat.html index.html combat_story.html
+          git diff --cached --stat
+      - name: Commit generated changes
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "fix: pass current owner personality into battle AI"
+          git push origin HEAD:fix/owner-combat-personality
