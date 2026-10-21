@@ -18,7 +18,7 @@ jobs:
       - name: Verify generated code
         run: npm run check
       - name: Verify no uncommitted build drift
-        run: git diff --exit-code -- index.html
+        run: git diff --exit-code -- index.html combat_story.html
   browser-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 20
