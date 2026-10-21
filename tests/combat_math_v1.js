@@ -14,9 +14,11 @@ assert.deepEqual([...ARMOR_SLOTS],["helmet","armor","gloves","boots"]);
 const weaponParts = Object.fromEntries(SWORD_SLOTS.map(slot => [slot,{attack:1,crit:1}]));
 const armor = Object.fromEntries(ARMOR_SLOTS.map(slot => [slot,{defense:2,speed:5}]));
 armor.helmet.maxHp = 10;
+weaponParts.seat.maxResonance = 6;
+weaponParts.seat.resonanceRecovery = 2;
 const playerInput = {
   owner:{maxHp:90,attack:30,defense:10,speed:10,crit:5,penetration:2,attackPct:10},
-  weapon:{attack:20,defense:5,crit:4,penetration:3,maxResonance:70,attackPct:5},
+  weapon:{attack:20,defense:5,crit:4,penetration:3,maxResonance:70,resonanceRecovery:9,attackPct:5},
   weaponParts,armor,
   buffs:{attack:2,defensePct:20,speedPct:10,penetration:1}
 };
@@ -26,7 +28,8 @@ near(p.attack,(30+20+8+2)*1.15);
 near(p.defense,(10+5+4*2)*1.20);
 near(p.attackSpeed,(100+10+4*5)*1.10);
 assert.equal(p.maxHp,100);
-assert.equal(p.maxResonance,70);
+assert.equal(p.maxResonance,76);
+assert.equal(p.resonanceRecovery,11);
 assert.equal(p.critChance,5+4+8);
 assert.equal(p.penetration,2+3+1);
 assert.equal(p.breakdown.flat.attack,60);
@@ -39,6 +42,7 @@ const enemy=calculateActorStats({owner:{maxHp:120,attack:28,defense:14,crit:3,sp
 assert.equal(enemy.attack,28);assert.equal(enemy.defense,14);
 assert.equal(enemy.maxHp,120);assert.equal(enemy.attackSpeed,120);
 assert.equal(enemy.maxResonance,0);
+assert.equal(enemy.resonanceRecovery,0);
 assert.equal(calculateActorStats().attackSpeed,100);
 assert.throws(()=>calculateActorStats({weaponParts:{wrong_part:{attack:500}}}),RangeError);
 assert.throws(()=>calculateActorStats({armor:{chest:{defense:20}}}),RangeError);
