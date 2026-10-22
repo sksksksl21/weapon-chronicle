@@ -1,10 +1,32 @@
-name: Web baseline CI
+# Deliberately no push/pull_request trigger: Actions minutes are budget-limited.
+# Request only the checks relevant to a known issue. Local checks are preferred.
+name: On-demand web verification
 on:
-  push:
-  pull_request:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: Select the smallest verification needed
+        required: true
+        default: quick
+        type: choice
+        options:
+          - quick
+          - smoke
+          - regression
+          - story
+          - full
+
+permissions:
+  contents: read
+
+concurrency:
+  group: on-demand-web-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build-check:
+  verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -13,45 +35,37 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Build
-        run: npm run build
-      - name: Verify generated code
-        run: npm run check
-      - name: Verify no uncommitted build drift
-        run: git diff --exit-code -- index.html combat_story.html
-      - name: Unified combat math core assertions
-        run: npm run test:combat-math
-      - name: Legacy combat source adapter assertions
-        run: npm run test:combat-adapter
-  browser-tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        suite: [smoke, regression, story]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-      - name: Install browser test dependencies
+      - name: Build once and verify generated files
+        run: |
+          npm run build
+          npm run check
+          git diff --exit-code -- index.html combat_story.html
+      - name: Fast combat calculations and source adapter assertions
+        run: |
+          npm run test:combat-math
+          npm run test:combat-adapter
+      - name: Install browser only when selected
+        if: ${{ inputs.suite != 'quick' }}
         run: |
           python3 -m pip install -r requirements-dev.txt
           python3 -m playwright install --with-deps chromium
-      - name: Build
-        run: npm run build
-      - name: Run ${{ matrix.suite }} tests
+      - name: Browser smoke
+        if: ${{ inputs.suite == 'smoke' || inputs.suite == 'full' }}
+        run: npm run test:smoke
+      - name: Browser regression
+        if: ${{ inputs.suite == 'regression' || inputs.suite == 'full' }}
         run: |
-          # Only upload reports produced by this run, including on partial failure.
           rm -f VALIDATION_*.json
-          npm run test:${{ matrix.suite }}
-      - name: Upload test reports
-        if: always() && matrix.suite != 'smoke'
+          npm run test:regression
+      - name: Browser story
+        if: ${{ inputs.suite == 'story' || inputs.suite == 'full' }}
+        run: |
+          rm -f VALIDATION_*.json
+          npm run test:story
+      - name: Save requested validation report
+        if: ${{ always() && inputs.suite != 'quick' }}
         uses: actions/upload-artifact@v4
         with:
-          name: validation-${{ matrix.suite }}
+          name: on-demand-validation-${{ inputs.suite }}
           path: VALIDATION_*.json
+          if-no-files-found: ignore
