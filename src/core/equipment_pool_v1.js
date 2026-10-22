@@ -43,8 +43,8 @@ function hash(s){let h=2166136261;for(const ch of String(s)){h^=ch.charCodeAt(0)
 function randomFrom(seed){let x=hash(seed)||1;return ()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return (x>>>0)/4294967296;};}
 function whole(rng,min,max){return min+Math.floor(rng()*(max-min+1));}
 function optionsFor(slot,armor){return armor?A_STATS[slot]:W_STATS;}
-function buildItem(slot,kind,baseId,base,tier,index){
- const armor=kind==="armor",rand=randomFrom("WC-5|"+kind+"|"+slot+"|"+baseId+"|"+tier.id);
+function buildItem(slot,kind,baseId,base,tier,index,rollToken=""){
+ const armor=kind==="armor",rand=randomFrom("WC-5|"+kind+"|"+slot+"|"+baseId+"|"+tier.id+(rollToken?"|"+rollToken:""));
  const original=base.mods||{},mods={...original};
  // Only protective/mobility data are meaningful for armor; legacy attack fields
  // must not leak into the new catalog even before adapter validation.
@@ -128,6 +128,7 @@ function formatDetail(item){
  const unique=item.uniqueEffect;
  return '<div class="wc5-quality"><b class="wc5-grade wc5-grade-'+(item.rarity||"common")+'">'+
   (tier?.name||item.rarity||"노멀")+'</b>'+
+  (item.rolledInstance?'<p>개체별 무작위 옵션 · 동일 종류라도 획득할 때마다 능력치가 달라집니다.</p>':'')+
   (!item.generated?'<p>기존 원본 아이템 · 원래 능력치 유지 (신규 등급 옵션 체계는 생성형 변형에 적용)</p>':
    options.length?'<p>추가 옵션 '+options.map((v,i)=>(i+1)+". "+v).join(" · ")+'</p>':
    '<p>추가 옵션 없음 · 기본 수치에 품질 변동 적용</p>')+
@@ -156,19 +157,81 @@ function installStyle(){
 }
 const result=expand(PART_CATALOG,OWNER_GEAR_CATALOG,RARITY_DEF);
 installStyle();
+// Reconstruct independent loot copies from SELF-DESCRIBING IDs. The existing
+// ID-keyed inventory and save schema stay unchanged: each acquired copy has
+// its own ID and its roll is reproduced from the encoded seed after reload.
+// Only the 240 validated wc5 templates can spawn a wc6 copy.
+const COPY_ID=/^wc6_(blade|guard|tang|grip|wrap|pommel|seat|scabbard|helmet|armor|gloves|boots)_([0-3])_(common|rare|unique|legendary|chronicle)_([a-z0-9]{5,24})$/;
+const COPY_FIND=/wc6_(?:blade|guard|tang|grip|wrap|pommel|seat|scabbard|helmet|armor|gloves|boots)_[0-3]_(?:common|rare|unique|legendary|chronicle)_[a-z0-9]{5,24}/g;
+let nextCopy=0;
+function restoreCopy(id){
+ if(typeof id!=="string")return null;
+ const m=COPY_ID.exec(id);if(!m)return null;
+ const [,slot,indexText,tierKey,seed]=m,idx=Number(indexText);
+ const armor=A_SLOTS.includes(slot),catalog=armor?OWNER_GEAR_CATALOG:PART_CATALOG[slot];
+ if(!catalog)return null;
+ if(catalog[id])return catalog[id];
+ const templateId="wc5_"+slot+"_"+idx+"_"+tierKey,template=catalog[templateId];
+ if(!template||!template.generated||template.rarity!==tierKey)return null;
+ const family=template.family;
+ const base=armor?OWNER_GEAR_CATALOG[family]:PART_CATALOG[slot]?.[family];
+ const tier=TIERS.find(t=>t.id===tierKey);
+ if(!base||!tier)return null;
+ const rolled=buildItem(slot,armor?"armor":"weapon",family,base,tier,idx,seed);
+ catalog[id]=Object.freeze({...rolled,rolledInstance:true,instanceSeed:seed,templateId});
+ return catalog[id];
+}
+function rollCopy(templateId){
+ if(typeof templateId!=="string")return null;
+ const m=/^wc5_(blade|guard|tang|grip|wrap|pommel|seat|scabbard|helmet|armor|gloves|boots)_([0-3])_(common|rare|unique|legendary|chronicle)$/.exec(templateId);
+ if(!m)return null;
+ const [,slot,idx,tier]=m,armor=A_SLOTS.includes(slot);
+ const catalog=armor?OWNER_GEAR_CATALOG:PART_CATALOG[slot];
+ if(!catalog?.[templateId])return null;
+ let id;
+ do{
+   const seed=Date.now().toString(36)+(nextCopy++).toString(36)+Math.floor(Math.random()*1679616).toString(36).padStart(4,"0");
+   id="wc6_"+slot+"_"+idx+"_"+tier+"_"+seed;
+ }while(catalog[id]);
+ return {id,item:restoreCopy(id)};
+}
+function restoreFromSave(raw){
+ if(typeof raw!=="string")return 0;
+ const found=new Set(raw.match(COPY_FIND)||[]);
+ let restored=0;
+ for(const id of found)if(restoreCopy(id))restored++;
+ return restored;
+}
+// Both paths matter: the saved merchant stock and equipped/owned item IDs
+// must be in their original catalogs BEFORE legacy load validation/rendering.
+if(typeof loadGame==="function"){
+ const oldLoad=loadGame;
+ loadGame=function(...args){
+   try{
+     if(typeof localStorage!=="undefined"&&typeof SAVE_KEY==="string")
+       restoreFromSave(localStorage.getItem(SAVE_KEY));
+   }catch(e){console.warn("Equipment copy pre-load restore skipped",e);}
+   const loaded=oldLoad.apply(this,args);
+   try{restoreFromSave(JSON.stringify(state));}
+   catch(e){console.warn("Equipment copy post-load restore skipped",e);}
+   return loaded;
+ };
+}
 // The legacy equipment trader sampled uniformly; preserve rarity scarcity.
 if(typeof randomGearStock==="function"){
  randomGearStock=function(){
   const entries=Object.entries(OWNER_GEAR_CATALOG);
   const selected=[],used=new Set(),count=Math.min(6,entries.length);
   for(let i=0;i<count;i++){
-   const weighted=entries.filter(([id])=>!used.has(id)).map(([id,item])=>({
+   const weighted=entries.filter(([id,item])=>!used.has(id)&&!item.rolledInstance).map(([id,item])=>({
     id,weight:Math.max(1,RARITY_DEF[item.rarity]?.weight||1)
    }));
    const sum=weighted.reduce((a,x)=>a+x.weight,0);
    let r=Math.random()*sum,chosen=weighted[weighted.length-1];
    for(const x of weighted){r-=x.weight;if(r<0){chosen=x;break;}}
-   used.add(chosen.id);selected.push({id:chosen.id,sold:false});
+   used.add(chosen.id);
+   const rolled=rollCopy(chosen.id);
+   selected.push({id:rolled?.id||chosen.id,sold:false});
   }
   return selected;
  };
@@ -187,5 +250,6 @@ if(typeof partDeltaHtml==="function"){
   return original.call(this,slot,id,...args)+formatDetail(PART_CATALOG[slot]?.[id]);
  };
 }
-return Object.freeze({TIERS,W_SLOTS,A_SLOTS,expand,buildItem,formatDetail,result,randomFrom});
+return Object.freeze({TIERS,W_SLOTS,A_SLOTS,expand,buildItem,formatDetail,result,randomFrom,
+ rollCopy,restoreCopy,restoreFromSave});
 })();
