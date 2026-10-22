@@ -58,6 +58,14 @@ Open the [DEV preview](https://sksksksl21.github.io/weapon-chronicle/play-dev.ht
 - Focused check: `npm run test:gear-rarity`; combat handoff:
   `npm run test:combat-adapter`. Android browser integration is still unverified.
 
+## DEV shops: equipment rollout (2026-10-22)
+
+- **Market > armor seller**: eight current offers in beta mode, four armor types, all five grades represented. Each `wc6` copy has a distinct recoverable roll.
+- **Smith > buy**: nine current part offers in beta mode, all eight sword-part types, all five grades represented. Items are purchased with the existing spare-part inventory and gold logic.
+- Existing sold shop entries and owned items remain unchanged. On the first merchant visit after an old save, unsold legacy stock is updated to expose the new equipment without destroying completed transactions. Later restocks use the new pools directly.
+- All five grades have item borders; armor offers show rolled properties and named unique effects. Smith cards use their original rarity styling and the part detail formatter.
+- `npm run test:merchant` performs focused checks. Final Android browser purchasing/unequipping/save smoke verification remains pending.
+
 ## Quick start (Codespaces)
 Open **Code → Codespaces → Create codespace on main**. The container setup installs the Python Playwright testing dependency and a browser. From the Codespaces terminal:
 
