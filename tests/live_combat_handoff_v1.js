@@ -49,7 +49,7 @@ const wrongSnapshot=handoff.calculate(wrong,adapter,math);
 assert.equal(wrongSnapshot.maxHp,96); // 65 + (6 baseline + 1 valid helmet Survival)*4 + 3 HP
 assert.equal(wrongSnapshot.attack,8*.72+20);
 assert.equal(wrongSnapshot.defense,6+16+2);
-assert.equal(JSON.stringify(wrong.ownerEquipment.gloves),"wrong_helmet");
+assert.equal(wrong.ownerEquipment.gloves,"wrong_helmet");
 console.log("PASS: wrong-slot gear ignored without modifying saved equipment");
 
 
