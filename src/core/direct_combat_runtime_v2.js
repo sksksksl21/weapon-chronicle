@@ -28,7 +28,11 @@ function wcDirectCurrentStats(weaponOverride=null,gearOverride=null){
  // so the direct layer can scale the equipment HP bonus once.
  const hpFromGear=WC_DIRECT_COMBAT_V2.ARMOR_SLOTS.reduce((total,slot)=>
   total+Number(items.armor[slot]?.maxHp||0),0);
- const owner={...rates,baseHp:Math.max(1,Number(state.maxHp||1)-hpFromGear)};
+ // Transitional display only: preserve the CURRENT legacy HP cap exactly.
+ // The permanent 0..100 HP migration needs its own save/version audit; never
+ // shrink or heal current HP just because the new status window is opened.
+ const owner={...rates,baseHp:Math.max(1,Number(state.maxHp||1)-
+   hpFromGear*rates.stableSurvival/100)};
  const result=WC_DIRECT_COMBAT_V2.calculate({owner,...items});
  return Object.freeze({...result,ownerRates:Object.freeze(rates),
   migration:Object.freeze({version:"legacy-v5.2-preview",audited:false})});
