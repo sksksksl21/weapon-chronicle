@@ -203,7 +203,7 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
       '.wc2-delta .wc2-up{color:#8cdda4}',
       '.wc2-delta .wc2-down{color:#ffae9e}',
       '.wc2-equipment-note{font-size:10px;color:#d1d6dd;margin:5px 0}',
-      '@media(max-width:440px){.wc2-stat{padding:5px;gap:4px;font-size:10px}.wc2-stat b{font-size:12px}}'
+      '@media(max-width:480px){.main .wc41-dashboard{grid-template-columns:minmax(0,1fr)!important}.main .wc41-dashboard .wc41-serviceGrid{grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-template-rows:repeat(2,minmax(115px,1fr))!important;min-height:0!important}.wc2-stat{padding:5px;gap:4px;font-size:10px}.wc2-stat b{font-size:12px}}'
     ].join("\n");
     document.head.appendChild(style);
   }
