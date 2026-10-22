@@ -80,9 +80,16 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
       baseHp = total - gearHp;
     } else {
       if (suspiciousHpSlot) {
-        throw new RangeError("Cannot undo wrong-slot legacy Survival/HP from capped maxHp (" +
-          suspiciousHpSlot + "); provide legacyVitals for exact owner HP reconstruction");
-      }
+        // A trustworthy gear-exclusive owner base is safe even if the stored
+        // aggregate was polluted by invalid equipped entries. Without that
+        // base (or legacyVitals), the bounded/rounded total is not invertible.
+        if (ownerCombat.maxHp === undefined || ownerCombat.maxHp === null ||
+            !Number.isFinite(Number(ownerCombat.maxHp))) {
+          throw new RangeError("Cannot undo wrong-slot legacy Survival/HP from capped maxHp (" +
+            suspiciousHpSlot + "); provide gear-exclusive ownerCombat.maxHp or legacyVitals");
+        }
+        baseHp = num(ownerCombat.maxHp);
+      } else {
       // Valid legacy aggregate is already capped and Survival-inclusive.
       // If only owner-only HP exists, a valid Survival gear contribution is
       // still nontrivial: require the aggregate or an exact legacy profile.
@@ -95,6 +102,7 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
         throw new RangeError("Provide totalMaxHp or legacyVitals to retain capped gear Survival HP");
       }
       baseHp = (hasTotal ? num(totalMaxHp) : num(ownerCombat.maxHp)+gearHp) - gearHp;
+      }
     }
     const owner = {...ownerCombat, maxHp:Math.max(1,baseHp)};
     // state.weapon's values already INCLUDE every equipped component.
