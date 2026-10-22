@@ -126,8 +126,10 @@ function ownerBody(){
 function armorBody(){
  const buttons=ARMOR_SLOTS.map(([id,title,role])=>{
   const gearId=state.ownerEquipment?.[id],item=OWNER_GEAR_CATALOG[gearId];
-  return '<button class="wc3-equip'+(selectedArmor===id?' active':'')+'" data-wc3-armor="'+id+'"><b>'+title+
-   '</b><small>'+escapeHtml(item?.name||"미장착")+'</small><em>'+role+'</em></button>';
+  return '<button class="wc3-equip'+(selectedArmor===id?' active':'')+' rarity-'+(item?.rarity||"common")+
+   '" data-wc3-armor="'+id+'"><b>'+title+
+   '</b><small>'+escapeHtml(item?.name||"미장착")+'</small><em>'+role+'</em>'+
+   (item?'<small>'+escapeHtml(RARITY_DEF[item.rarity]?.name||"노멀")+'</small>':"")+'</button>';
  }).join("");
  const id=state.ownerEquipment?.[selectedArmor],item=OWNER_GEAR_CATALOG[id],title=ARMOR_SLOTS.find(x=>x[0]===selectedArmor)?.[1];
  const mods=item?.mods||{};
@@ -138,7 +140,8 @@ function armorBody(){
  '<section class="wc3-panel"><h3>'+title+' 상세 정보</h3>'+
  '<div class="wc3-detail"><h4>'+escapeHtml(item?.name||"비어 있음")+'</h4>'+
  '<small>'+escapeHtml(item?.rarity||"미장착")+'</small><p>'+escapeHtml(item?.desc||"이 부위에 방어구를 장착할 수 있습니다.")+'</p>'+
- '<p>'+escapeHtml(effects.join(" · ")||"추가 효과 없음")+'</p></div>'+
+ '<p>'+escapeHtml(effects.join(" · ")||"추가 효과 없음")+'</p>'+
+ (item&&typeof WC_EQUIPMENT_POOL_V1!=="undefined"?WC_EQUIPMENT_POOL_V1.formatDetail(item):"")+'</div>'+
  '<button class="wc3-primary" data-wc3-armor-equip="'+selectedArmor+'">장비 선택 / 교체</button></section>'+
  '<p class="wc3-note">방어구는 공격력·치명타·관통력에 직접 보너스를 주지 않습니다.</p>';
 }
@@ -153,8 +156,10 @@ function partEffects(mods){
 function weaponBody(){
  const buttons=PART_SLOTS.map((slot,i)=>{
   const id=state.weapon.parts?.[slot],item=PART_CATALOG[slot]?.[id];
-  return '<button class="wc3-part'+(selectedPart===slot?' active':'')+'" data-wc3-part="'+slot+'"><b>'+
-   escapeHtml(PART_LABELS[slot])+'</b><small>'+escapeHtml(item?.name||"비어 있음")+'</small></button>';
+  return '<button class="wc3-part'+(selectedPart===slot?' active':'')+' rarity-'+(item?.rarity||"common")+
+   '" data-wc3-part="'+slot+'"><b>'+
+   escapeHtml(PART_LABELS[slot])+'</b><small>'+escapeHtml(item?.name||"비어 있음")+'</small>'+
+   (item?'<small>'+escapeHtml(RARITY_DEF[item.rarity]?.name||"노멀")+'</small>':"")+'</button>';
  });
  const selectedId=state.weapon.parts?.[selectedPart],p=PART_CATALOG[selectedPart]?.[selectedId];
  const visual=typeof weaponArt41==="function"?weaponArt41({},"wc41-smithSword"):'<div class="wc3-swordFallback">⚔</div>';
@@ -167,6 +172,7 @@ function weaponBody(){
   escapeHtml(RARITY_DEF[p?.rarity]?.name||"일반")+'</span></h4>'+
   '<p>'+escapeHtml(p?.note||p?.passive||"파츠의 전투 기여도와 재료를 확인합니다.")+'</p>'+
   '<p>'+escapeHtml(partEffects(p?.mods)||"수치 효과 없음")+'</p>'+
+  (p&&typeof WC_EQUIPMENT_POOL_V1!=="undefined"?WC_EQUIPMENT_POOL_V1.formatDetail(p):"")+
   '<small>내구 '+Math.round(n(state.weapon.dur))+' / '+Math.round(n(state.weapon.maxDur))+
   ' · 공명 '+Math.round(n(state.weapon.resonance))+' / '+Math.round(n(state.weapon.maxResonance))+'</small></section>';
 }
