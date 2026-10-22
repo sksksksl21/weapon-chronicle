@@ -51,3 +51,42 @@ assert.equal(wrongSnapshot.attack,8*.72+20);
 assert.equal(wrongSnapshot.defense,6+16+2);
 assert.equal(JSON.stringify(wrong.ownerEquipment.gloves),"wrong_helmet");
 console.log("PASS: wrong-slot gear ignored without modifying saved equipment");
+
+
+// The actual runtime load order installs a wrapper around launchStoryCombat.
+// The new dataset is present before legacy srcdoc initialization; no side effect
+// is allowed to change the original launcher, then battle exit clears it.
+const vm=require("node:vm"),fs=require("node:fs"),path=require("node:path");
+const combatFrame={dataset:{}};
+let messageListener;
+let legacyCalls=0;
+const context={
+  window:{addEventListener:(type,fn)=>{if(type==="message")messageListener=fn;}},
+  console,
+  state:{owner:input.owner,weapon:input.weapon,maxHp:input.maxHp,ownerEquipment:input.ownerEquipment},
+  PART_CATALOG:input.partCatalog,
+  OWNER_GEAR_CATALOG:input.gearCatalog,
+  WC_LEGACY_COMBAT_SOURCES_V1:adapter,
+  WC_COMBAT_MATH_V1:math,
+  effectiveOwnerStats:()=>input.effectiveOwner,
+  rawOwnerStats:()=>input.rawOwner,
+  armorSurvivalValue:()=>input.armorSurvival,
+  $:()=>combatFrame,
+  launchStoryCombat:function(enemy,label){
+    legacyCalls++;
+    assert.equal(enemy,"bandit");
+    assert.equal(label,"첫 전투");
+    assert.equal(JSON.parse(combatFrame.dataset.unifiedActorV1).attack,computed.attack);
+    return "original-battle";
+  }
+};
+vm.runInNewContext(
+  fs.readFileSync(path.join(__dirname,"../src/core/live_combat_handoff_v1.js"),"utf8"),
+  context
+);
+assert.equal(context.launchStoryCombat("bandit","첫 전투"),"original-battle");
+assert.equal(legacyCalls,1,"new handoff must not invoke legacy battle twice");
+messageListener({data:{type:"wc-story-combat"}});
+assert.equal(combatFrame.dataset.unifiedActorV1,undefined,"battle completion clears transient handoff");
+assert.equal(JSON.stringify(input),frozenBefore,"live wrapper never mutates game/save inputs");
+console.log("PASS: live launchStoryCombat wrapper attaches/transfers/clears stat snapshot once");
