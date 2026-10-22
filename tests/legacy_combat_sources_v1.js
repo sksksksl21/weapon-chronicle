@@ -19,7 +19,8 @@ const gearCatalog={
   gloves:{slot:"gloves",mods:{defense:2,attack:3}},
   boots:{slot:"boots",mods:{speed:15,defense:-1}},
   invalid:{slot:"helmet",mods:{attack:999,maxHp:10}},
-  veteran_helm:{slot:"helmet",mods:{attack:999,maxHp:4,survival:2}}
+  veteran_helm:{slot:"helmet",mods:{attack:999,maxHp:4,survival:2}},
+  survivor_helm:{slot:"helmet",mods:{survival:2}}
 };
 const equipped={helmet:"helm",armor:"coat",gloves:"gloves",boots:"boots"};
 const weapon={parts,power:19,toughness:16,precision:13,handling:12,
@@ -67,12 +68,15 @@ assert.throws(()=>bridge.fromLegacyLoadout({...survivalSlot,ownerCombat:{}}),Ran
   "legacy Survival*4 and [58,170] clamp make HP aggregate non-invertible");
 assert.throws(()=>bridge.fromLegacyLoadout({...survivalSlot,totalMaxHp:170,ownerCombat:{}}),RangeError,
   "capped max HP must not be guessed");
+const survivalOnly={...survivalSlot,ownerEquipment:{...survivalSlot.ownerEquipment,gloves:"survivor_helm"}};
+assert.throws(()=>bridge.fromLegacyLoadout({...survivalOnly,ownerCombat:{}}),RangeError,
+  "even wrong-slot survival alone changes clamped legacy HP");
 const validWithoutBase=math.calculateActorStats(bridge.fromLegacyLoadout({
   ...sourceInput,ownerCombat:{attack:10,defense:4,speed:3,crit:2}
 }));
 assert.equal(validWithoutBase.maxHp,112,"normal legacy aggregate remains unchanged");
 assert.equal(JSON.stringify(sourceInput),snapshot,"HP correction must not mutate input");
-console.log("PASS: wrong-slot gear HP excluded with explicit base and aggregate fallback");
+console.log("PASS: wrong-slot HP/Survival excluded with explicit base; ambiguous aggregate rejected");
 const unknownWeapon={...weapon,parts:{...parts,blade:"old_unlisted_id"}};
 const unknownSources=bridge.fromLegacyLoadout({...sourceInput,weapon:unknownWeapon});
 const unknown=math.calculateActorStats(unknownSources);
