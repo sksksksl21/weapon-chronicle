@@ -9,12 +9,13 @@
 ## Validation
 - Direct JavaScript VM execution: source parses, fixed/percent aggregation, HP normalization, wrong-slot gear rejection, original launcher invoked once, transient frame data removed.
 - Reproducible Node fixture: `npm run test:combat-handoff`.
-- **Browser gameplay and full build not certified.** The account's GitHub Actions budget is exhausted and automatic CI is disabled.
+- Local `python3 tools/build.py`, `node tests/live_combat_handoff_v1.js`, and `python3 tools/verify_baseline.py` passed on 2026-10-22.
+- Generated index SHA256: `d67c2355c8939a1327d993256948df541a22f1b25ba82b4a36503a077a96c67f`.
+- Browser gameplay is not yet certified. GitHub Actions was not invoked.
 
-## Build artifact limitation
-- `index.html` is a generated ~10 MB blob; the GitHub connector rejected its direct rewrite due to transport size.
-- `npm run dev` now rebuilds it from source before serving, so the local development entry point uses this handoff when run.
-- The checked-in root `index.html` may remain stale until `npm run build` is executed and the output committed from a Git-capable environment. Do not treat the repository's existing root HTML as evidence of this feature.
+## Generated artifact
+- The generated root `index.html` was rebuilt and uploaded through Git blob/tree APIs; its Git blob SHA matches the locally verified build.
+- `npm run dev` also rebuilds before serving.
 
 ## Next stage
 1. Determine the enemy stat mapping from its actual encounter catalog and feed both actors through the same math contract.

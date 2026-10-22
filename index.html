@@ -7763,6 +7763,318 @@ if(location.search.includes('wc52test'))window.__wc52test={
   next:no=>v50Variant(v47ByNo(no)),finish:()=>v50HistoricalEnding()
 };
 
+/* Weapon Chronicle: unified combat arithmetic, independent of UI and legacy saves.
+ * Phase 1: verified pure functions. Not injected into the live HTML until
+ * character/weapon/armor/enemy data adapters are validated in a separate PR.
+ */
+const WC_COMBAT_MATH_V1 = (() => {
+  "use strict";
+  const SWORD_SLOTS = Object.freeze(["blade", "guard", "tang", "grip", "wrap", "pommel", "seat", "scabbard"]);
+  const ARMOR_SLOTS = Object.freeze(["helmet", "armor", "gloves", "boots"]);
+  const FLAT = Object.freeze(["attack", "defense", "speed", "crit", "penetration"]);
+  const PERCENT = Object.freeze(["attackPct", "defensePct", "speedPct"]);
+
+  function number(value, fallback = 0) {
+    if (value === null || value === undefined || value === "") return fallback;
+    const result = Number(value);
+    return Number.isFinite(result) ? result : fallback;
+  }
+  function checkSlots(source, allowed, name) {
+    if (source === null || source === undefined) return {};
+    if (!source || typeof source !== "object" || Array.isArray(source)) {
+      throw new TypeError(name + " must be an object keyed by equipment slot");
+    }
+    const unknown = Object.keys(source).filter(key => !allowed.includes(key));
+    if (unknown.length) throw new RangeError(name + " has unknown slot(s): " + unknown.join(", "));
+    return source;
+  }
+  function sumKey(sources, key) {
+    return sources.reduce((total, value) => total + number(value?.[key]), 0);
+  }
+  function components({owner = {}, weapon = {}, weaponParts = {}, armor = {}, buffs = {}} = {}) {
+    const parts = checkSlots(weaponParts, SWORD_SLOTS, "weaponParts");
+    const gear = checkSlots(armor, ARMOR_SLOTS, "armor");
+    // The weapon argument must be the base item BEFORE equipment-part bonuses.
+    // The adapter is responsible for not passing already-recalculated totals.
+    const sources = [owner, weapon, buffs, ...SWORD_SLOTS.map(k => parts[k]), ...ARMOR_SLOTS.map(k => gear[k])];
+    return {sources, parts, gear};
+  }
+  function calculateActorStats(input = {}) {
+    const {sources, parts, gear} = components(input);
+    const {owner = {}, weapon = {}, buffs = {}} = input;
+    const flat = Object.fromEntries(FLAT.map(k => [k, sumKey(sources, k)]));
+    const pct = Object.fromEntries(PERCENT.map(k => [k, sumKey(sources, k)]));
+    // Exactly one multiplier AFTER summing fixed additions and percentage points.
+    const scaled = key => Math.max(0, flat[key] * Math.max(0, 1 + pct[key + "Pct"] / 100));
+    return Object.freeze({
+      maxHp: Math.max(1, number(owner.maxHp, 1) + sumKey(Object.values(gear), "maxHp")),
+      maxResonance: Math.max(0, number(weapon.maxResonance) + sumKey(Object.values(parts), "maxResonance") + number(buffs.maxResonance)),
+      resonanceRecovery: Math.max(0, number(weapon.resonanceRecovery) + sumKey(Object.values(parts), "resonanceRecovery") + number(buffs.resonanceRecovery)),
+      attack: scaled("attack"),
+      defense: scaled("defense"),
+      attackSpeed: Math.max(1, (100 + flat.speed) * Math.max(0, 1 + pct.speedPct / 100)),
+      critChance: Math.min(100, Math.max(0, flat.crit)),
+      penetration: Math.max(0, flat.penetration),
+      breakdown: Object.freeze({flat: Object.freeze(flat), permanentPct: Object.freeze(pct)})
+    });
+  }
+  function resolveDamage({damage = 0, critMultiplier = 1, cardMultiplier = 1,
+    preDefenseBonus = 0, defense = 0, penetration = 0, temporaryDefense = 0} = {}) {
+    const base = Math.max(0, number(damage));
+    const preDefense = Math.max(0, base * Math.max(0, number(critMultiplier, 1)) *
+      Math.max(0, number(cardMultiplier, 1)) + number(preDefenseBonus));
+    const effectiveDefense = Math.max(0, number(defense) - Math.max(0, number(penetration)));
+    const afterDefense = Math.max(1, preDefense - effectiveDefense);
+    const finalDamage = Math.max(0, afterDefense - Math.max(0, number(temporaryDefense)));
+    return Object.freeze({preDefense, effectiveDefense, afterDefense, finalDamage});
+  }
+  function speedRate(firstSpeed, secondSpeed) {
+    const faster = Math.max(1, number(firstSpeed, 100), number(secondSpeed, 100));
+    const slower = Math.max(1, Math.min(number(firstSpeed, 100), number(secondSpeed, 100)));
+    return Math.min(0.5, (faster - slower) / faster);
+  }
+  function advanceSpeedGauge(previous, ownerSpeed, enemySpeed) {
+    const owner = Math.max(1, number(ownerSpeed, 100));
+    const enemy = Math.max(1, number(enemySpeed, 100));
+    const faster = owner > enemy ? "owner" : enemy > owner ? "enemy" : null;
+    if (!faster) return Object.freeze({faster: null, gauge: 0, extraBasicAttack: null, rate: 0});
+    // Clear fractional progress when the faster combatant changes.
+    const previousGauge = previous?.faster === faster ? Math.max(0, number(previous.gauge)) : 0;
+    const rate = speedRate(owner, enemy);
+    const accrued = previousGauge + rate;
+    const trigger = accrued >= 1 - 1e-9;
+    return Object.freeze({
+      faster, rate,
+      gauge: trigger ? Math.max(0, accrued - 1) : accrued,
+      extraBasicAttack: trigger ? faster : null
+    });
+  }
+  return Object.freeze({SWORD_SLOTS, ARMOR_SLOTS, calculateActorStats, resolveDamage,
+    speedRate, advanceSpeedGauge});
+})();
+if (typeof module !== "undefined" && module.exports) module.exports = WC_COMBAT_MATH_V1;
+
+/* Weapon Chronicle — legacy equipment -> unified combat arithmetic inputs.
+ * Non-live adapter: preserves v5.2 saves and historical part IDs.
+ * The caller must supply ownerCombat BASE stats (not gear-inclusive) and the
+ * runtime's CURRENT totalMaxHp (which already includes equipped gear maxHp).
+ * If saved slots may be invalid, supply legacyVitals to reproduce original HP caps.
+ */
+const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
+  "use strict";
+  const SWORD = Object.freeze(["blade","guard","tang","grip","wrap","pommel","seat","scabbard"]);
+  const ARMOR = Object.freeze(["helmet","armor","gloves","boots"]);
+  const FLATS = Object.freeze(["attack","defense","speed","crit","penetration","maxResonance","resonanceRecovery"]);
+  function num(value) {
+    if (value === "" || value === null || value === undefined) return 0;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+  }
+  function modsOf(catalog, slot, itemId) {
+    if (!itemId) return {};
+    const item = catalog?.[slot]?.[itemId];
+    return item?.mods && typeof item.mods === "object" ? item.mods : {};
+  }
+  function swordPartValues(mods) {
+    return {
+      attack:num(mods.power), defense:num(mods.toughness),
+      speed:num(mods.handling), crit:num(mods.precision),
+      penetration:num(mods.penetration),
+      maxResonance:num(mods.maxResonance),
+      resonanceRecovery:num(mods.resonanceRecovery),
+      attackPct:num(mods.attackPct), defensePct:num(mods.defensePct), speedPct:num(mods.speedPct)
+    };
+  }
+  function armorValues(mods) {
+    return {
+      attack:num(mods.attack), defense:num(mods.defense),
+      speed:num(mods.speed), crit:num(mods.crit),
+      penetration:num(mods.penetration), maxHp:num(mods.maxHp),
+      attackPct:num(mods.attackPct), defensePct:num(mods.defensePct), speedPct:num(mods.speedPct)
+    };
+  }
+  function fromLegacyLoadout({ownerCombat={},totalMaxHp,weapon={},partCatalog={},
+    ownerEquipment={},gearCatalog={},buffs={},legacyVitals}={}) {
+    const weaponParts = {};
+    for (const slot of SWORD) {
+      weaponParts[slot] = swordPartValues(modsOf(partCatalog,slot,weapon.parts?.[slot]));
+    }
+    const armor = {};
+    for (const slot of ARMOR) {
+      const entry = ownerEquipment?.[slot] && gearCatalog?.[ownerEquipment[slot]];
+      // The saved equipped item must actually belong to the expected slot.
+      const mods = entry?.slot === slot ? (entry.mods||{}) : {};
+      armor[slot] = armorValues(mods);
+    }
+    // Legacy ownerVitalCaps: clamp(round(65 + rawSurvival*4 +
+    // boldness/age modifiers + fixed equipment HP), 58, 170).
+    // rawOwnerStats includes clamp(round(sum(gear.survival)), 0, 12).
+    // A capped saved aggregate alone cannot be inverted after an invalid slot.
+    const suspiciousHpSlot = ARMOR.find(slot=>{
+      const item = gearCatalog?.[ownerEquipment?.[slot]];
+      return item && item.slot !== slot &&
+        (num(item.mods?.maxHp) !== 0 || num(item.mods?.survival) !== 0);
+    });
+    const gearHp = ARMOR.reduce((sum,slot)=>sum+armor[slot].maxHp,0);
+    let baseHp;
+    if (legacyVitals !== undefined && legacyVitals !== null) {
+      if (!Number.isFinite(Number(legacyVitals.rawSurvivalBeforeArmor))) {
+        throw new TypeError("legacyVitals.rawSurvivalBeforeArmor is required");
+      }
+      const validSurvival = ARMOR.reduce((sum,slot)=>{
+        const itemId = ownerEquipment?.[slot];
+        const item = gearCatalog?.[itemId];
+        return sum + (item?.slot === slot ? num(item?.mods?.survival) : 0);
+      },0);
+      const armorSurvival = Math.max(0,Math.min(12,Math.round(validSurvival)));
+      const rawSurvival = Math.max(1,num(legacyVitals.rawSurvivalBeforeArmor)+armorSurvival);
+      const boldness = Number(legacyVitals.boldness)||50;
+      const age = Math.max(16,Number(legacyVitals.age)||24);
+      const uncapped = 65 + rawSurvival*4 + (boldness-50)*.08 - Math.max(0,age-34)*.45 + gearHp;
+      const total = Math.max(58,Math.min(170,Math.round(uncapped)));
+      // The pure core separately adds valid gear's flat HP, exactly once.
+      baseHp = total - gearHp;
+    } else {
+      if (suspiciousHpSlot) {
+        throw new RangeError("Cannot undo wrong-slot legacy Survival/HP from capped maxHp (" +
+          suspiciousHpSlot + "); provide legacyVitals for exact owner HP reconstruction");
+      }
+      // Valid legacy aggregate is already capped and Survival-inclusive.
+      // If only owner-only HP exists, a valid Survival gear contribution is
+      // still nontrivial: require the aggregate or an exact legacy profile.
+      const hasTotal = totalMaxHp !== undefined && totalMaxHp !== null;
+      const validSurvival = ARMOR.reduce((sum,slot)=>{
+        const item = gearCatalog?.[ownerEquipment?.[slot]];
+        return sum + (item?.slot === slot ? num(item?.mods?.survival) : 0);
+      },0);
+      if (!hasTotal && (ownerCombat.maxHp === undefined || validSurvival !== 0)) {
+        throw new RangeError("Provide totalMaxHp or legacyVitals to retain capped gear Survival HP");
+      }
+      baseHp = (hasTotal ? num(totalMaxHp) : num(ownerCombat.maxHp)+gearHp) - gearHp;
+    }
+    const owner = {...ownerCombat, maxHp:Math.max(1,baseHp)};
+    // state.weapon's values already INCLUDE every equipped component.
+    // Strip mapped component contributions now, so the core adds them once.
+    const totals = {
+      attack:num(weapon.power), defense:num(weapon.toughness),
+      speed:num(weapon.handling), crit:num(weapon.precision),
+      penetration:num(weapon.penetration),
+      maxResonance:num(weapon.maxResonance),
+      resonanceRecovery:num(weapon.resonanceRecovery)
+    };
+    const base = {};
+    for (const key of FLATS) {
+      base[key] = totals[key] - SWORD.reduce((sum,slot)=>sum+weaponParts[slot][key],0);
+    }
+    // Explicit baseline permanent bonuses remain separate from part modifiers.
+    for (const key of ["attackPct","defensePct","speedPct"]) base[key] = num(weapon[key]);
+    return {owner, weapon:base, weaponParts, armor, buffs:{...buffs}};
+  }
+  function enemyFromLegacy(stage, overrides={}) {
+    const enemy={...stage,...overrides};
+    return {
+      owner:{
+        maxHp:Math.max(1,num(enemy.maxHp)),
+        attack:num(enemy.attack),defense:num(enemy.defense),
+        speed:num(enemy.speed),crit:num(enemy.crit),
+        penetration:num(enemy.penetration)
+      }
+    };
+  }
+  return Object.freeze({SWORD,ARMOR,fromLegacyLoadout,enemyFromLegacy});
+})();
+if (typeof module !== "undefined" && module.exports) module.exports = WC_LEGACY_COMBAT_SOURCES_V1;
+
+/* Live handoff: compose the current loadout into ONE combat arithmetic snapshot.
+ * This phase only transfers calculated values to the story-combat frame.
+ * Damage, AI/card windows, saves and round timing remain legacy until separately reviewed.
+ */
+const WC_LIVE_COMBAT_HANDOFF_V1=(()=>{
+  "use strict";
+  function number(n, fallback=0){const x=Number(n);return Number.isFinite(x)?x:fallback;}
+  function calculate(input, adapter, math) {
+    if(!input||!adapter||!math)throw new TypeError("Combat handoff requires runtime, adapter and math");
+    const eff=input.effectiveOwner||{},raw=input.rawOwner||{},owner=input.owner||{};
+    const gearSurvival=number(input.armorSurvival);
+    const rawSurvivalBeforeArmor=Math.max(1,number(raw.survival,1)-gearSurvival);
+    // Existing owner martial effectiveness remains the compatibility source
+    // until all five owner attributes have an approved combat curve.
+    // The blade, eight sword parts and four armor slots are NOT folded
+    // into this flat owner attack again.
+    // The legacy effective attributes ALREADY incorporate weapon-fit and
+    // equipped Survival bonuses. Remove those effects before the sword and
+    // armor are added by the unified core, or they would count twice.
+    const mental=number(eff.mult,1);
+    const ownerMartial=Math.max(0,number(eff.martial)-number(raw.parts?.weapon)*mental);
+    const ownerSurvival=Math.max(0,number(eff.survival)-gearSurvival*mental);
+    const sources=adapter.fromLegacyLoadout({
+      ownerCombat:{
+        attack:ownerMartial*.72,
+        defense:ownerSurvival,
+        speed:0,
+        crit:2+ownerMartial*.52,
+        penetration:0
+      },
+      totalMaxHp:input.maxHp,
+      weapon:input.weapon,
+      partCatalog:input.partCatalog,
+      ownerEquipment:input.ownerEquipment,
+      gearCatalog:input.gearCatalog,
+      legacyVitals:{
+        rawSurvivalBeforeArmor,
+        boldness:owner.boldness,
+        age:owner.age
+      }
+    });
+    const stats=math.calculateActorStats(sources);
+    return Object.freeze({
+      maxHp:stats.maxHp,
+      maxResonance:stats.maxResonance,
+      resonanceRecovery:stats.resonanceRecovery,
+      attack:stats.attack,
+      defense:stats.defense,
+      attackSpeed:stats.attackSpeed,
+      critChance:stats.critChance,
+      penetration:stats.penetration
+    });
+  }
+  return Object.freeze({calculate});
+})();
+if(typeof module!=="undefined"&&module.exports)module.exports=WC_LIVE_COMBAT_HANDOFF_V1;
+
+if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
+  // Hook the existing launcher without replacing any legacy encounter rules.
+  const wcLaunchCombatBeforeHandoff=launchStoryCombat;
+  launchStoryCombat=function(...args){
+    const frame=$("combatFrame");
+    // A failed preview must never block the underlying game/combat.
+    try{
+      const snapshot=WC_LIVE_COMBAT_HANDOFF_V1.calculate({
+        owner:state.owner,
+        effectiveOwner:effectiveOwnerStats(),
+        rawOwner:rawOwnerStats(),
+        armorSurvival:armorSurvivalValue(),
+        maxHp:state.maxHp,
+        weapon:state.weapon,
+        partCatalog:PART_CATALOG,
+        ownerEquipment:state.ownerEquipment,
+        gearCatalog:OWNER_GEAR_CATALOG
+      },WC_LEGACY_COMBAT_SOURCES_V1,WC_COMBAT_MATH_V1);
+      frame.dataset.unifiedActorV1=JSON.stringify(snapshot);
+    }catch(err){
+      delete frame.dataset.unifiedActorV1;
+      console.warn("Unified combat handoff skipped; legacy combat retained:",err);
+    }
+    return wcLaunchCombatBeforeHandoff.apply(this,args);
+  };
+  window.addEventListener("message",event=>{
+    if(event?.data?.type==="wc-story-combat"){
+      const frame=$("combatFrame");
+      if(frame)delete frame.dataset.unifiedActorV1;
+    }
+  });
+}
+
 
 v48EnsureState();
 const v483Loaded=loadGame();
