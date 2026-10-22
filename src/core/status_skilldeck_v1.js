@@ -77,6 +77,8 @@ function ensureDeck(){
  const data=state.skillDeckData;
  if(!Array.isArray(data.owned))data.owned=STARTER.slice();
  data.owned=[...new Set(data.owned.filter(id=>BY_ID[id]))].slice(0,20);
+ if(!Array.isArray(data.dismantled))data.dismantled=[];
+ data.dismantled=[...new Set(data.dismantled.filter(id=>BY_ID[id]&&!STARTER.includes(id)))];
  for(const id of STARTER)if(!data.owned.includes(id)&&data.owned.length<20)data.owned.push(id);
  if(!Array.isArray(data.deck))data.deck=STARTER.slice();
  let dedup=[...new Set(data.deck.filter(id=>data.owned.includes(id)&&BY_ID[id]))];
@@ -86,13 +88,13 @@ function ensureDeck(){
  data.shards=Math.max(0,Math.floor(n(data.shards)));
  // Existing authored discoveries are the source of earned story skill cards.
  for(const [tag,id] of Object.entries(STORY_UNLOCKS)){
-   if((state.weapon?.engravings||[]).includes(tag)&&!data.owned.includes(id)&&data.owned.length<20)data.owned.push(id);
+   if((state.weapon?.engravings||[]).includes(tag)&&!data.dismantled.includes(id)&&!data.owned.includes(id)&&data.owned.length<20)data.owned.push(id);
  }
  return data;
 }
 function grant(id){
  const d=ensureDeck();if(!BY_ID[id]||d.owned.includes(id)||d.owned.length>=20)return false;
- d.owned.push(id);saveGame();return true;
+ d.owned.push(id);d.dismantled=d.dismantled.filter(x=>x!==id);saveGame();return true;
 }
 function labelRarity(r){return "wc3-rarity wc3-"+({"일반":"common","레어":"rare","유니크":"unique","레전더리":"legend"}[r]||"common");}
 function skillText(id){
@@ -223,7 +225,7 @@ function css(){
  document.head.appendChild(el);
 }
 function draw(tab){
- ensureOwner();ensureDeck();css();tab=["owner","gear","weapon","combat"].includes(tab)?tab:"owner";
+ ensureV26Progression();recalcWeapon();ensureOwner();ensureDeck();css();tab=["owner","gear","weapon","combat"].includes(tab)?tab:"owner";
  const tabs=[["owner","소유자"],["gear","방어구"],["weapon","무기"],["combat","스킬덱"]];
  const nav='<div class="tabRow">'+tabs.map(([id,label])=>'<button class="tabBtn'+(id===tab?' active':'')+
  '" data-wc3-tab="'+id+'">'+label+'</button>').join("")+'</div>';
@@ -251,7 +253,7 @@ function draw(tab){
  document.querySelectorAll("[data-wc3-salvage]").forEach(e=>e.onclick=()=>{
    const id=e.dataset.wc3Salvage,d=ensureDeck();
    if(STARTER.includes(id)||d.deck.includes(id))return;
-   d.owned=d.owned.filter(x=>x!==id);d.shards++;selectedSkill="";equipMode=false;
+   d.owned=d.owned.filter(x=>x!==id);d.dismantled.push(id);d.shards++;selectedSkill="";equipMode=false;
    saveGame();draw("combat");
  });
 }
