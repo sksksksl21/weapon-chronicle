@@ -11,10 +11,15 @@ without changing the save, the original catalog, a resource balance, or battle
 rules. It recognizes exactly eight sword slots and four owner gear slots. It
 deducts item part contributions from the existing recalculated weapon totals,
 then passes each actual part separately; the sum reconstructs the original
-aggregate exactly. It similarly strips the currently equipped item HP bonuses
-from an explicitly supplied `totalMaxHp` before the math core adds them back.
-Unrecognized legacy part IDs retain their total value in the base weapon; gear
-with a mismatched slot is ignored. Neither input nor persistent state is mutated.
+aggregate exactly. For HP, the caller's gear-exclusive `ownerCombat.maxHp` is authoritative
+when supplied; the math core adds HP from valid equipped gear once. When only
+an aggregate `totalMaxHp` is available, the adapter first removes bonuses from
+all recorded known equipment entries, **including wrong-slot items**, then lets
+the core add back only valid-slot bonuses. This prevents a mismatched saved item
+from retaining an invisible HP boost. Callers must not pass an already-gear-
+inclusive HP as `ownerCombat.maxHp`. Unrecognized legacy part IDs retain their
+total value in the base weapon; wrong-slot gear has no combat effect. Neither
+input nor persistent state is mutated.
 
 ### Current one-to-one source-field mapping
 
