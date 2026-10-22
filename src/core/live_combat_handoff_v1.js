@@ -105,7 +105,7 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
       }else aside.prepend(panel);
     }
     const s=wcCurrentUnifiedStats();
-    const fmt=v=>Number(v).toFixed(1).replace(/\\.0$/,"");
+    const fmt=v=>String(Math.round(Number(v)*10)/10);
     const grid=[
       ["공격력",s.attack],["방어력",s.defense],
       ["공격속도",s.attackSpeed],["치명타 확률",s.critChance+"%"],
