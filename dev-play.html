@@ -7,7 +7,7 @@
 const SCRIPT_PARTS=[
 "legacy/game_runtime.js","core/save_ledger_v48.js","core/action_checkpoint_v482.js","core/checkpoint_v483.js",
 "story/history_branch_v50.js","story/world_aftermath_v51.js","story/act1_history_v52.js",
-"core/combat_math_v1.js","core/legacy_combat_sources_v1.js","core/live_combat_handoff_v1.js","legacy/bootstrap.js"];
+"core/combat_math_v1.js","core/legacy_combat_sources_v1.js","core/live_combat_handoff_v1.js","core/status_skilldeck_v1.js","legacy/bootstrap.js"];
 const status=document.getElementById("wcLoading");
 const fetchText=async p=>{
   const url=new URL("src/"+p,location.href);
@@ -34,6 +34,17 @@ try{
   let combat=data["combat/story_combat.html"];
   for(const name of ["combat_math_v1","legacy_combat_sources_v1"])
     combat=replaceOnce(combat,"/* @include:"+name+" */",data["core/"+name+".js"]);
+  // Use exactly ten selected cards, without automatic story-card additions.
+  combat=replaceOnce(combat,
+    'const BASE_DECK=["aim1","aim2","guard","over","blood","feint","giant","last","reroll","reverse","counter","endure"];',
+    "const BASE_DECK=(()=>{const fallback=[\"aim1\",\"guard\",\"over\",\"blood\",\"feint\",\"giant\",\"reroll\",\"reverse\",\"counter\",\"endure\"];const raw=STORY_FRAME?.dataset?.skillDeck||STORY_PARAMS.get(\"skillDeck\")||\"\";try{const cards=JSON.parse(raw);if(Array.isArray(cards)&&cards.length===10&&new Set(cards).size===10&&cards.every(id=>typeof id===\"string\"&&CARD_DB[id]))return cards;}catch(e){}return fallback;})();");
+  for(const [tag,id] of [
+    ["carapace_gap","storyGap"],["left_behind","storyLeft"],
+    ["silent_prayer","storyPrayer"],["cyclops_gap","mainCyclops"],["carry_them","mainCarry"]
+  ]){
+    combat=replaceOnce(combat,"if(STORY_SKILLS.has('"+tag+"')) BASE_DECK.push('"+id+"');",
+      "// Earned story cards enter only when equipped in the ten-slot deck.");
+  }
   status.textContent="최신 게임 조립 중…";
   const docB64=await base64(new TextEncoder().encode(combat));
   let scripts=SCRIPT_PARTS.map(p=>data[p]);
