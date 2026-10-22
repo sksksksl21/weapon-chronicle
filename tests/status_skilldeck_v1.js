@@ -23,6 +23,16 @@ const ctx={
  combatXpNeed:l=>55+l*35,
  rawOwnerStats:()=>({martial:7,survival:6,social:4}),
  effectiveOwnerStats:()=>({martial:7,survival:6,social:4}),
+ wcDirectOwnerRates:()=>({martial:70,survival:60,social:40,stableSurvival:60}),
+ wcDirectCurrentStats:()=>({
+  martial:70,survival:60,minAttack:11,maxAttack:17,defense:12,
+  hitChance:77,attackSpeed:107,critChance:9,critMultiplier:1.2,
+  penetration:3,maxHp:93,critChanceResist:2,critDamageResist:4,
+  statusResist:5,evade:6,blockChance:7,blockAmount:2,
+  maxResonance:70,resonanceRecovery:5,
+  breakdown:{gearMinAttack:16,gearMaxAttack:24,gearDefense:20,
+   baseHitChance:70,gearHitBonus:10}
+ }),
  modalHead:(a,b)=>a+" "+b,openModal:s=>{html=s;},bindClose(){},
  saveGame:()=>{saves++;return true;},
  weaponArt41:()=>"<svg></svg>",openOwnerSlot(){},
@@ -47,6 +57,12 @@ assert.equal(new Set(data.deck).size,10);
 assert.equal(data.owned.length,10);
 deck.draw("owner");
 assert(html.includes("성장 경험치")&&html.includes("무예")&&html.includes("생존")&&html.includes("처세"));
+assert(html.includes("공격 장비 성능 70%"));
+assert(html.includes("방어 장비 성능 60%"));
+assert(html.includes("11 ~ 17"));
+assert(html.includes("방어·저항·공명 상세 펼치기"));
+assert(html.includes("장비 자체 성능 → 소유자 발휘율 → 최종값"));
+assert(!html.includes("위력")&&!html.includes("조작성"));
 deck.draw("gear");
 assert(html.includes("방어구 장착 상태")&&html.includes("상세 정보"));
 deck.draw("weapon");
