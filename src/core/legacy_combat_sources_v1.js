@@ -49,17 +49,26 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
       const mods = entry?.slot === slot ? (entry.mods||{}) : {};
       armor[slot] = armorValues(mods);
     }
-    // ownerCombat.maxHp, when supplied, is the authoritative gear-exclusive HP.
-    // In older inputs with only aggregate totalMaxHp, strip bonuses from every
-    // recorded equipped item (including a wrong-slot item), not only valid gear.
-    // The core then adds back HP solely from validated equipment slots.
+    // Legacy HP is clamped after Survival*4 and fixed gear maxHp are added.
+    // A capped aggregate cannot be reliably inverted to remove wrong-slot gear.
+    // Prefer an explicitly supplied gear-exclusive owner maximum.
+    const hasOwnerBase = ownerCombat.maxHp !== undefined && ownerCombat.maxHp !== null;
+    const uncertainSlot = ARMOR.find(slot=>{
+      const item = gearCatalog?.[ownerEquipment?.[slot]];
+      return item && item.slot !== slot &&
+        (num(item.mods?.maxHp) !== 0 || num(item.mods?.survival) !== 0);
+    });
+    if (!hasOwnerBase && uncertainSlot) {
+      throw new RangeError("Cannot normalize capped legacy HP with wrong-slot HP/Survival gear (" +
+        uncertainSlot + "); supply gear-exclusive ownerCombat.maxHp");
+    }
+    // For valid loadouts the sum of known fixed HP bonuses is reversible:
+    // subtract them from the aggregate and let the core add each valid item once.
     const knownEquippedHp = ARMOR.reduce((sum,slot)=>{
       const itemId = ownerEquipment?.[slot];
       return sum + num(itemId && gearCatalog?.[itemId]?.mods?.maxHp);
     },0);
-    const baseHp = ownerCombat.maxHp !== undefined && ownerCombat.maxHp !== null
-      ? num(ownerCombat.maxHp)
-      : num(totalMaxHp) - knownEquippedHp;
+    const baseHp = hasOwnerBase ? num(ownerCombat.maxHp) : num(totalMaxHp) - knownEquippedHp;
     const owner = {...ownerCombat, maxHp:Math.max(1,baseHp)};
     // state.weapon's values already INCLUDE every equipped component.
     // Strip mapped component contributions now, so the core adds them once.
