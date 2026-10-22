@@ -19,6 +19,8 @@ jobs:
         run: npm run check
       - name: Verify no uncommitted build drift
         run: git diff --exit-code -- index.html combat_story.html
+      - name: Unified combat math core assertions
+        run: npm run test:combat-math
   browser-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 20
