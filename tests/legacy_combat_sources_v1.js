@@ -56,23 +56,28 @@ const invalidWithProfile=math.calculateActorStats(bridge.fromLegacyLoadout({
 }));
 assert.equal(invalidWithProfile.maxHp,97,"invalid flat HP must not survive reconstruction");
 assert.equal(invalidWithProfile.attack,(10+19)*1.15,"wrong-slot gear attack must not contribute");
-assert.throws(()=>bridge.fromLegacyLoadout(swapped),RangeError,
-  "aggregate with invalid HP gear cannot be safely inverted");
+const explicitBase=math.calculateActorStats(bridge.fromLegacyLoadout(swapped));
+assert.equal(explicitBase.maxHp,112,"trusted owner-only base excludes wrong-slot HP");
+const contaminatedBase=math.calculateActorStats(bridge.fromLegacyLoadout({...swapped,totalMaxHp:122}));
+assert.equal(contaminatedBase.maxHp,112,"bad aggregate cannot override trusted owner-only base");
+assert.throws(()=>bridge.fromLegacyLoadout({...swapped,ownerCombat:{attack:10}}),RangeError,
+  "aggregate with invalid HP gear cannot be safely inverted without context");
 const survivalSlot={...swapped,ownerEquipment:{...swapped.ownerEquipment,gloves:"veteran_helm"},
   totalMaxHp:124};
 const survivalWithProfile=math.calculateActorStats(bridge.fromLegacyLoadout({
   ...survivalSlot,legacyVitals:uncappedProfile
 }));
 assert.equal(survivalWithProfile.maxHp,97,"invalid Survival*4 and flat HP are excluded");
-assert.throws(()=>bridge.fromLegacyLoadout(survivalSlot),RangeError);
+assert.equal(math.calculateActorStats(bridge.fromLegacyLoadout(survivalSlot)).maxHp,112);
+assert.throws(()=>bridge.fromLegacyLoadout({...survivalSlot,ownerCombat:{attack:10}}),RangeError);
 const cappedHp=math.calculateActorStats(bridge.fromLegacyLoadout({
   ...survivalSlot,totalMaxHp:170,
   legacyVitals:{rawSurvivalBeforeArmor:50,boldness:70,age:55}
 }));
 assert.equal(cappedHp.maxHp,170,"upper HP clamp is reproduced");
 const survivalOnly={...survivalSlot,ownerEquipment:{...survivalSlot.ownerEquipment,gloves:"survivor_helm"}};
-assert.throws(()=>bridge.fromLegacyLoadout(survivalOnly),RangeError,
-  "invalid Survival alone must not survive via aggregate HP");
+assert.throws(()=>bridge.fromLegacyLoadout({...survivalOnly,ownerCombat:{}}),RangeError,
+  "invalid Survival alone must not survive via aggregate HP without base/context");
 const survivalOnlyWithProfile=math.calculateActorStats(bridge.fromLegacyLoadout({
   ...survivalOnly,legacyVitals:uncappedProfile
 }));
