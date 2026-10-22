@@ -27,7 +27,7 @@ function boot(){
 const {engine,sandbox,parts,gear,rarities}=boot();
 const ranks=["common","rare","unique","legendary","chronicle"];
 const optionCounts=[0,1,2,3,3];
-assert.deepEqual(Object.keys(parts).sort(),engine.W_SLOTS.slice().sort());
+assert.equal(JSON.stringify(Object.keys(parts).sort()),JSON.stringify(Array.from(engine.W_SLOTS).sort()));
 let generated=0;
 for(const [kind,slots] of [["weapon",engine.W_SLOTS],["armor",engine.A_SLOTS]]){
  for(const slot of slots){
@@ -56,9 +56,9 @@ for(const [kind,slots] of [["weapon",engine.W_SLOTS],["armor",engine.A_SLOTS]]){
 }
 assert.equal(generated,240);
 for(const [slot,items] of Object.entries(baseParts)){
- for(const [id,item] of Object.entries(items))assert.deepEqual(parts[slot][id],item,id+" original unchanged");
+ for(const [id,item] of Object.entries(items))assert.equal(JSON.stringify(parts[slot][id]),JSON.stringify(item),id+" original unchanged");
 }
-for(const [id,item] of Object.entries(baseGear))assert.deepEqual(gear[id],item,id+" original unchanged");
+for(const [id,item] of Object.entries(baseGear))assert.equal(JSON.stringify(gear[id]),JSON.stringify(item),id+" original unchanged");
 assert.equal(JSON.stringify({baseParts,baseGear}),snapshot);
 const countBefore=Object.keys(gear).length;
 engine.expand(parts,gear,rarities);
