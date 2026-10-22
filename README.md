@@ -2,6 +2,19 @@
 
 This repository preserves the **v5.2 playable web baseline** while establishing Git/Codex/Codespaces development. This migration does not rewrite battle, story, or save rules.
 
+## Mobile DEV live preview (source-built)
+
+Open **https://sksksksl21.github.io/weapon-chronicle/play-dev.html** after setting
+**Settings → Pages → Deploy from a branch → dev → /(root)**. This preview fetches
+all source fragments on the deployed `dev` branch and assembles the exact build
+manifest in the browser (including the combat iframe), so the 10 MB generated
+`index.html` does not need to be uploaded for every quick iteration. The regular
+`index.html` remains the offline/release build output, and `main` is unchanged.
+The preview depends on a network connection, whereas the bundled HTML can run
+offline. Browser/Android manual smoke testing is still required; `play-dev.html`
+is not itself proof of battle correctness. If the preview gives 404, check that
+GitHub Pages is deploying `dev`, not `main`.
+
 ## Quick start (Codespaces)
 Open **Code → Codespaces → Create codespace on main**. The container setup installs the Python Playwright testing dependency and a browser. From the Codespaces terminal:
 
