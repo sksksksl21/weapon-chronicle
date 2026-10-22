@@ -9,6 +9,13 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
   const SWORD = Object.freeze(["blade","guard","tang","grip","wrap","pommel","seat","scabbard"]);
   const ARMOR = Object.freeze(["helmet","armor","gloves","boots"]);
   const FLATS = Object.freeze(["attack","defense","speed","crit","penetration","maxResonance","resonanceRecovery"]);
+  // Transitional combat-role bonuses for the v5.2 gear catalog.
+  // The legacy item records have no attack for gloves or speed for boots.
+  // These affect ONLY unified combat, not old save objects or legacy derived stats.
+  const GEAR_ROLE = Object.freeze({
+    gloves:Object.freeze({work_gloves:1,miner_gloves:2,bronze_gauntlet:4,healer_gloves:1}),
+    boots:Object.freeze({rope_sandals:4,traveler_boots:6,iron_greaves:-3,climber_boots:8})
+  });
   function num(value) {
     if (value === "" || value === null || value === undefined) return 0;
     const n = Number(value);
@@ -29,10 +36,12 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
       attackPct:num(mods.attackPct), defensePct:num(mods.defensePct), speedPct:num(mods.speedPct)
     };
   }
-  function armorValues(mods) {
+  function armorValues(mods,slot,itemId) {
+    const role=slot==="gloves" ? {attack:num(GEAR_ROLE.gloves[itemId])} :
+      slot==="boots" ? {speed:num(GEAR_ROLE.boots[itemId])} : {};
     return {
-      attack:num(mods.attack), defense:num(mods.defense),
-      speed:num(mods.speed), crit:num(mods.crit),
+      attack:num(mods.attack)+num(role.attack), defense:num(mods.defense),
+      speed:num(mods.speed)+num(role.speed), crit:num(mods.crit),
       penetration:num(mods.penetration), maxHp:num(mods.maxHp),
       attackPct:num(mods.attackPct), defensePct:num(mods.defensePct), speedPct:num(mods.speedPct)
     };
@@ -48,7 +57,7 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
       const entry = ownerEquipment?.[slot] && gearCatalog?.[ownerEquipment[slot]];
       // The saved equipped item must actually belong to the expected slot.
       const mods = entry?.slot === slot ? (entry.mods||{}) : {};
-      armor[slot] = armorValues(mods);
+      armor[slot] = armorValues(mods,slot,entry?.slot===slot?ownerEquipment[slot]:null);
     }
     // Legacy ownerVitalCaps: clamp(round(65 + rawSurvival*4 +
     // boldness/age modifiers + fixed equipment HP), 58, 170).
