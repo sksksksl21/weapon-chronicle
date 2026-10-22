@@ -5,7 +5,7 @@
 - Armor: helmet, armor, gloves, boots.
 - Four source archetypes per slot x five tiers = **20 newly generated entries per slot** (240 new entries).
 - Old identifiers and their underlying item records remain intact for existing saves and story gating; additional items are additive.
-- A deterministic pseudo-random seed based on each variant ID rolls the base-stat variance. Different catalog variants have different outcomes; acquiring the same ID again retains identical stats. **Independent per-drop instance rolls are not implemented yet**, because legacy inventories count by item ID rather than retaining instance attributes.
+- The 240 static template IDs retain deterministic base rolls. New armor-shop acquisitions can now mint unique copy IDs with independent seeds; each copy can be rehydrated from its own ID on reload without changing the existing inventory shape.
 
 ## Rarity contract
 | Key | Korean | Normal affixes | Unique effect | Stock weight |
@@ -32,12 +32,23 @@ The weights above are used for item-stock selection (not probabilities guarantee
 - Existing armor merchant restock is weighted by rarity; existing sword-part market and smith weights use RARITY_DEF.
 - Generated item IDs include slot, family index and tier, and therefore survive save/load with no new field added to stored inventories.
 
+## Copy-specific rolls (V1.1)
+- Existing 240 `wc5` templates remain immutable; acquiring a generated **armor-shop template** now makes a new `wc6` copy with a distinct compact ID.
+- ID encodes slot, family index, tier and randomly seeded copy token. It is not a new save schema: the original ID-keyed stock, inventory and equipped-item fields can store these IDs.
+- On load, saved `wc6` identifiers are detected and their deterministic modifiers rebuilt **before** invoking the old load function, then checked after load. Reopening the game does not reroll an existing copy.
+- `rollCopy(templateId)` and `restoreCopy(instanceId)` work for **both sword parts and armor**, so upcoming sword crafting and adventure rewards can call one shared mechanism.
+- New shop stock excludes already rolled copies to prevent a recursive pool and unbounded fresh templates. Original non-`wc5` legacy equipment stays untouched.
+- Shop, smith and modal item cards now receive the appropriate rarity-frame class where their existing markup exposes supported selectors.
+- Copy IDs are not interchangeable with deterministic `wc5` template IDs: save/loading or transferring an individual copy must preserve its full ID.
+
 ## Open follow-ups
-- **Legacy originals** keep their old authored modifiers, so legacy items do not automatically acquire the new tier-count contract. The contract is strict for the 240 generated variants.
+- **Sword crafting and combat/event rewards still need actual grant hooks** that call `rollCopy` on successful acquisition. The core API exists; only new armor-shop stock is wired automatically.
+- Inventory duplicates, capacity, buy/equip/discard/refund and persistence must still be exercised against the full browser runtime on Android; this is not a certified playthrough.
+- **Legacy originals** retain authored modifiers and do not automatically receive the new tier-count contract.
 - Full Android browser interaction, save migration stress test, economy/balance and rarity drop frequency audits remain outstanding.
-- Independent same-ID per-copy random stats would require instance-aware inventory records and an explicit migration plan, not silent mutation of the existing save format.
+- Conditional combat triggers for named unique effects are not yet designed; current unique effects are live numeric modifiers.
 
 ## Verification
-- `npm run test:gear-rarity` checks all 240 generated variants, option counts, exclusive effects, weapon/armor separation, unchanged legacy data and build manifest.
+- `npm run test:gear-rarity` includes 240 generated variants, five tiers, independent copy rolls, restart recovery, defensive-only armor and item-frame classes.
 - `npm run test:combat-adapter` includes missing-aggregate vs explicit-aggregate sword penetration regression.
 - Direct integration evaluation passed for unique weapon penetration and armor defensive effects without modifying existing save objects.
