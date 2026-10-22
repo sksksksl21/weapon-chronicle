@@ -700,7 +700,7 @@ body.storyMode .actions #resetBtn{display:none!important}
     </div>
     <div class="overdriveBar">
       <button class="odBtn" id="overdriveBtn">OVERDRIVE · OFF</button>
-      <div class="odRisk" id="overdriveRisk">사용/버림 합계 턴당 1장 · 보충 없음</div>
+      <div class="odRisk" id="overdriveRisk">매 턴 손패 1장 보충 · 최대 4장 · 턴당 개입 1회</div>
     </div>
     <details class="battleItemsFold361"><summary>전투 소모품 <span>붕대 · 응급약 · 해독약</span></summary>
       <div class="itemBar" id="itemBar">
@@ -1392,7 +1392,8 @@ function recordCardUse(id){
 function grantMoment(id,reason){
   if(momentGenerated[id]) return;
   momentGenerated[id]=true;
-  // Record a new memory in the chronicle; this battle never receives replacement cards.
+  // A newly acquired one-shot memory enters the draw pile for a later turn.
+  if(CARD_DB[id] && !hand.includes(id) && !deck.includes(id) && !discard.includes(id) && !exhausted.includes(id)) deck.unshift(id);
   showBanner("MEMORY BORN · "+CARD_DB[id].name);
   log("순간기억 생성 — "+CARD_DB[id].name+" / "+reason,"good");
   addChronicle('memory',CARD_DB[id].name,reason,8);
@@ -1662,8 +1663,8 @@ function renderWeakness(){
   if(txt){s.textContent=txt;s.className='enemyState show';}
   else{s.textContent='';s.className='enemyState';}
 }
-function renderOverdrive(){ $('overdriveBtn').hidden=true; $('overdriveRisk').textContent=hand.length?'한 턴에 기억카드 1장 사용 또는 버림 · 보충 없음':'손패 소진 · 소유자 자동전투 계속'; }
-function renderCombo(){ const b=$('comboBar'); b.className='comboBar'; b.textContent='MEMORY · 사용/버림 합계 턴당 1장 · 보충 없음'; }
+function renderOverdrive(){ $('overdriveBtn').hidden=true; $('overdriveRisk').textContent='매 턴 시작 시 손패 빈칸 1장 보충 · 사용/버림 합계 턴당 1장'; }
+function renderCombo(){ const b=$('comboBar'); b.className='comboBar'; b.textContent='MEMORY · 사용/버림 턴당 1장 · 덱 소진 시 버린 카드 순환'; }
 function toggleOverdrive(){ return; } // One intervention per turn has no two-card override.
 function exposeEnemy(){ if(enemy.exposed) return; enemy.exposed=true; showBanner(weakness().name+'!'); log(weakness().desc+` — 다음 ${hero.name} 행동에 약점 보너스.`,'warn'); render(); }
 function consumeExposure(){ if(enemy.exposed){enemy.exposed=false;log('약점 노출 종료.','muted');} }
@@ -1691,7 +1692,7 @@ function discardBattleCard36(){
  const id=discardChoice36;
  if(!canDiscardBattleCard36(id))return;
  removeHand(id);discard.push(id);cardUses=1;discardedThisTurn36=true;discardChoice36=null;
- log('기억카드 「'+displayCardName(id)+'」를 버렸다. 이번 턴 개입 종료 · 보충 없음.','warn');
+ log('기억카드 「'+displayCardName(id)+'」를 버렸다. 이번 턴 개입 종료 · 다음 턴 1장 보충.','warn');
  showBanner('기억 정리');render();
 }
 function battleImpact36(label){
@@ -1777,12 +1778,14 @@ function useBattleItem(id){
 function render(){
   $('heroName').textContent=hero.name;
   hero.pow=hero.martial*1.4+hero.survival*.8+hero.weapon.power*.65+hero.weapon.precision*.35+hero.weapon.handling*.3+hero.weapon.toughness*.25;
-  $('heroPow').textContent=`전투력 ${hero.pow.toFixed(1)}`;
+  $('heroPow').textContent=LIVE_ACTOR ? `공 ${LIVE_ACTOR.attack.toFixed(1)} · 방 ${LIVE_ACTOR.defense.toFixed(1)} · 속 ${LIVE_ACTOR.attackSpeed.toFixed(0)}` : `전투력 ${hero.pow.toFixed(1)}`;
+  $('heroPow').title=LIVE_ACTOR ? `치명 ${LIVE_ACTOR.critChance.toFixed(1)}% · 관통 ${LIVE_ACTOR.penetration.toFixed(1)}` : '';
   $('heroFill').style.width=(hero.hp/hero.maxHp*100)+'%';
   $('heroHp').textContent=`${hero.hp.toFixed(1)} / ${hero.maxHp.toFixed(1)}`;
 
   $('enemyName').textContent=stage().name;
-  $('enemyPow').textContent=`전투력 ${stage().pow.toFixed(1)}`;
+  $('enemyPow').textContent=enemy.unified ? `공 ${enemy.unified.attack.toFixed(1)} · 방 ${enemy.unified.defense.toFixed(1)} · 속 ${enemy.unified.attackSpeed.toFixed(0)}` : `전투력 ${stage().pow.toFixed(1)}`;
+  $('enemyPow').title=enemy.unified ? `치명 ${enemy.unified.critChance.toFixed(1)}% · 관통 ${enemy.unified.penetration.toFixed(1)}` : '';
   $('enemyFill').style.width=(enemy.hp/enemy.maxHp*100)+'%';
   $('enemyHp').textContent=`${enemy.hp.toFixed(1)} / ${enemy.maxHp.toFixed(1)}`;
 
@@ -1819,6 +1822,24 @@ function canUseCard(id){
   return false;
 }
 function removeHand(id){ const i=hand.indexOf(id); if(i>=0) hand.splice(i,1); }
+
+/* Four-slot rotating memory hand: one replacement at each new turn.
+ * No bonus-attack or reaction refill; exhausted cards never return.
+ */
+function openingBattleHand(){
+  deck=shuffle(BASE_DECK.slice());
+  hand=deck.splice(0,4);
+}
+function refillBattleHandOnce(){
+  if(hand.length>=4)return false;
+  if(!deck.length && discard.length){
+    deck=shuffle(discard.splice(0));
+    log('버린 기억카드를 다시 섞었다.','muted');
+  }
+  if(!deck.length)return false;
+  hand.push(deck.shift());
+  return true;
+}
 function useCard(id){
   const c=CARD_DB[id];
   if(!canUseCard(id)) return;
@@ -2063,6 +2084,7 @@ function startTurn(){
     log('독 피해 — HP -4 ('+hero.poisonTurns+'T 남음).','bad');
     if(hero.hp<=0){render();runEnd();return;}
   }
+  if(turn>1) refillBattleHandOnce();
   enemyIntent=chooseEnemyIntent();
   heroPlan=chooseHeroPlan();
   selectedPre=[];discardChoice36=null;discardedThisTurn36=false;
@@ -2475,9 +2497,9 @@ function nextStage(){
   stageIndex++;
   enemy=makeEnemy();
   turn=1;
-  // A new encounter receives four cards; no card recycles inside a battle.
-  hand=shuffle(BASE_DECK.slice()).slice(0,4);
-  deck=[];discard=[];exhausted=[];selectedPre=[];usedThisTurn=[];
+  // Each encounter shuffles the complete card pool. Used non-exhaust cards can cycle.
+  discard=[];exhausted=[];selectedPre=[];usedThisTurn=[];
+  openingBattleHand();
   cardUses=0;discardChoice36=null;discardedThisTurn36=false;
   setScene();
   startTurn();
@@ -2578,7 +2600,7 @@ function resetRun(){
   heroDecisionBias=0;
   heroDecisionForced=false;
 
-  hand=shuffle(BASE_DECK.slice()).slice(0,4);
+  openingBattleHand();
   setScene();
   renderChronicleButton();
   log('v2.0 — UI 재배치 + 무기 연대기 기록 시스템 연결.','muted');
