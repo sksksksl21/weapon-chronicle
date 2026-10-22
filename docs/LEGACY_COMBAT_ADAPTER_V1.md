@@ -11,24 +11,30 @@ without changing the save, the original catalog, a resource balance, or battle
 rules. It recognizes exactly eight sword slots and four owner gear slots. It
 deducts item part contributions from the existing recalculated weapon totals,
 then passes each actual part separately; the sum reconstructs the original
-aggregate exactly. For HP, the caller's gear-exclusive `ownerCombat.maxHp` is authoritative
-when supplied; the math core adds HP from valid equipped gear once. If only
-aggregate `totalMaxHp` is supplied, the adapter subtracts known fixed HP
-bonuses for a **valid** loadout and then adds them back once through the core.
-This preserves the current aggregate, including its legacy Survival-derived HP.
+aggregate exactly. HP from the old runtime is **not** simply base HP plus flat equipment HP:
+`ownerVitalCaps` computes
+`clamp(round(65 + rawSurvival*4 + (boldness-50)*.08 - agePenalty*.45 + gearMaxHp),58,170)`.
+The raw Survival includes `clamp(round(sum(equipped gear survival)),0,12)`.
+Consequently, removing a wrong-slot item from a capped total cannot be done
+reliably by subtraction, even if its fixed `maxHp` bonus is known.
 
-**An aggregate with known wrong-slot HP/Survival gear is not reversible.**
-The original `ownerVitalCaps` computes `clamp(round(65 + rawSurvival*4 +
-other owner terms + gearMaxHp), 58, 170)`, and `armorSurvivalValue`
-clamps the sum of equipped Survival to [0,12]. Removing wrong-slot equipment
-from a *capped* aggregate cannot reconstruct the owner-only HP exactly.
-Without a trustworthy gear-exclusive `ownerCombat.maxHp`, the adapter raises
-`RangeError` rather than leaking HP or inventing a correction. An integration
-caller must derive the genuine owner-only HP from owner state and legacy caps,
-or handle this validation failure explicitly without modifying saved data.
-Do not pass already-gear-inclusive HP as `ownerCombat.maxHp`.
-Unrecognized legacy part IDs retain their total weapon values. Neither input
-nor persistent state is mutated.
+For a **valid** loadout the adapter preserves explicitly supplied
+`totalMaxHp` (including all old valid Survival bonuses) while removing the
+already-included flat `maxHp` for recombination exactly once in the math core.
+This is the safe legacy-save baseline. If a known wrong-slot equipped item has
+a `maxHp` or `survival` bonus, the adapter requires `legacyVitals`, with:
+`rawSurvivalBeforeArmor` (legacy `survivalBase + life`, before equipment),
+`boldness`, and `age`. It then recomputes the entire original HP formula
+using **only valid equipped slots**, including the 58–170 clamp, and returns
+an HP input that yields the exact recomputed total after valid fixed gear HP
+is added by the core. The same reconstruction is available for valid loadouts.
+Without sufficient provenance, it fails with `RangeError` instead of silently
+giving a wrong-slot item an HP bonus or inventing a value.
+
+The caller must not interpret `ownerCombat.maxHp` alone as enough to
+reconstruct a corrupted/clamped legacy total, because gear Survival also
+contributes. Neither saved data nor the live combat runtime is mutated.
+Unrecognized older sword part IDs retain their aggregate values.
 
 ### Current one-to-one source-field mapping
 
