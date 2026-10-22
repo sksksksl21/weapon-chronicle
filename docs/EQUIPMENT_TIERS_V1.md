@@ -52,3 +52,9 @@ The weights above are used for item-stock selection (not probabilities guarantee
 - `npm run test:gear-rarity` includes 240 generated variants, five tiers, independent copy rolls, restart recovery, defensive-only armor and item-frame classes.
 - `npm run test:combat-adapter` includes missing-aggregate vs explicit-aggregate sword penetration regression.
 - Direct integration evaluation passed for unique weapon penetration and armor defensive effects without modifying existing save objects.
+
+## Shop connection
+- `src/core/merchant_stock_v1.js` is loaded after the equipment-pool module. Beta armor sellers display eight `wc6` copies with all four armor slots and five ranks; smith buy shows nine copies with all eight sword slots and five ranks.
+- Market buy and smith buy retain their original gold checks, inventory capacity, sold flags, and save behaviors. The merchant glue only generates offer IDs/rolls and upgrades unsold old-stock rows once when first opened.
+- Existing sold items and ownership are not replaced. Newly purchased smith copies cannot be mass-crafted from the same generated copy ID; static `wc5` templates remain available under existing craft rules.
+- The 5-grade display is guaranteed for beta stock only; future live rarity rates should be controlled independently of beta visibility.
