@@ -119,6 +119,13 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
     };
     const base = {};
     for (const key of FLATS) {
+      // Legacy recalcWeapon aggregates power/precision/toughness/handling and
+      // resonance, but has NO aggregate penetration field. New part affixes
+      // own penetration directly; do not subtract those from a missing total.
+      if(key==="penetration"&&(weapon.penetration===undefined||weapon.penetration===null)){
+        base[key]=0;
+        continue;
+      }
       base[key] = totals[key] - SWORD.reduce((sum,slot)=>sum+weaponParts[slot][key],0);
     }
     // Explicit baseline permanent bonuses remain separate from part modifiers.
