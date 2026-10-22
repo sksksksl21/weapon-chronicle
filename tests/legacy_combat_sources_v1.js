@@ -88,6 +88,9 @@ const recomputed=math.calculateActorStats(bridge.fromLegacyLoadout({
   ...validSurvivalInput,legacyVitals:uncappedProfile
 }));
 assert.equal(recomputed.maxHp,109,"valid gear Survival is included in recomputed HP");
+assert.throws(()=>bridge.fromLegacyLoadout({
+  ...validSurvivalInput,totalMaxHp:undefined
+}),RangeError,"missing aggregate cannot drop valid gear Survival HP");
 const validWithoutBase=math.calculateActorStats(bridge.fromLegacyLoadout({
   ...sourceInput,ownerCombat:{attack:10,defense:4,speed:3,crit:2}
 }));
