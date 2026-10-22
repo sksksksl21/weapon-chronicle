@@ -12,10 +12,13 @@ const state={
  ownerEquipment:{helmet:"hat",armor:null,gloves:null,boots:null}
 };
 let html="",saves=0;
-const el={dataset:{}};
+const el={dataset:{}},eventNodes={};
+const simulate=(selector,key,val)=>{
+ const target={dataset:{[key]:val},onclick:null};eventNodes[selector]=[target];return target;
+};
 const ctx={
  state,console,window:{},
- document:{head:{appendChild(){}},createElement:()=>({}),getElementById:()=>el,querySelectorAll:()=>[]},
+ document:{head:{appendChild(){}},createElement:()=>({}),getElementById:()=>el,querySelectorAll:selector=>eventNodes[selector]||[]},
  ensureV26Progression(){},recalcWeapon(){},syncOwnerVitalCaps(){},
  combatXpNeed:l=>55+l*35,
  rawOwnerStats:()=>({martial:7,survival:6,social:4}),
@@ -57,4 +60,27 @@ assert(!deck.grant("storyGap"));
 assert(!deck.grant("not_a_skill"));
 assert(saves>0);
 assert.equal(JSON.parse(JSON.stringify(state.skillDeckData)).deck.length,10);
-console.log("PASS: owner pool / experience / armor / 8-part weapon / 10-card deck / 20-slot inventory / save");
+// Exercise the actual modal callbacks, not only data construction.
+// Selecting an earned card, tapping Equip, then choosing a position must replace exactly one card.
+const inv=simulate("[data-wc3-inv]","wc3Inv","storyGap");
+const equip=simulate("[data-wc3-equip]","wc3Equip","storyGap");
+const slot=simulate("[data-wc3-deckslot]","wc3Deckslot","0");
+deck.draw("combat");inv.onclick();equip.onclick();slot.onclick();
+assert.equal(state.skillDeckData.deck[0],"storyGap");
+assert.equal(state.skillDeckData.deck.length,10);
+assert.equal(new Set(state.skillDeckData.deck).size,10);
+const starter=simulate("[data-wc3-inv]","wc3Inv","aim1");
+deck.draw("combat");starter.onclick();
+simulate("[data-wc3-equip]","wc3Equip","aim1");
+deck.draw("combat");eventNodes["[data-wc3-equip]"][0].onclick();
+simulate("[data-wc3-deckslot]","wc3Deckslot","0");
+deck.draw("combat");eventNodes["[data-wc3-deckslot]"][0].onclick();
+assert.equal(state.skillDeckData.deck[0],"aim1");
+const salvage=simulate("[data-wc3-salvage]","wc3Salvage","storyGap");
+deck.draw("combat");salvage.onclick();
+assert(!state.skillDeckData.owned.includes("storyGap"));
+assert.equal(state.skillDeckData.shards,1);
+assert.equal(state.skillDeckData.deck.length,10);
+assert(saves>=4);
+console.log("PASS: 12 owners / 21 skills / owner XP / 4 armor / 8 sword parts / 10-slot deck / 20 inventory");
+console.log("PASS: select -> equip -> choose position -> replace -> dismantle -> persisted");
