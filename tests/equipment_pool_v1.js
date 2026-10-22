@@ -76,6 +76,46 @@ assert(preview.includes("core/equipment_pool_v1.js"));
 const status=fs.readFileSync(path.join(root,"src/core/status_skilldeck_v1.js"),"utf8");
 assert(status.includes("WC_EQUIPMENT_POOL_V1.formatDetail"));
 assert(status.includes("rarity-"));
+// Each acquisition of the same generated template is a different saved item ID.
+// The ID embeds a seed; rebuilding the catalog from a save restores exact rolls.
+const copies=Array.from({length:20},()=>engine.rollCopy("wc5_blade_0_chronicle"));
+assert(copies.every(x=>x&&x.id.startsWith("wc6_blade_0_chronicle_")));
+assert.equal(new Set(copies.map(x=>x.id)).size,20,"each weapon copy gets an independent ID");
+assert(new Set(copies.map(x=>JSON.stringify(x.item.mods))).size>1,
+  "same archetype/tier can roll different attribute values");
+for(const {id,item} of copies.slice(0,3)){
+ assert.equal(item.rarity,"chronicle");
+ assert.equal(item.options.length,3);
+ assert(item.uniqueEffect);
+ assert.equal(item.rolledInstance,true);
+ const snapshot=JSON.stringify(item);
+ delete parts.blade[id];
+ assert.equal(JSON.stringify(engine.restoreCopy(id)),snapshot,
+   "instance can be reproduced from its own ID, without saved catalog blobs");
+}
+const armorCopy=engine.rollCopy("wc5_helmet_0_unique");
+assert(armorCopy&&gear[armorCopy.id]);
+assert.equal(armorCopy.item.options.length,2);
+assert(armorCopy.item.uniqueEffect);
+for(const key of ["attack","crit","penetration","attackPct"])
+ assert.equal(armorCopy.item.mods[key]||0,0,"no armor offensive bonuses on rolled copies");
+const saved=JSON.stringify({inventory:{[copies[0].id]:2},
+  ownerEquipment:{helmet:armorCopy.id},
+  weapon:{parts:{blade:copies[1].id}}});
+delete parts.blade[copies[0].id];delete parts.blade[copies[1].id];
+delete gear[armorCopy.id];
+assert.equal(engine.restoreFromSave(saved),3,"both owned, equipped gear and sword IDs restored");
+assert.equal(JSON.stringify(gear[armorCopy.id]),JSON.stringify(armorCopy.item));
+const fresh=boot();
+assert.equal(JSON.stringify(fresh.engine.restoreCopy(copies[0].id)),
+  JSON.stringify(copies[0].item),"independent new session reconstructs original roll");
+assert.equal(engine.restoreCopy("wc6_blade_9_chronicle_fake"),null,
+  "invalid instance IDs are not accepted");
+const framed=engine.decorateCardHTML('<button class="gearChoiceCard40 active">상점 장비</button>',armorCopy.item);
+assert(framed.includes("rarity-unique"),"shop card gets the correct rarity frame class");
+assert(engine.decorateCardHTML('<button class="smithChoiceBtn">부품</button>',copies[0].item)
+  .includes("rarity-chronicle"),"smith item gets its correct rarity frame class");
+console.log("PASS: 20 independent copies, exact reload, 2 instance slots, rarity UI classes");
 console.log("PASS: 240 rolled equipment variants, 20/slot, five grades and affix counts");
 console.log("PASS: armor offensive prohibition, deterministic persistent IDs, unique effects");
 console.log("PASS: old catalog unchanged, mobile loader/real status UI wired");
