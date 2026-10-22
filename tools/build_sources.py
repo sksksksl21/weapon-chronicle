@@ -5,7 +5,9 @@ SCRIPT_PARTS = (
     'legacy/game_runtime.js', 'core/save_ledger_v48.js',
     'core/action_checkpoint_v482.js', 'core/checkpoint_v483.js',
     'story/history_branch_v50.js', 'story/world_aftermath_v51.js',
-    'story/act1_history_v52.js', 'legacy/bootstrap.js',
+    'story/act1_history_v52.js',
+    'core/combat_math_v1.js', 'core/legacy_combat_sources_v1.js',
+    'core/live_combat_handoff_v1.js', 'legacy/bootstrap.js',
 )
 
 
