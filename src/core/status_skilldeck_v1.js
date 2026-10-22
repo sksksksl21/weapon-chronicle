@@ -145,6 +145,15 @@ function ownerBody(){
  '<div class="wc3-avatar">◈</div><div><h3>'+escapeHtml(state.owner.name)+'</h3><small>'+
  escapeHtml(state.owner.role||"소유자")+' · '+n(state.owner.age)+'세 · 제'+n(state.generation)+'대</small></div></div>'+
  '<p class="wc3-story">'+escapeHtml(state.owner.background||"아직 기록된 과거가 없다.")+'</p></section>'+
+ '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>현재 장착</h3><small>부위를 눌러 상세 확인</small></div>'+
+ '<div class="wc3-ownerEquipGrid">'+
+ [["helmet","투구"],["armor","갑옷"],["gloves","장갑"],["boots","신발"]].map(([slot,label])=>{
+   const id=state.ownerEquipment?.[slot],entry=OWNER_GEAR_CATALOG[id];
+   return '<button data-wc3-tab="gear" class="wc3-ownerEquip rarity-'+(entry?.rarity||"common")+
+    '"><b>'+label+'</b><small>'+escapeHtml(entry?.name||"미장착")+'</small></button>';
+ }).join("")+
+ '<button data-wc3-tab="weapon" class="wc3-ownerEquip wc3-ownerWeapon"><b>검</b><small>8파츠 상세</small></button>'+
+ '</div></section>'+
  '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>소유자 기본 능력</h3><small>현재 발휘율 · 0~100</small></div>'+
  '<div class="wc3-abilityGrid">'+abilities.map(([title,v,note])=>
   '<div class="wc3-ability"><b>'+title+'</b><strong>'+v+'<small>/100</small></strong>'+
@@ -267,6 +276,10 @@ function css(){
  '.wc3-hero{padding:12px;background:#283b50;color:#f5e8d5;border-radius:12px}.wc3-hero small{color:#dfd2bb!important}' +
  '.wc3-hero .wc3-story{background:#354961;color:#fff}.wc3-hero h3{color:#fff}' +
  '.wc3-sectionTitle{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px}.wc3-sectionTitle h3{font-size:14px!important;margin:0}.wc3-sectionTitle small{font-size:10px}' +
+ '.wc3-ownerEquipGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}' +
+ '.wc3-ownerEquip{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:8px;border:1px solid #b9aa92;border-radius:7px;background:#fff8eb;font-size:11px;color:#413b33;text-align:left;min-width:0}' +
+ '.wc3-ownerEquip b{font-size:11px;flex-shrink:0}.wc3-ownerEquip small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:72%}' +
+ '.wc3-ownerWeapon{grid-column:1/-1;border-color:#987142;background:#f6e8d0}' +
  '.wc3-abilityGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}' +
  '.wc3-ability{border:1px solid #c7b496;border-radius:9px;background:#fff8e9;padding:9px 6px;display:flex;flex-direction:column;gap:6px;min-width:0}' +
  '.wc3-ability>b{font-size:12px}.wc3-ability>strong{font-size:23px;color:#254d56;line-height:1}.wc3-ability>strong small{font-size:10px}' +
