@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Weapon Chronicle · DEV live preview</title>
+<style>
+html,body{margin:0;min-height:100%;background:#101b2a;color:#f1d6a6;font:16px system-ui,sans-serif}
+#status{max-width:460px;margin:12vh auto;padding:20px;line-height:1.7;text-align:center}
+small{display:block;color:#a7b3c4;margin-top:8px}button{font:inherit;border-radius:8px;padding:8px 14px;background:#f1d6a6;color:#142030;border:0}
+</style>
+</head>
+<body>
+<div id="status"><strong>Weapon Chronicle · DEV</strong><small id="detail">최신 dev 소스에서 게임을 조립하고 있습니다.</small></div>
+<script>
+(async function(){
+  "use strict";
+  const scriptParts=[
+    "legacy/game_runtime.js","core/save_ledger_v48.js","core/action_checkpoint_v482.js",
+    "core/checkpoint_v483.js","story/history_branch_v50.js","story/world_aftermath_v51.js",
+    "story/act1_history_v52.js","core/combat_math_v1.js",
+    "core/legacy_combat_sources_v1.js","core/live_combat_handoff_v1.js",
+    "legacy/bootstrap.js"
+  ];
+  const supporting=[
+    "legacy/html_before_script.html","legacy/html_after_script.html",
+    "combat/story_combat.html","story/main_chapters_v47.js"
+  ];
+  const paths=[...new Set([...scriptParts,...supporting])];
+  const detail=document.getElementById("detail");
+  try{
+    const entries=await Promise.all(paths.map(async path=>{
+      const response=await fetch("./src/"+path,{cache:"no-store"});
+      if(!response.ok)throw Error(path+" 다운로드 실패 (HTTP "+response.status+")");
+      return [path,await response.text()];
+    }));
+    const files=Object.fromEntries(entries);
+    function replaceOnce(source,marker,replacement){
+      const first=source.indexOf(marker);
+      if(first===-1||source.indexOf(marker,first+marker.length)!==-1)
+        throw Error("조립 위치 오류: "+marker);
+      return source.slice(0,first)+replacement+source.slice(first+marker.length);
+    }
+    let combat=files["combat/story_combat.html"];
+    for(const module of ["combat_math_v1","legacy_combat_sources_v1"]){
+      combat=replaceOnce(combat,"/* @include:"+module+" */",files["core/"+module+".js"]);
+    }
+    // Match tools/build_sources.py without committing a 10 MB generated bundle.
+    const data=new TextEncoder().encode(combat);
+    const chunks=[];
+    for(let i=0;i<data.length;i+=16384)
+      chunks.push(String.fromCharCode(...data.subarray(i,i+16384)));
+    const combatB64=btoa(chunks.join(""));
+    let scripts=scriptParts.map(path=>files[path]);
+    const substitutions=[
+      ["/* @include:combat-document */","const COMBAT_DOC_B64="+JSON.stringify(combatB64)+";"],
+      ["/* @include:main-chapters-v47 */",files["story/main_chapters_v47.js"].replace(/\n$/,"")]
+    ];
+    for(const [marker,value] of substitutions){
+      let hits=0;
+      scripts=scripts.map(source=>{
+        if(source.includes(marker)){hits++;return replaceOnce(source,marker,value);}
+        return source;
+      });
+      if(hits!==1)throw Error("조립 위치 개수 오류: "+marker+" ("+hits+")");
+    }
+    const html=files["legacy/html_before_script.html"]+
+      "<script>\n"+scripts.join("\n")+"\n<"+"/script>"+
+      files["legacy/html_after_script.html"];
+    if(!html.includes("wcUnifiedCombatStats")||!html.includes("refillBattleHandOnce"))
+      throw Error("dev 전투/UI 변경 내용이 누락되었습니다.");
+    document.open();
+    document.write(html);
+    document.close();
+  }catch(error){
+    console.error("DEV preview failed",error);
+    detail.textContent="개발판 실행 실패: "+(error?.message||String(error));
+    const retry=document.createElement("button");
+    retry.textContent="새로고침";
+    retry.onclick=()=>location.reload();
+    document.getElementById("status").appendChild(retry);
+  }
+})();
+</script>
+</body>
+</html>
