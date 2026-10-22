@@ -12,14 +12,23 @@ rules. It recognizes exactly eight sword slots and four owner gear slots. It
 deducts item part contributions from the existing recalculated weapon totals,
 then passes each actual part separately; the sum reconstructs the original
 aggregate exactly. For HP, the caller's gear-exclusive `ownerCombat.maxHp` is authoritative
-when supplied; the math core adds HP from valid equipped gear once. When only
-an aggregate `totalMaxHp` is available, the adapter first removes bonuses from
-all recorded known equipment entries, **including wrong-slot items**, then lets
-the core add back only valid-slot bonuses. This prevents a mismatched saved item
-from retaining an invisible HP boost. Callers must not pass an already-gear-
-inclusive HP as `ownerCombat.maxHp`. Unrecognized legacy part IDs retain their
-total value in the base weapon; wrong-slot gear has no combat effect. Neither
-input nor persistent state is mutated.
+when supplied; the math core adds HP from valid equipped gear once. If only
+aggregate `totalMaxHp` is supplied, the adapter subtracts known fixed HP
+bonuses for a **valid** loadout and then adds them back once through the core.
+This preserves the current aggregate, including its legacy Survival-derived HP.
+
+**An aggregate with known wrong-slot HP/Survival gear is not reversible.**
+The original `ownerVitalCaps` computes `clamp(round(65 + rawSurvival*4 +
+other owner terms + gearMaxHp), 58, 170)`, and `armorSurvivalValue`
+clamps the sum of equipped Survival to [0,12]. Removing wrong-slot equipment
+from a *capped* aggregate cannot reconstruct the owner-only HP exactly.
+Without a trustworthy gear-exclusive `ownerCombat.maxHp`, the adapter raises
+`RangeError` rather than leaking HP or inventing a correction. An integration
+caller must derive the genuine owner-only HP from owner state and legacy caps,
+or handle this validation failure explicitly without modifying saved data.
+Do not pass already-gear-inclusive HP as `ownerCombat.maxHp`.
+Unrecognized legacy part IDs retain their total weapon values. Neither input
+nor persistent state is mutated.
 
 ### Current one-to-one source-field mapping
 
