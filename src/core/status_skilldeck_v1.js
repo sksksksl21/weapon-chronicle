@@ -109,19 +109,64 @@ function statRows(rows){
 function ownerBody(){
  const d=state.ownerProgress||{level:1,combatXp:0,lifeXp:0,reputation:0};
  const lv=Math.max(1,Math.floor(n(d.level)||1)),xp=n(d.combatXp),need=combatXpNeed(lv);
- const raw=rawOwnerStats(),eff=effectiveOwnerStats();
- return '<section class="wc3-panel"><div class="wc3-profile">'+
+ const r=wcDirectOwnerRates(),s=wcDirectCurrentStats();
+ const fmt=x=>String(Math.round(n(x)*10)/10);
+ const main=[
+  ["공격력",s.minAttack+" ~ "+s.maxAttack],
+  ["방어력",s.defense],
+  ["명중",fmt(s.hitChance)+"%"],
+  ["속도",s.attackSpeed],
+  ["치명타 확률",fmt(s.critChance)+"%"],
+  ["치명타 피해",fmt(s.critMultiplier)+"배"]
+ ];
+ const detail=[
+  ["최대 HP",s.maxHp],["관통",fmt(s.penetration)],
+  ["치명타 확률 저항",fmt(s.critChanceResist)+"%p"],
+  ["치명타 추가피해 저항",fmt(s.critDamageResist)+"%p"],
+  ["상태이상 저항",fmt(s.statusResist)+"%"],
+  ["회피",fmt(s.evade)+"%"],["막기 확률",fmt(s.blockChance)+"%"],
+  ["막기량",fmt(s.blockAmount)],["최대 공명",fmt(s.maxResonance)],
+  ["교전당 공명 회복",fmt(s.resonanceRecovery)]
+ ];
+ const abilities=[
+  ["무예",r.martial,"공격 장비 성능 "+r.martial+"%"],
+  ["생존",r.survival,"방어 장비 성능 "+r.survival+"%"],
+  ["처세",r.social,"사건·교섭 능력"]
+ ];
+ const resources=[
+  ["체력",Math.max(0,n(state.hp))+" / "+s.maxHp],
+  ["정신",Math.max(0,n(state.mind))+" / 100"],
+  ["공명",Math.max(0,n(state.weapon?.resonance))+" / "+n(state.weapon?.maxResonance)],
+  ["검 내구",Math.max(0,n(state.weapon?.dur))+" / "+n(state.weapon?.maxDur)]
+ ];
+ const stats=list=>'<div class="wc3-directGrid">'+list.map(([title,value])=>
+   '<div class="wc3-directStat"><small>'+title+'</small><strong>'+escapeHtml(value)+'</strong></div>').join("")+'</div>';
+ return '<section class="wc3-hero"><div class="wc3-profile">'+
  '<div class="wc3-avatar">◈</div><div><h3>'+escapeHtml(state.owner.name)+'</h3><small>'+
  escapeHtml(state.owner.role||"소유자")+' · '+n(state.owner.age)+'세 · 제'+n(state.generation)+'대</small></div></div>'+
  '<p class="wc3-story">'+escapeHtml(state.owner.background||"아직 기록된 과거가 없다.")+'</p></section>'+
- '<section class="wc3-panel"><h3>성장 경험치</h3>'+
- statRows([["레벨","Lv. "+lv],["전투 경험치",xp+" / "+need],["생활 경험치",n(d.lifeXp)],["개인 명성",n(d.reputation)]])+
+ '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>소유자 기본 능력</h3><small>현재 발휘율 · 0~100</small></div>'+
+ '<div class="wc3-abilityGrid">'+abilities.map(([title,v,note])=>
+  '<div class="wc3-ability"><b>'+title+'</b><strong>'+v+'<small>/100</small></strong>'+
+  '<div class="wc3-meter"><i style="width:'+Math.max(0,Math.min(100,v))+'%"></i></div>'+
+  '<small>'+note+'</small></div>').join("")+'</div></section>'+
+ '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>전투 능력치</h3><small>핵심 6개</small></div>'+
+ stats(main)+
+ '<details class="wc3-directDetails"><summary>방어·저항·공명 상세 펼치기</summary>'+
+ stats(detail)+
+ '<div class="wc3-formula"><b>장비 자체 성능 → 소유자 발휘율 → 최종값</b>'+
+ '<p>장비 공격 '+fmt(s.breakdown.gearMinAttack)+' ~ '+fmt(s.breakdown.gearMaxAttack)+
+ ' × 무예 '+r.martial+'% → '+s.minAttack+' ~ '+s.maxAttack+'</p>'+
+ '<p>장비 방어 '+fmt(s.breakdown.gearDefense)+' × 생존 '+r.survival+'% → '+s.defense+'</p>'+
+ '<p>기본 명중 '+fmt(s.breakdown.baseHitChance)+'% + 장비 명중 '+
+ fmt(s.breakdown.gearHitBonus)+'%p × 무예 '+r.martial+'% → '+fmt(s.hitChance)+'%</p></div>'+
+ '</details></section>'+
+ '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>현재 자원</h3></div>'+stats(resources)+'</section>'+
+ '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>성장 경험치</h3></div>'+
+ statRows([["레벨","Lv. "+lv],["전투 경험치",xp+" / "+need],
+ ["생활 경험치",n(d.lifeXp)],["개인 명성",n(d.reputation)]])+
  '<div class="wc3-xp"><i style="width:'+Math.max(0,Math.min(100,xp/need*100))+'%"></i></div></section>'+
- '<section class="wc3-panel"><h3>소유자 능력치</h3>'+
- statRows([["무예",Math.round(eff.martial)+" (기본 "+Math.round(raw.martial)+")"],
- ["생존",Math.round(eff.survival)+" (기본 "+Math.round(raw.survival)+")"],
- ["처세",Math.round(eff.social)+" (기본 "+Math.round(raw.social)+")"]])+
- '<p class="wc3-note">정신 '+n(state.mind)+'/100 · 발휘율은 정신 상태에 따라 변합니다.</p></section>';
+ '<p class="wc3-migrationNote">개편 중: 개인 성장 수치는 구형 데이터에서 임시 이관한 값입니다. 전투 엔진 전체 적용 전까지 표시와 전투 결과가 다를 수 있습니다.</p>';
 }
 function armorBody(){
  const buttons=ARMOR_SLOTS.map(([id,title,role])=>{
@@ -210,6 +255,20 @@ function css(){
  el.textContent='.wc3-panel{border:1px solid #ae9772;border-radius:12px;background:#f8efdf;margin:8px 0;padding:10px}' +
  '.wc3-panel h3{margin:0 0 9px;font-size:13px}.wc3-panel h3 small{font-size:10px;color:#806c50}' +
  '.wc3-panel h4{margin:4px 0;font-size:12px}.wc3-panel p{font-size:11px;line-height:1.6}' +
+ '.wc3-hero{padding:12px;background:#283b50;color:#f5e8d5;border-radius:12px}.wc3-hero small{color:#dfd2bb!important}' +
+ '.wc3-hero .wc3-story{background:#354961;color:#fff}.wc3-hero h3{color:#fff}' +
+ '.wc3-sectionTitle{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px}.wc3-sectionTitle h3{font-size:14px!important;margin:0}.wc3-sectionTitle small{font-size:10px}' +
+ '.wc3-abilityGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}' +
+ '.wc3-ability{border:1px solid #c7b496;border-radius:9px;background:#fff8e9;padding:9px 6px;display:flex;flex-direction:column;gap:6px;min-width:0}' +
+ '.wc3-ability>b{font-size:12px}.wc3-ability>strong{font-size:23px;color:#254d56;line-height:1}.wc3-ability>strong small{font-size:10px}' +
+ '.wc3-ability>small{font-size:10px;line-height:1.25;color:#695b48}.wc3-meter{height:5px;border-radius:4px;background:#d9d0bf;overflow:hidden}.wc3-meter i{display:block;height:100%;background:#54887e}' +
+ '.wc3-directGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}' +
+ '.wc3-directStat{display:flex;flex-direction:column;justify-content:center;padding:9px;border-radius:9px;background:#fff9ed;border:1px solid #d4c7af;gap:4px;min-width:0}' +
+ '.wc3-directStat small{font-size:10px;color:#725f49}.wc3-directStat strong{font-size:17px;font-variant-numeric:tabular-nums;color:#253b4b;overflow-wrap:anywhere}' +
+ '.wc3-directDetails{margin-top:10px;border-top:1px solid #ccb99e;padding-top:8px}.wc3-directDetails summary{font-size:12px;font-weight:750;color:#255b66;cursor:pointer;padding:6px}' +
+ '.wc3-formula{background:#efe4d0;border-radius:9px;padding:9px;margin-top:9px;font-size:11px}.wc3-formula p{margin:5px 0}' +
+ '.wc3-migrationNote{font-size:10px;line-height:1.5;color:#7b644b;margin:8px 2px}' +
+ '@media(max-width:350px){.wc3-ability{padding:6px 4px}.wc3-ability>strong{font-size:19px}.wc3-directStat strong{font-size:14px}}' +
  '.wc3-profile{display:flex;align-items:center;gap:10px}.wc3-avatar{font-size:26px;border-radius:10px;background:#e4ceb0;padding:9px}' +
  '.wc3-profile h3{font-size:17px;margin:0}.wc3-profile small,.wc3-panel small{font-size:10px;color:#826e51}' +
  '.wc3-story{padding:8px;border-radius:7px;background:#eee1c9}.wc3-statRows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}' +
