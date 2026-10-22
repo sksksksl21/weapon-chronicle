@@ -49,7 +49,10 @@ body{display:flex;justify-content:center}
 .side{display:flex;flex-direction:column;gap:4px;min-width:0}
 .nrow{display:flex;justify-content:space-between;align-items:flex-end;gap:4px}
 .nm{font-size:11px;font-weight:1000}
-.pow{font-size:10px;color:#7d6f5e;font-weight:800;white-space:nowrap}
+.pow{font-size:9px;color:#7d6f5e;font-weight:800;white-space:normal;line-height:1.3}
+.statusGrid .nrow{display:block;min-width:0}
+.statusGrid .pow{margin-top:3px}
+.statusGrid .pow span{display:block;overflow-wrap:anywhere}
 .bar{height:18px;border:2px solid #bca98a;border-radius:6px;overflow:hidden;background:#c9bfae;position:relative}
 .fill{height:100%}
 .fill.hero{background:#2e9b84}
@@ -601,9 +604,9 @@ body.storyMode .actions #resetBtn{display:none!important}
 <body>
 <div class="app">
   <section class="panel topbar">
-    <div class="title">Weapon Chronicle · 전투 v4.6.1</div>
+    <div class="title">Weapon Chronicle · 전투 DEV</div>
     <div class="meta">
-      <span>스토리 전투 · Core Deck</span>
+      <span>스토리 전투 · 순환 손패</span>
       <button class="topMini" id="chronicleBtn">연대기 0</button>
     </div>
   </section>
@@ -1778,14 +1781,16 @@ function useBattleItem(id){
 function render(){
   $('heroName').textContent=hero.name;
   hero.pow=hero.martial*1.4+hero.survival*.8+hero.weapon.power*.65+hero.weapon.precision*.35+hero.weapon.handling*.3+hero.weapon.toughness*.25;
-  $('heroPow').textContent=LIVE_ACTOR ? `공 ${LIVE_ACTOR.attack.toFixed(1)} · 방 ${LIVE_ACTOR.defense.toFixed(1)} · 속 ${LIVE_ACTOR.attackSpeed.toFixed(0)}` : `전투력 ${hero.pow.toFixed(1)}`;
-  $('heroPow').title=LIVE_ACTOR ? `치명 ${LIVE_ACTOR.critChance.toFixed(1)}% · 관통 ${LIVE_ACTOR.penetration.toFixed(1)}` : '';
+  if(LIVE_ACTOR){
+    $('heroPow').innerHTML=`<span>공 ${LIVE_ACTOR.attack.toFixed(1)} · 방 ${LIVE_ACTOR.defense.toFixed(1)}</span><span>속 ${LIVE_ACTOR.attackSpeed.toFixed(0)} · 치 ${LIVE_ACTOR.critChance.toFixed(0)}% · 관 ${LIVE_ACTOR.penetration.toFixed(1)}</span>`;
+  }else $('heroPow').textContent=`전투력 ${hero.pow.toFixed(1)}`;
   $('heroFill').style.width=(hero.hp/hero.maxHp*100)+'%';
   $('heroHp').textContent=`${hero.hp.toFixed(1)} / ${hero.maxHp.toFixed(1)}`;
 
   $('enemyName').textContent=stage().name;
-  $('enemyPow').textContent=enemy.unified ? `공 ${enemy.unified.attack.toFixed(1)} · 방 ${enemy.unified.defense.toFixed(1)} · 속 ${enemy.unified.attackSpeed.toFixed(0)}` : `전투력 ${stage().pow.toFixed(1)}`;
-  $('enemyPow').title=enemy.unified ? `치명 ${enemy.unified.critChance.toFixed(1)}% · 관통 ${enemy.unified.penetration.toFixed(1)}` : '';
+  if(enemy.unified){
+    $('enemyPow').innerHTML=`<span>공 ${enemy.unified.attack.toFixed(1)} · 방 ${enemy.unified.defense.toFixed(1)}</span><span>속 ${enemy.unified.attackSpeed.toFixed(0)} · 치 ${enemy.unified.critChance.toFixed(0)}% · 관 ${enemy.unified.penetration.toFixed(1)}</span>`;
+  }else $('enemyPow').textContent=`전투력 ${stage().pow.toFixed(1)}`;
   $('enemyFill').style.width=(enemy.hp/enemy.maxHp*100)+'%';
   $('enemyHp').textContent=`${enemy.hp.toFixed(1)} / ${enemy.maxHp.toFixed(1)}`;
 
