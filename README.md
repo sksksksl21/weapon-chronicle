@@ -38,6 +38,23 @@ Open the [DEV preview](https://sksksksl21.github.io/weapon-chronicle/play-dev.ht
   Test this version through `play-dev.html`; remote mobile rendering has not
   been certified. Existing save data should be backed up before extensive testing.
 
+## DEV five-tier equipment pools (2026-10-22)
+
+- `dev` now includes `src/core/equipment_pool_v1.js`, generating 20 new
+  rarity variants for each of eight sword-part slots and four armor slots:
+  **240 new item IDs**, added without removing existing save IDs.
+- Tiers: Normal (0 affixes), Rare (1), Unique (2 + 1 exclusive),
+  Legendary (3), Chronicle (3 + 1 exclusive).
+- Armor remains defensive/mobility-only, never adding attack, critical or
+  penetration. Rolled effects and tier outlines are displayed in status, smith
+  and merchant equipment views.
+- New variant rolls are deterministic per **item ID**, so persistent quantities
+  still work. Per-drop copies with independent rolls are a later inventory
+  migration, not claimed as implemented.
+- See `docs/EQUIPMENT_TIERS_V1.md`.
+- Focused check: `npm run test:gear-rarity`; combat handoff:
+  `npm run test:combat-adapter`. Android browser integration is still unverified.
+
 ## Quick start (Codespaces)
 Open **Code → Codespaces → Create codespace on main**. The container setup installs the Python Playwright testing dependency and a browser. From the Codespaces terminal:
 
