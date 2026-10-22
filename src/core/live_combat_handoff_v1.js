@@ -302,7 +302,7 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
         if(formula)formula.textContent="능력치는 검과 장비를 합산한 뒤 상시 비율 보정을 한 번 적용합니다. 치명타 확률·관통력은 합산합니다.";
       }else if((tab==="gear"||tab==="owner")&&!modal.querySelector(".wc2-snapshot")){
         const anchor=modal.querySelector(".profileBox");
-        if(anchor)anchor.insertAdjacentHTML("afterend",wcStatsHeader(s));
+        if(tab==="owner"&&anchor)anchor.insertAdjacentHTML("afterend",wcStatsHeader(s));
         if(tab==="gear"){
           if(anchor)anchor.insertAdjacentHTML("afterend",wcGearBreakdown());
           const intro=modal.querySelector(".profileBox p");
@@ -325,9 +325,9 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
       const slot=Object.keys(PART_CATALOG).find(k=>Boolean(PART_CATALOG[k]?.[id]));
       if(slot)button.insertAdjacentHTML("beforeend",wcPartContribution(slot,id));
     });
-    if(modal.querySelector("[data-owner-slot],[data-owner-equip2],[data-equip-gear]")&&!modal.querySelector(".wc2-snapshot")){
+    if(modal.querySelector("[data-owner-slot],[data-owner-equip2],[data-equip-gear]")&&!modal.querySelector(".wc2-gearBox")){
       const head=modal.querySelector(".modalDesc,.dualTitle,.serviceCard40");
-      if(head)head.insertAdjacentHTML("afterend",wcStatsHeader(s));
+      if(head)head.insertAdjacentHTML("afterend",wcGearBreakdown());
     }
   }
   // Replace the player-facing legacy summaries, not the underlying source
@@ -346,8 +346,7 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
   };
   partDeltaHtml=function(slot,id){return wcPartContribution(slot,id);};
   gearSummaryHtml=function(){
-    const s=wcSafeUnified();
-    return wcGearBreakdown()+(s?wcStatsHeader(s):"");
+    return wcGearBreakdown();
   };
   const wcOpenModalBeforeUI=openModal;
   openModal=function(content){
