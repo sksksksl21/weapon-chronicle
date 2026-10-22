@@ -18,7 +18,8 @@ const gearCatalog={
   coat:{slot:"armor",mods:{maxHp:8,defense:7}},
   gloves:{slot:"gloves",mods:{defense:2,attack:3}},
   boots:{slot:"boots",mods:{speed:15,defense:-1}},
-  invalid:{slot:"helmet",mods:{attack:999,maxHp:10}}
+  invalid:{slot:"helmet",mods:{attack:999,maxHp:10}},
+  veteran_helm:{slot:"helmet",mods:{attack:999,maxHp:4,survival:2}}
 };
 const equipped={helmet:"helm",armor:"coat",gloves:"gloves",boots:"boots"};
 const weapon={parts,power:19,toughness:16,precision:13,handling:12,
@@ -56,8 +57,16 @@ const corruptedAggregate={...swapped,totalMaxHp:122};
 const invalidHp=math.calculateActorStats(bridge.fromLegacyLoadout(corruptedAggregate));
 assert.equal(invalidHp.maxHp,112);
 const withoutOwnerBase={...corruptedAggregate,ownerCombat:{attack:10,defense:4,speed:3,crit:2}};
-const fallbackHp=math.calculateActorStats(bridge.fromLegacyLoadout(withoutOwnerBase));
-assert.equal(fallbackHp.maxHp,112,"aggregate-only fallback strips wrong-slot HP");
+assert.throws(()=>bridge.fromLegacyLoadout(withoutOwnerBase),RangeError,
+  "capped aggregate cannot safely remove wrong-slot HP without owner base");
+const survivalSlot={...swapped,ownerEquipment:{...swapped.ownerEquipment,gloves:"veteran_helm"},
+  totalMaxHp:124};
+const survivalExplicit=math.calculateActorStats(bridge.fromLegacyLoadout(survivalSlot));
+assert.equal(survivalExplicit.maxHp,112,"wrong-slot Survival*4 and fixed HP must not leak");
+assert.throws(()=>bridge.fromLegacyLoadout({...survivalSlot,ownerCombat:{}}),RangeError,
+  "legacy Survival*4 and [58,170] clamp make HP aggregate non-invertible");
+assert.throws(()=>bridge.fromLegacyLoadout({...survivalSlot,totalMaxHp:170,ownerCombat:{}}),RangeError,
+  "capped max HP must not be guessed");
 const validWithoutBase=math.calculateActorStats(bridge.fromLegacyLoadout({
   ...sourceInput,ownerCombat:{attack:10,defense:4,speed:3,crit:2}
 }));
