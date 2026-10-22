@@ -8,7 +8,7 @@ SCRIPT_PARTS = (
     'story/act1_history_v52.js',
     'core/combat_math_v1.js', 'core/legacy_combat_sources_v1.js',
     'core/live_combat_handoff_v1.js', 'core/equipment_pool_v1.js',
-    'core/status_skilldeck_v1.js', 'legacy/bootstrap.js',
+    'core/merchant_stock_v1.js', 'core/status_skilldeck_v1.js', 'legacy/bootstrap.js',
 )
 
 
