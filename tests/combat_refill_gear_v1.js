@@ -42,10 +42,11 @@ const input={ownerCombat:{maxHp:90},totalMaxHp:90,weapon:{parts:{}},
   ownerEquipment:{helmet:"bronze_helm",armor:null,gloves:"work_gloves",boots:"climber_boots"},
   gearCatalog:gear,partCatalog:{},legacyVitals:{rawSurvivalBeforeArmor:5,boldness:50,age:24}};
 const adapted=adapter.fromLegacyLoadout(input);
-assert.equal(adapted.armor.gloves.attack,1,"gloves affect unified attack");
+assert.equal(adapted.armor.gloves.attack,0,"gloves do not affect attack");
+assert.equal(adapted.armor.gloves.defense,1,"gloves retain defense");
 assert.equal(adapted.armor.boots.speed,8,"boots affect unified speed");
 assert.equal(adapted.armor.helmet.maxHp,2,"helmet HP retained");
 const wrong=adapter.fromLegacyLoadout({...input,
   ownerEquipment:{...input.ownerEquipment,gloves:"climber_boots"}});
 assert.equal(wrong.armor.gloves.attack,0,"wrong-slot equipment ignored");
-console.log("PASS: card rotation through turn 30, exhaustion, 4 armor slots, wrong-slot rejection");
+console.log("PASS: card rotation through turn 30, defensive armor roles and slot validation");
