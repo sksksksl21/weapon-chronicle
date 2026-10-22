@@ -124,5 +124,20 @@ assert.equal(enemy.maxHp,125);
 assert.equal(enemy.attack,13);
 assert.equal(enemy.defense,9);
 assert.equal(enemy.attackSpeed,100);
+// RecalcWeapon does not aggregate penetration, so independently rolled
+// sword-part penetration must survive the legacy adapter exactly once.
+const piercePartCatalog={blade:{piercing:{mods:{power:5,penetration:4}}}};
+const pierceSources=bridge.fromLegacyLoadout({
+  ownerCombat:{attack:5,defense:2},weapon:{parts:{blade:"piercing"},power:5},
+  partCatalog:piercePartCatalog,legacyVitals:{rawSurvivalBeforeArmor:5,boldness:50,age:24}
+});
+assert.equal(math.calculateActorStats(pierceSources).penetration,4);
+const oldAggregate=bridge.fromLegacyLoadout({
+  ownerCombat:{attack:5},weapon:{parts:{blade:"piercing"},power:5,penetration:7},
+  partCatalog:piercePartCatalog,legacyVitals:{rawSurvivalBeforeArmor:5,boldness:50,age:24}
+});
+assert.equal(math.calculateActorStats(oldAggregate).penetration,7,
+  "explicit already-aggregated penetration is not counted twice");
+console.log("PASS: rolled sword unique penetration is active without double counting");
 console.log("PASS: old/missing part IDs, rejected mismatched gear, enemy baseline");
 console.log("TOTAL legacy combat data adapter checks PASS (not yet active battle)");
