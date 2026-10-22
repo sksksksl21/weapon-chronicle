@@ -75,6 +75,17 @@ const cappedHp=math.calculateActorStats(bridge.fromLegacyLoadout({
   legacyVitals:{rawSurvivalBeforeArmor:50,boldness:70,age:55}
 }));
 assert.equal(cappedHp.maxHp,170,"upper HP clamp is reproduced");
+const floorHp=math.calculateActorStats(bridge.fromLegacyLoadout({
+  ...survivalSlot,legacyVitals:{rawSurvivalBeforeArmor:1,boldness:1,age:140}
+}));
+assert.equal(floorHp.maxHp,58,"lower legacy HP clamp is reproduced");
+const cappedSurvivalCatalog={...gearCatalog,
+  helm:{slot:"helmet",mods:{maxHp:4,survival:20}},
+  coat:{slot:"armor",mods:{maxHp:8,survival:20}}};
+const cappedSurvival=math.calculateActorStats(bridge.fromLegacyLoadout({
+  ...sourceInput,gearCatalog:cappedSurvivalCatalog,legacyVitals:uncappedProfile
+}));
+assert.equal(cappedSurvival.maxHp,145,"gear Survival is capped at 12 before HP conversion");
 const survivalOnly={...survivalSlot,ownerEquipment:{...survivalSlot.ownerEquipment,gloves:"survivor_helm"}};
 assert.throws(()=>bridge.fromLegacyLoadout({...survivalOnly,ownerCombat:{}}),RangeError,
   "invalid Survival alone must not survive via aggregate HP without base/context");
