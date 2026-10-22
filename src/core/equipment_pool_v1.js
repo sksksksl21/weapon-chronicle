@@ -197,7 +197,9 @@ function restoreCopy(id){
  const tier=TIERS.find(t=>t.id===tierKey);
  if(!base||!tier)return null;
  const rolled=buildItem(slot,armor?"armor":"weapon",family,base,tier,idx,seed);
- catalog[id]=Object.freeze({...rolled,rolledInstance:true,instanceSeed:seed,templateId});
+ catalog[id]=Object.freeze({...rolled,rolledInstance:true,instanceSeed:seed,templateId,
+   // Unique acquired pieces cannot be mass-crafted under the same rolled ID.
+   ...(armor?{}:{cost:null}),market:false});
  return catalog[id];
 }
 function rollCopy(templateId){
