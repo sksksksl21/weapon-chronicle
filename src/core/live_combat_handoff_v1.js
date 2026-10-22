@@ -165,9 +165,14 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
   }
   function wcStatTiles(stats,compact=false){
     const fields=compact?wcStatFields.slice(0,5):wcStatFields;
-    return '<div class="wc2-stats'+(compact?' wc2-compact':'')+'">'+
-      fields.map(([name,key])=>'<div class="wc2-stat"><span>'+name+
-      '</span><b>'+wcStatValue(stats,key)+'</b></div>').join("")+'</div>';
+    const groupOf=key=>["attack","critChance","penetration"].includes(key)?"공격 · 검":(
+      ["defense","maxHp"].includes(key)?"방어 · 생존":"기동 · 공명");
+    return [...new Set(fields.map(([,key])=>groupOf(key)))].map(group=>
+      '<section class="wc2-statGroup"><h4>'+group+'</h4>'+
+      '<div class="wc2-stats'+(compact?' wc2-compact':'')+'">'+
+      fields.filter(([,key])=>groupOf(key)===group).map(([name,key])=>
+      '<div class="wc2-stat"><span>'+name+'</span><b>'+
+      wcStatValue(stats,key)+'</b></div>').join("")+'</div></section>').join("");
   }
   function wcSafeUnified(){
     try{return wcCurrentUnifiedStats();}catch(err){
@@ -176,8 +181,27 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
     }
   }
   function wcStatsHeader(stats){
-    return '<section class="wc2-snapshot"><div class="wc2-heading">최종 전투 능력치 <small>소유자 + 검 8파츠 + 방어구 4부위</small></div>'+
+    return '<section class="wc2-snapshot"><div class="wc2-heading">최종 전투 능력치 <small>공격은 소유자·검 / 방어는 소유자·검 방어 특성·방어구 / 기동은 검·신발</small></div>'+
       wcStatTiles(stats)+'</section>';
+  }
+  function wcGearBreakdown(){
+    const roles=[["helmet","투구","체력·보호"],["armor","갑옷","방어·생존"],
+      ["gloves","장갑","손 보호·방어"],["boots","신발","기동·방어"]];
+    const rows=roles.map(([slot,title,role])=>{
+      const id=state.ownerEquipment?.[slot];
+      const entry=id?OWNER_GEAR_CATALOG[id]:null;
+      const valid=entry?.slot===slot;
+      const v=WC_LEGACY_COMBAT_SOURCES_V1.armorContribution(slot,id,OWNER_GEAR_CATALOG);
+      const effects=[["체력",v.maxHp],["방어력",v.defense],
+        ["방어 보정",v.defensePct],["공격속도",v.speed],["속도 보정",v.speedPct]]
+        .filter(([,n])=>Number(n)!==0)
+        .map(([name,n])=>name+" "+(n>0?"+":"")+wcFmt(n)+(name.includes("보정")?"%":""));
+      return '<div class="wc2-gearRow"><b>'+title+'</b><span>'+role+'</span><small>'+
+        (valid?(entry.name||id):"미장착")+'</small><em>'+
+        (effects.join(" · ")||"통합 능력치 직접 보너스 없음")+'</em></div>';
+    });
+    return '<section class="wc2-gearBox"><div class="wc2-heading">방어구 4부위 <small>공격력·치명타·관통력 보너스 없음</small></div>'+
+      '<div class="wc2-gearGrid">'+rows.join("")+'</div></section>';
   }
   function wcUIStyle(){
     if(document.getElementById("wc2-ui-style"))return;
@@ -194,7 +218,13 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
       '.wc2-snapshot{border:1px solid #a18455;border-radius:11px;background:#172538;color:#f1dbb0;padding:10px;margin:10px 0}',
       '.wc2-heading{font-weight:900;font-size:13px;margin-bottom:8px}',
       '.wc2-heading small{display:block;font-size:10px;color:#c4cbd4;font-weight:500;line-height:1.5;margin-top:3px}',
+      '.wc2-statGroup{margin-top:8px}.wc2-statGroup h4{font-size:11px;color:#ecd29c;margin:0 0 5px}',
       '.wc2-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}',
+      '.wc2-gearBox{padding:9px;margin:8px 0;border:1px solid #8c9cad;border-radius:10px;background:#1a2d3c;color:#eee}',
+      '.wc2-gearGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}',
+      '.wc2-gearRow{display:flex;flex-direction:column;gap:3px;font-size:10px;border:1px solid #516b7c;padding:7px;border-radius:7px}',
+      '.wc2-gearRow b{font-size:12px;color:#ffe2aa}.wc2-gearRow span{color:#bcd0db}',
+      '.wc2-gearRow small{font-size:10px}.wc2-gearRow em{font-size:10px;font-style:normal;color:#afdbcb}',
       '.wc2-stat{min-width:0;display:flex;justify-content:space-between;align-items:center;gap:6px;border:1px solid #485e72;background:#20344a;border-radius:7px;padding:7px;font-size:11px}',
       '.wc2-stat span{color:#d4d9df;min-width:0}',
       '.wc2-stat b{color:#ffe3a3;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}',
@@ -222,7 +252,8 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
     const html='<div class="wcCombatTitle">최종 전투 능력치</div>'+
       '<div class="wcCombatGrid">'+keyNames.map(([name,key])=>
         '<div><span>'+name+'</span><b>'+wcStatValue(s,key)+'</b></div>').join("")+'</div>'+
-      '<div class="wcCombatParts">검 8파츠 · 방어구 4부위 합산<br>'+
+      '<div class="wcCombatParts">공격력·치명타·관통력: 소유자와 검<br>'+
+      '방어·체력: 소유자·검 방어 특성·방어구 / 기동: 검·신발<br>'+
       '체력 '+wcStatValue(s,"maxHp")+' · 공명 회복/T '+wcStatValue(s,"resonanceRecovery")+'</div>';
     if(el.innerHTML!==html)el.innerHTML=html;
     const title=document.querySelector(".top .title");
@@ -273,8 +304,9 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
         const anchor=modal.querySelector(".profileBox");
         if(anchor)anchor.insertAdjacentHTML("afterend",wcStatsHeader(s));
         if(tab==="gear"){
+          if(anchor)anchor.insertAdjacentHTML("afterend",wcGearBreakdown());
           const intro=modal.querySelector(".profileBox p");
-          if(intro)intro.textContent="투구는 체력, 갑옷은 방어, 장갑은 공격 보조, 신발은 공격속도를 담당합니다. 모든 유효 장비는 아래 최종 수치에 반영됩니다.";
+          if(intro)intro.textContent="투구는 체력·보호, 갑옷은 방어, 장갑은 손 보호, 신발은 기동을 담당합니다. 방어구는 공격력·치명타·관통력을 올리지 않습니다.";
         }
       }
     }
@@ -315,7 +347,7 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
   partDeltaHtml=function(slot,id){return wcPartContribution(slot,id);};
   gearSummaryHtml=function(){
     const s=wcSafeUnified();
-    return s?wcStatsHeader(s):"";
+    return wcGearBreakdown()+(s?wcStatsHeader(s):"");
   };
   const wcOpenModalBeforeUI=openModal;
   openModal=function(content){
