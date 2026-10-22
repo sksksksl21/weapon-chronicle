@@ -14,12 +14,18 @@ const WC_LIVE_COMBAT_HANDOFF_V1=(()=>{
     // until all five owner attributes have an approved combat curve.
     // The blade, eight sword parts and four armor slots are NOT folded
     // into this flat owner attack again.
+    // The legacy effective attributes ALREADY incorporate weapon-fit and
+    // equipped Survival bonuses. Remove those effects before the sword and
+    // armor are added by the unified core, or they would count twice.
+    const mental=number(eff.mult,1);
+    const ownerMartial=Math.max(0,number(eff.martial)-number(raw.parts?.weapon)*mental);
+    const ownerSurvival=Math.max(0,number(eff.survival)-gearSurvival*mental);
     const sources=adapter.fromLegacyLoadout({
       ownerCombat:{
-        attack:Math.max(0,number(eff.martial)*.72),
-        defense:Math.max(0,number(eff.survival)),
+        attack:ownerMartial*.72,
+        defense:ownerSurvival,
         speed:0,
-        crit:Math.max(0,2+number(eff.martial)*.52),
+        crit:2+ownerMartial*.52,
         penetration:0
       },
       totalMaxHp:input.maxHp,
