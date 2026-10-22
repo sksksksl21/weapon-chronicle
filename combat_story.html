@@ -767,10 +767,242 @@ body.storyMode .actions #resetBtn{display:none!important}
 </div>
 
 <script>
+/* Weapon Chronicle: unified combat arithmetic, independent of UI and legacy saves.
+ * Phase 1: verified pure functions. Not injected into the live HTML until
+ * character/weapon/armor/enemy data adapters are validated in a separate PR.
+ */
+const WC_COMBAT_MATH_V1 = (() => {
+  "use strict";
+  const SWORD_SLOTS = Object.freeze(["blade", "guard", "tang", "grip", "wrap", "pommel", "seat", "scabbard"]);
+  const ARMOR_SLOTS = Object.freeze(["helmet", "armor", "gloves", "boots"]);
+  const FLAT = Object.freeze(["attack", "defense", "speed", "crit", "penetration"]);
+  const PERCENT = Object.freeze(["attackPct", "defensePct", "speedPct"]);
+
+  function number(value, fallback = 0) {
+    if (value === null || value === undefined || value === "") return fallback;
+    const result = Number(value);
+    return Number.isFinite(result) ? result : fallback;
+  }
+  function checkSlots(source, allowed, name) {
+    if (source === null || source === undefined) return {};
+    if (!source || typeof source !== "object" || Array.isArray(source)) {
+      throw new TypeError(name + " must be an object keyed by equipment slot");
+    }
+    const unknown = Object.keys(source).filter(key => !allowed.includes(key));
+    if (unknown.length) throw new RangeError(name + " has unknown slot(s): " + unknown.join(", "));
+    return source;
+  }
+  function sumKey(sources, key) {
+    return sources.reduce((total, value) => total + number(value?.[key]), 0);
+  }
+  function components({owner = {}, weapon = {}, weaponParts = {}, armor = {}, buffs = {}} = {}) {
+    const parts = checkSlots(weaponParts, SWORD_SLOTS, "weaponParts");
+    const gear = checkSlots(armor, ARMOR_SLOTS, "armor");
+    // The weapon argument must be the base item BEFORE equipment-part bonuses.
+    // The adapter is responsible for not passing already-recalculated totals.
+    const sources = [owner, weapon, buffs, ...SWORD_SLOTS.map(k => parts[k]), ...ARMOR_SLOTS.map(k => gear[k])];
+    return {sources, parts, gear};
+  }
+  function calculateActorStats(input = {}) {
+    const {sources, parts, gear} = components(input);
+    const {owner = {}, weapon = {}, buffs = {}} = input;
+    const flat = Object.fromEntries(FLAT.map(k => [k, sumKey(sources, k)]));
+    const pct = Object.fromEntries(PERCENT.map(k => [k, sumKey(sources, k)]));
+    // Exactly one multiplier AFTER summing fixed additions and percentage points.
+    const scaled = key => Math.max(0, flat[key] * Math.max(0, 1 + pct[key + "Pct"] / 100));
+    return Object.freeze({
+      maxHp: Math.max(1, number(owner.maxHp, 1) + sumKey(Object.values(gear), "maxHp")),
+      maxResonance: Math.max(0, number(weapon.maxResonance) + sumKey(Object.values(parts), "maxResonance") + number(buffs.maxResonance)),
+      resonanceRecovery: Math.max(0, number(weapon.resonanceRecovery) + sumKey(Object.values(parts), "resonanceRecovery") + number(buffs.resonanceRecovery)),
+      attack: scaled("attack"),
+      defense: scaled("defense"),
+      attackSpeed: Math.max(1, (100 + flat.speed) * Math.max(0, 1 + pct.speedPct / 100)),
+      critChance: Math.min(100, Math.max(0, flat.crit)),
+      penetration: Math.max(0, flat.penetration),
+      breakdown: Object.freeze({flat: Object.freeze(flat), permanentPct: Object.freeze(pct)})
+    });
+  }
+  function resolveDamage({damage = 0, critMultiplier = 1, cardMultiplier = 1,
+    preDefenseBonus = 0, defense = 0, penetration = 0, temporaryDefense = 0} = {}) {
+    const base = Math.max(0, number(damage));
+    const preDefense = Math.max(0, base * Math.max(0, number(critMultiplier, 1)) *
+      Math.max(0, number(cardMultiplier, 1)) + number(preDefenseBonus));
+    const effectiveDefense = Math.max(0, number(defense) - Math.max(0, number(penetration)));
+    const afterDefense = Math.max(1, preDefense - effectiveDefense);
+    const finalDamage = Math.max(0, afterDefense - Math.max(0, number(temporaryDefense)));
+    return Object.freeze({preDefense, effectiveDefense, afterDefense, finalDamage});
+  }
+  function speedRate(firstSpeed, secondSpeed) {
+    const faster = Math.max(1, number(firstSpeed, 100), number(secondSpeed, 100));
+    const slower = Math.max(1, Math.min(number(firstSpeed, 100), number(secondSpeed, 100)));
+    return Math.min(0.5, (faster - slower) / faster);
+  }
+  function advanceSpeedGauge(previous, ownerSpeed, enemySpeed) {
+    const owner = Math.max(1, number(ownerSpeed, 100));
+    const enemy = Math.max(1, number(enemySpeed, 100));
+    const faster = owner > enemy ? "owner" : enemy > owner ? "enemy" : null;
+    if (!faster) return Object.freeze({faster: null, gauge: 0, extraBasicAttack: null, rate: 0});
+    // Clear fractional progress when the faster combatant changes.
+    const previousGauge = previous?.faster === faster ? Math.max(0, number(previous.gauge)) : 0;
+    const rate = speedRate(owner, enemy);
+    const accrued = previousGauge + rate;
+    const trigger = accrued >= 1 - 1e-9;
+    return Object.freeze({
+      faster, rate,
+      gauge: trigger ? Math.max(0, accrued - 1) : accrued,
+      extraBasicAttack: trigger ? faster : null
+    });
+  }
+  return Object.freeze({SWORD_SLOTS, ARMOR_SLOTS, calculateActorStats, resolveDamage,
+    speedRate, advanceSpeedGauge});
+})();
+if (typeof module !== "undefined" && module.exports) module.exports = WC_COMBAT_MATH_V1;
+
+/* Weapon Chronicle — legacy equipment -> unified combat arithmetic inputs.
+ * Non-live adapter: preserves v5.2 saves and historical part IDs.
+ * The caller must supply ownerCombat BASE stats (not gear-inclusive) and the
+ * runtime's CURRENT totalMaxHp (which already includes equipped gear maxHp).
+ * If saved slots may be invalid, supply legacyVitals to reproduce original HP caps.
+ */
+const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
+  "use strict";
+  const SWORD = Object.freeze(["blade","guard","tang","grip","wrap","pommel","seat","scabbard"]);
+  const ARMOR = Object.freeze(["helmet","armor","gloves","boots"]);
+  const FLATS = Object.freeze(["attack","defense","speed","crit","penetration","maxResonance","resonanceRecovery"]);
+  function num(value) {
+    if (value === "" || value === null || value === undefined) return 0;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+  }
+  function modsOf(catalog, slot, itemId) {
+    if (!itemId) return {};
+    const item = catalog?.[slot]?.[itemId];
+    return item?.mods && typeof item.mods === "object" ? item.mods : {};
+  }
+  function swordPartValues(mods) {
+    return {
+      attack:num(mods.power), defense:num(mods.toughness),
+      speed:num(mods.handling), crit:num(mods.precision),
+      penetration:num(mods.penetration),
+      maxResonance:num(mods.maxResonance),
+      resonanceRecovery:num(mods.resonanceRecovery),
+      attackPct:num(mods.attackPct), defensePct:num(mods.defensePct), speedPct:num(mods.speedPct)
+    };
+  }
+  function armorValues(mods) {
+    return {
+      attack:num(mods.attack), defense:num(mods.defense),
+      speed:num(mods.speed), crit:num(mods.crit),
+      penetration:num(mods.penetration), maxHp:num(mods.maxHp),
+      attackPct:num(mods.attackPct), defensePct:num(mods.defensePct), speedPct:num(mods.speedPct)
+    };
+  }
+  function fromLegacyLoadout({ownerCombat={},totalMaxHp,weapon={},partCatalog={},
+    ownerEquipment={},gearCatalog={},buffs={},legacyVitals}={}) {
+    const weaponParts = {};
+    for (const slot of SWORD) {
+      weaponParts[slot] = swordPartValues(modsOf(partCatalog,slot,weapon.parts?.[slot]));
+    }
+    const armor = {};
+    for (const slot of ARMOR) {
+      const entry = ownerEquipment?.[slot] && gearCatalog?.[ownerEquipment[slot]];
+      // The saved equipped item must actually belong to the expected slot.
+      const mods = entry?.slot === slot ? (entry.mods||{}) : {};
+      armor[slot] = armorValues(mods);
+    }
+    // Legacy ownerVitalCaps: clamp(round(65 + rawSurvival*4 +
+    // boldness/age modifiers + fixed equipment HP), 58, 170).
+    // rawOwnerStats includes clamp(round(sum(gear.survival)), 0, 12).
+    // A capped saved aggregate alone cannot be inverted after an invalid slot.
+    const suspiciousHpSlot = ARMOR.find(slot=>{
+      const item = gearCatalog?.[ownerEquipment?.[slot]];
+      return item && item.slot !== slot &&
+        (num(item.mods?.maxHp) !== 0 || num(item.mods?.survival) !== 0);
+    });
+    const gearHp = ARMOR.reduce((sum,slot)=>sum+armor[slot].maxHp,0);
+    let baseHp;
+    if (legacyVitals !== undefined && legacyVitals !== null) {
+      if (!Number.isFinite(Number(legacyVitals.rawSurvivalBeforeArmor))) {
+        throw new TypeError("legacyVitals.rawSurvivalBeforeArmor is required");
+      }
+      const validSurvival = ARMOR.reduce((sum,slot)=>{
+        const itemId = ownerEquipment?.[slot];
+        const item = gearCatalog?.[itemId];
+        return sum + (item?.slot === slot ? num(item?.mods?.survival) : 0);
+      },0);
+      const armorSurvival = Math.max(0,Math.min(12,Math.round(validSurvival)));
+      const rawSurvival = Math.max(1,num(legacyVitals.rawSurvivalBeforeArmor)+armorSurvival);
+      const boldness = Number(legacyVitals.boldness)||50;
+      const age = Math.max(16,Number(legacyVitals.age)||24);
+      const uncapped = 65 + rawSurvival*4 + (boldness-50)*.08 - Math.max(0,age-34)*.45 + gearHp;
+      const total = Math.max(58,Math.min(170,Math.round(uncapped)));
+      // The pure core separately adds valid gear's flat HP, exactly once.
+      baseHp = total - gearHp;
+    } else {
+      if (suspiciousHpSlot) {
+        throw new RangeError("Cannot undo wrong-slot legacy Survival/HP from capped maxHp (" +
+          suspiciousHpSlot + "); provide legacyVitals for exact owner HP reconstruction");
+      }
+      // Valid legacy aggregate is already capped and Survival-inclusive.
+      // If only owner-only HP exists, a valid Survival gear contribution is
+      // still nontrivial: require the aggregate or an exact legacy profile.
+      const hasTotal = totalMaxHp !== undefined && totalMaxHp !== null;
+      const validSurvival = ARMOR.reduce((sum,slot)=>{
+        const item = gearCatalog?.[ownerEquipment?.[slot]];
+        return sum + (item?.slot === slot ? num(item?.mods?.survival) : 0);
+      },0);
+      if (!hasTotal && (ownerCombat.maxHp === undefined || validSurvival !== 0)) {
+        throw new RangeError("Provide totalMaxHp or legacyVitals to retain capped gear Survival HP");
+      }
+      baseHp = (hasTotal ? num(totalMaxHp) : num(ownerCombat.maxHp)+gearHp) - gearHp;
+    }
+    const owner = {...ownerCombat, maxHp:Math.max(1,baseHp)};
+    // state.weapon's values already INCLUDE every equipped component.
+    // Strip mapped component contributions now, so the core adds them once.
+    const totals = {
+      attack:num(weapon.power), defense:num(weapon.toughness),
+      speed:num(weapon.handling), crit:num(weapon.precision),
+      penetration:num(weapon.penetration),
+      maxResonance:num(weapon.maxResonance),
+      resonanceRecovery:num(weapon.resonanceRecovery)
+    };
+    const base = {};
+    for (const key of FLATS) {
+      base[key] = totals[key] - SWORD.reduce((sum,slot)=>sum+weaponParts[slot][key],0);
+    }
+    // Explicit baseline permanent bonuses remain separate from part modifiers.
+    for (const key of ["attackPct","defensePct","speedPct"]) base[key] = num(weapon[key]);
+    return {owner, weapon:base, weaponParts, armor, buffs:{...buffs}};
+  }
+  function enemyFromLegacy(stage, overrides={}) {
+    const enemy={...stage,...overrides};
+    return {
+      owner:{
+        maxHp:Math.max(1,num(enemy.maxHp)),
+        attack:num(enemy.attack),defense:num(enemy.defense),
+        speed:num(enemy.speed),crit:num(enemy.crit),
+        penetration:num(enemy.penetration)
+      }
+    };
+  }
+  return Object.freeze({SWORD,ARMOR,fromLegacyLoadout,enemyFromLegacy});
+})();
+if (typeof module !== "undefined" && module.exports) module.exports = WC_LEGACY_COMBAT_SOURCES_V1;
+
 (()=>{
 const STORY_PARAMS=new URLSearchParams(location.search);
 const STORY_FRAME=window.frameElement;
 const STORY_MODE=(STORY_FRAME?.dataset?.storyMode==='1') || STORY_PARAMS.get('mode')==='story';
+// One validated, transient snapshot supplied by the owning game. Standalone
+// battles without it retain the previous rules for compatibility.
+const LIVE_ACTOR=(()=>{
+  if(!STORY_MODE)return null;
+  try{
+    const actor=JSON.parse(STORY_FRAME?.dataset?.unifiedActorV1||'null');
+    const keys=['maxHp','maxResonance','resonanceRecovery','attack','defense','attackSpeed','critChance','penetration'];
+    return actor&&keys.every(k=>Number.isFinite(actor[k])&&actor[k]>=0)&&actor.maxHp>=1&&actor.attackSpeed>=1?Object.freeze(actor):null;
+  }catch(e){return null;}
+})();
 const STORY_ENEMY=(STORY_FRAME?.dataset?.enemy) || STORY_PARAMS.get('enemy') || 'bandit';
 const STORY_STAGE=({bandit:0,spider:1,slime:2,ismaros:0,cyclops:0,v25_troy_reaver:0,v25_ismaros_guard:0,v25_lotus_keeper:0,v25_lotus_hunter:0,v25_cave_beast:1,v25_cyclops_first:0,v25_cyclops_final:0})[STORY_ENEMY]??0;
 const STORY_ENEMY_HP_SCALE=Math.max(.5,Math.min(2.5,Number(STORY_FRAME?.dataset?.enemyHpScale||STORY_PARAMS.get('enemyHpScale'))||1));
@@ -1029,6 +1261,7 @@ const MEMORY_POOL={
 };
 
 let hero, enemy, stageIndex, turn, deck, discard, exhausted, hand, selectedPre, cardUses, maxCardUses, phase, heroPlan, enemyIntent, heroMissPenaltyNext, pending, resonance;
+let speedGauge=null,speedResolvedThisTurn=false,finishingExchange=false;
 let discardChoice36=null, discardedThisTurn36=false;
 let overdriveArmed=false, overdriveRolled=false, usedThisTurn=[], coreLockedTurns=0, coreLockedThisTurn=false;
 let memoryMods, memoriesTaken, rewardChoices=[];
@@ -1158,11 +1391,17 @@ function stage(){ return (STORY_MODE&&STORY_BOSS[STORY_ENEMY])?STORY_BOSS[STORY_
 function makeEnemy(){
   const s=stage();
   const maxHp=STORY_MODE?Math.round(s.maxHp*STORY_ENEMY_HP_SCALE):s.maxHp;
-  return {
+  const result = {
     name:s.name,pow:s.pow,maxHp,hp:maxHp,attack:s.attack+(STORY_MODE?STORY_ENEMY_ATTACK_DELTA:0),defense:Math.max(0,s.defense+(STORY_MODE?STORY_ENEMY_DEFENSE_DELTA:0)),evasion:Math.max(0,s.evasion+(STORY_MODE?STORY_ENEMY_EVASION_DELTA:0)),crit:s.crit,
     staggered:false,guarded:false,exposed:false,
     parryReady:false,retreatTurns:0,absorbReady:false,splitTurns:0,splitStacks:0
   };
+  if(LIVE_ACTOR){
+    result.unified=WC_COMBAT_MATH_V1.calculateActorStats(WC_LEGACY_COMBAT_SOURCES_V1.enemyFromLegacy({
+      ...result,speed:s.speed??0,penetration:s.penetration??0
+    }));
+  }
+  return result;
 }
 function weighted(arr){ let total=0; arr.forEach(([,w])=>total+=w); let r=Math.random()*total; for(const [v,w] of arr){ r-=w; if(r<=0) return v; } return arr[0][0]; }
 function chooseEnemyIntent(){
@@ -1480,20 +1719,32 @@ function calcHeroHit(){
 function calcHeroCrit(){
   if(heroPlan==='defend'||heroPlan==='dodge') return 0;
   let c=2 + hero.weapon.precision*.72 + hero.martial*.52 + effectiveHandling()*.18 +(heroPlan==='heavy'?5:0)+(enemy.staggered?4:0)+memoryMods.crit+(hasWeaponBuild('duelist')?4:0);
+  if(LIVE_ACTOR)c=LIVE_ACTOR.critChance+(heroPlan==='heavy'?5:0)+(enemy.staggered?4:0)+memoryMods.crit+(hasWeaponBuild('duelist')?4:0);
   if(preHas('blood')) c+=isUpgraded('blood')?40:30;
   if(preHas('giant')) c+=20;
   if(preHas('mainCyclops')) c+=20;
   if(preHas('miracle')) c+=20;
   if(enemy.exposed) c+=weakness().crit+memoryMods.exposeCrit;
   if(hasCombo('legendAim')) c+=10;
-  return clamp(c,3,70);
+  return LIVE_ACTOR?clamp(c,0,100):clamp(c,3,70);
 }
-function calcHeroDmg(){
+function liveDamage(raw,side,critMultiplier=1,temporaryMultiplier=1,ignoreDefense=false){
+  const attacker=side==='owner'?LIVE_ACTOR:enemy.unified;
+  const defender=side==='owner'?enemy.unified:LIVE_ACTOR;
+  const input={damage:raw,critMultiplier,defense:ignoreDefense?0:defender.defense,penetration:attacker.penetration};
+  // Convert existing guard/absorption reductions to a temporary shield AFTER
+  // permanent defense. Critical/card damage has already been applied before it.
+  const hit=WC_COMBAT_MATH_V1.resolveDamage(input);
+  const temporaryDefense=hit.afterDefense*(1-clamp(temporaryMultiplier,0,1));
+  return Math.max(0,Math.round(WC_COMBAT_MATH_V1.resolveDamage({...input,temporaryDefense}).finalDamage));
+}
+function calcHeroDmg(critMultiplier=1){
   if(heroPlan==='defend'||heroPlan==='dodge') return [0,0];
   const mass=Math.max(0,hero.weapon.weight-1.0)*3.5;
   let base=hero.weapon.power + hero.martial*.72 + mass - enemy.defense*.42;
+  if(LIVE_ACTOR)base=LIVE_ACTOR.attack+mass;
   if(hasWeaponBuild('duelist'))base*=.94;
-  if(preHas('storyGap')) base+=enemy.defense*.32;
+  if(!LIVE_ACTOR&&preHas('storyGap')) base+=enemy.defense*.32;
   let mn=Math.max(2,Math.floor(base-2)),mx=Math.ceil(base+3);
   if(heroPlan==='heavy'){
     const control=clamp(.05+(effectiveHandling()-8)*.015,-.03,.12);
@@ -1514,11 +1765,14 @@ function calcHeroDmg(){
   if(enemy.exposed){mn*=weakness().damage;mx*=weakness().damage}
   if(hero.hp/hero.maxHp<=.35){mn*=memoryMods.lowHpDamage;mx*=memoryMods.lowHpDamage}
 
-  if(stageIndex===0 && enemy.parryReady){const parryMult=(hasWeaponBuild('breaker')&&heroPlan==='heavy')?0.80:0.55;mn*=parryMult;mx*=parryMult}
+  let temporaryMultiplier=1;
+  if(stageIndex===0 && enemy.parryReady){const parryMult=(hasWeaponBuild('breaker')&&heroPlan==='heavy')?0.80:0.55;temporaryMultiplier*=parryMult;}
   if(stageIndex===2 && !enemy.exposed){
-    mn*=.65;mx*=.65;
-    if(enemy.absorbReady){const corePierce=(hasWeaponBuild('deep_core')||hasWeaponBuild('cycle_core'))&&selectedPre.length>0;mn*=corePierce?0.78:0.60;mx*=corePierce?0.78:0.60}
+    temporaryMultiplier*=.65;
+    if(enemy.absorbReady){const corePierce=(hasWeaponBuild('deep_core')||hasWeaponBuild('cycle_core'))&&selectedPre.length>0;temporaryMultiplier*=corePierce?0.78:0.60;}
   }
+  if(LIVE_ACTOR)return [mn,mx].map(raw=>liveDamage(raw,'owner',critMultiplier,temporaryMultiplier,preHas('storyGap')));
+  mn*=temporaryMultiplier;mx*=temporaryMultiplier;
   return [Math.max(1,Math.round(mn)),Math.max(1,Math.round(mx))];
 }
 function calcEnemyHit(){
@@ -1534,9 +1788,22 @@ function calcEnemyHit(){
   if(preHas('escapeMemory')) h-=35;
   return clamp(h,10,90);
 }
-function calcEnemyDmg(){
+function calcEnemyDmg(critMultiplier=1){
   if(enemyIntent==='guard'||enemyIntent==='web') return [0,0];
   let d=(stage().damage[enemyIntent]||stage().damage.light).slice();
+  if(LIVE_ACTOR){
+    d=d.map(raw=>Math.max(0,enemy.unified.attack+raw-stage().attack));
+    let temporaryMultiplier=1;
+    if(heroPlan==='defend'){
+      temporaryMultiplier*=clamp(.68-(hero.weapon.toughness*.014+hero.survival*.012+effectiveHandling()*.005),.38,.62);
+      if(hasWeaponBuild('bulwark'))temporaryMultiplier*=.88;
+    }
+    if(enemy.staggered)d=d.map(raw=>raw*.7);
+    if(stageIndex===2)d=d.map(raw=>raw*(1+puddingRage()*.08+(enemy.splitTurns>0?enemy.splitStacks*.08:0)));
+    if(preHas('gritMemory'))temporaryMultiplier*=.50;
+    if(heroPlan==='defend'&&(hero.armor?.block||0)>0)temporaryMultiplier*=clamp(1-hero.armor.block/100,.55,1);
+    return d.map(raw=>liveDamage(raw,'enemy',critMultiplier,temporaryMultiplier));
+  }
   if(heroPlan==='defend'){
     const guard=clamp(.68-(hero.weapon.toughness*.014+hero.survival*.012+effectiveHandling()*.005),.38,.62);
     d=[Math.ceil(d[0]*guard),Math.ceil(d[1]*guard)];
@@ -1902,7 +2169,8 @@ async function animateCounter(){
   const r=roll100();
   await heroAttackAnim();
   if(r<=cc){
-    const dmg=hasCombo('guardCounter')?ri(13,20):ri(8,14);
+    const raw=hasCombo('guardCounter')?ri(13,20):ri(8,14);
+    const dmg=LIVE_ACTOR?liveDamage(raw,'owner'):raw;
     enemy.hp=Math.max(0,enemy.hp-dmg);
     enemySprite().classList.add('hit');
     addDamage(79,48,String(dmg),'red');
@@ -1960,7 +2228,8 @@ async function resolveBanditParry(wasHit){
   const parryChance=(hasWeaponBuild('breaker')&&heroPlan==='heavy')?45:70;
   if(r<=parryChance){
     await enemyAttackAnim();
-    const dmg=ri(6,9);
+    const raw=ri(6,9);
+    const dmg=LIVE_ACTOR?liveDamage(raw,'enemy'):raw;
     hero.hp=Math.max(0,hero.hp-dmg);
     ownerTookDamage(dmg);
     heroSprite().classList.add('hit');
@@ -2000,6 +2269,7 @@ function consumeAfterHeroActionStatuses(){
 }
 
 function startTurn(){
+  speedResolvedThisTurn=false;
   if(turn>1 && $("banner").textContent==="전투 준비") $("banner").style.display="none";
   if(turn>1){
     const gain=turnResonanceRecovery();
@@ -2035,6 +2305,7 @@ async function executeTurn(){
   const r=roll100(); pending={heroRoll:r}; await resolveHeroRoll(r,true);
 }
 async function resolveHeroRoll(r, allowReaction){
+  if(pending?.speedBasic==='owner')return resolveSpeedHeroRoll(r,allowReaction);
   const hit=calcHeroHit(),crit=calcHeroCrit();
   const critLine=Math.min(hit,crit);
 
@@ -2043,11 +2314,10 @@ async function resolveHeroRoll(r, allowReaction){
     showBanner(chain?'CHAIN · '+chain.name:'치명타!');battleImpact36('치명타!');
     await heroAttackAnim();
 
-    let dmg=ri(...calcHeroDmg());
     let mult=1.75;
     if(hasCombo('legendAim')) mult=2.15;
     if(hasCombo('bloodOver')) mult=2.35;
-    dmg=Math.round(dmg*mult);
+    const dmg=LIVE_ACTOR?ri(...calcHeroDmg(mult)):Math.round(ri(...calcHeroDmg())*mult);
 
     enemy.hp=Math.max(0,enemy.hp-dmg);
     enemySprite().classList.add('hit');
@@ -2140,8 +2410,8 @@ async function resolveBanditCombo(){
     const r=roll100();
     await enemyAttackAnim();
     if(r<=hit){
-      let dmg=ri(d[0],d[1]);
-      if(r<=crit) dmg=Math.round(dmg*1.5);
+      let dmg=LIVE_ACTOR?ri(...calcEnemyDmg(r<=crit?1.5:1)):ri(d[0],d[1]);
+      if(!LIVE_ACTOR&&r<=crit) dmg=Math.round(dmg*1.5);
       if(preHas('feint') && Math.random()<(isUpgraded('feint')?.70:.55)) dmg=0;
       hero.hp=Math.max(0,hero.hp-dmg);
       ownerTookDamage(dmg);
@@ -2166,7 +2436,7 @@ async function resolveBanditCombo(){
     render();
     return;
   }
-  endTurn();
+  return endTurn();
 }
 
 async function resolveEnemyPhase(){
@@ -2185,8 +2455,7 @@ async function resolveEnemyPhase(){
     hero.webbedTurns=1;
     log(`거미줄에 묶였다 — 다음 ${hero.name} 공격 명중 ${hasWeaponBuild('duelist')?'-12%':'-25%'}.`+(hasWeaponBuild('duelist')?' 결투형 조작성이 구속 페널티를 줄였다.':''),'bad');
     render();
-    endTurn();
-    return;
+    return endTurn();
   }
 
   if(enemyIntent==='guard'){
@@ -2204,8 +2473,7 @@ async function resolveEnemyPhase(){
       log('블랙 푸딩이 몸을 응집 — 다음 유효 공격 피해를 추가 흡수.','warn');
     }
     render();
-    endTurn();
-    return;
+    return endTurn();
   }
 
   const hit=calcEnemyHit(),crit=enemy.crit+(enemyIntent==='heavy'?3:0);
@@ -2224,15 +2492,14 @@ async function resolveEnemyPhase(){
       grantMoment('escapeMemory','강력한 공격을 회피해 죽음의 궤적을 기억했다.');
       exposeEnemy();
     }
-    endTurn();
-    return;
+    return endTurn();
   }
 
   if(r<=hit){
     showBanner(r<=crit?'적 치명타':'적 공격');if(r<=crit)battleImpact36('위험!');
     await enemyAttackAnim();
-    let dmg=ri(...calcEnemyDmg());
-    if(r<=crit) dmg=Math.round(dmg*1.6);
+    let dmg=LIVE_ACTOR?ri(...calcEnemyDmg(r<=crit?1.6:1)):ri(...calcEnemyDmg());
+    if(!LIVE_ACTOR&&r<=crit) dmg=Math.round(dmg*1.6);
     if(preHas('feint') && Math.random()<(isUpgraded('feint')?.70:.55)){
       dmg=0;
       log('흘려내기 성공 — 피해 무효.','good');
@@ -2264,8 +2531,7 @@ async function resolveEnemyPhase(){
       render();
       return;
     }
-    endTurn();
-    return;
+    return endTurn();
   }
 
   showBanner('적 실패');
@@ -2277,16 +2543,82 @@ async function resolveEnemyPhase(){
     log('적 대실패 — 경직.','warn');
   }
   if(enemyIntent==='heavy') exposeEnemy();
-  endTurn();
+  return endTurn();
 }
-function finishAfterEnemyReaction(){ if(enemy.hp<=0){ stageVictory(); return; } endTurn(); }
-function endTurn(){
+function finishAfterEnemyReaction(){ if(enemy.hp<=0){ stageVictory(); return; } return endTurn(); }
+function basicHeroValues(roll){
+  const oldPlan=heroPlan,oldCards=selectedPre;
+  try{
+    // Extra attacks are basic attacks; never replay a heavy move/pre-card.
+    heroPlan='basic';selectedPre=[];
+    const hit=calcHeroHit(),critical=roll<=Math.min(hit,calcHeroCrit());
+    return {hit,critical,damage:calcHeroDmg(critical?1.75:1)};
+  }finally{heroPlan=oldPlan;selectedPre=oldCards;}
+}
+async function resolveSpeedHeroRoll(roll,allowReaction,fromExchange=false){
+  phase='speedResolve';
+  const values=basicHeroValues(roll);
+  await heroAttackAnim();
+  if(roll<=values.hit){
+    const damage=ri(...values.damage);
+    enemy.hp=Math.max(0,enemy.hp-damage);
+    addDamage(79,46,String(damage),values.critical?'gold':'red');
+    log(`공속 추가공격 — ${damage} 피해.`,'good');
+  }else{
+    addDamage(79,46,'MISS','gray');log('공속 추가공격 실패.','muted');
+    if(allowReaction&&cardUses<maxCardUses&&hand.some(id=>CARD_DB[id].timing==='heroMiss')){
+      pending={heroRoll:roll,speedBasic:'owner'};phase='heroReaction';
+      $('reactMsg').textContent='추가 기본공격 실패. 이번 교전의 남은 카드 개입을 사용할 수 있다.';
+      render();return true;
+    }
+  }
+  pending=null;render();
+  if(!fromExchange)return endTurn();
+  return false;
+}
+async function resolveSpeedBasic(side){
+  if(side==='owner')return resolveSpeedHeroRoll(roll100(),true,true);
+  const oldIntent=enemyIntent;
+  let hit,critical,damage;
+  const roll=roll100();
+  try{
+    enemyIntent='light';hit=calcEnemyHit();critical=roll<=Math.min(hit,enemy.unified.critChance);
+    damage=calcEnemyDmg(critical?1.6:1);
+  }finally{enemyIntent=oldIntent;}
+  await enemyAttackAnim();
+  // Keep the same defender's guard/dodge and committed defensive card.
+  if(roll>hit||(heroPlan==='dodge'&&roll>hit-18)){
+    addDamage(24,44,'MISS','gray');log('적 공속 추가공격 회피.','good');return false;
+  }
+  let amount=ri(...damage);
+  if(preHas('feint')&&Math.random()<(isUpgraded('feint')?.70:.55))amount=0;
+  hero.hp=Math.max(0,hero.hp-amount);ownerTookDamage(amount);
+  addDamage(24,44,String(amount),critical?'gold':'red');log(`적 공속 추가공격 — ${amount} 피해.`,'bad');render();
+  if(hero.hp>0&&amount>0&&cardUses<maxCardUses&&hand.some(id=>CARD_DB[id].timing==='enemyHit')){
+    pending={enemyDamage:amount};phase='enemyReaction';
+    $('reactMsg').textContent='추가 기본공격 피격. 이번 교전의 남은 카드 개입을 사용할 수 있다.';
+    render();return true;
+  }
+  return false;
+}
+async function endTurn(){
+  if(finishingExchange||phase==='done')return;
+  finishingExchange=true;
+  try{
+  if(LIVE_ACTOR&&!speedResolvedThisTurn&&hero.hp>0&&enemy.hp>0){
+    speedResolvedThisTurn=true;phase='speedResolve';
+    speedGauge=WC_COMBAT_MATH_V1.advanceSpeedGauge(speedGauge,LIVE_ACTOR.attackSpeed,enemy.unified.attackSpeed);
+    if(speedGauge.extraBasicAttack&&await resolveSpeedBasic(speedGauge.extraBasicAttack))return;
+  }
+  if(hero.hp<=0){runEnd();return;}
+  if(enemy.hp<=0){stageVictory();return;}
   phase='pre';
   enemy.staggered=false;
   enemy.guarded=false;
   if(ownerMind.damageMemory>0) ownerMind.damageMemory--;
   turn++;
   startTurn();
+  }finally{finishingExchange=false;}
 }
 function pickRewardChoices(){
   // Overdrive is disabled: keep its legacy definition but never offer a no-op reward.
@@ -2402,12 +2734,18 @@ function runEnd(){
   $('overlay').classList.add('show');
 }
 function resetRun(){
+  speedGauge=null;speedResolvedThisTurn=false;finishingExchange=false;
   $('overlay').classList.remove('show');
   $('rewardBox').className='rewardBox';
   $('nextBtn').style.display='block';
   $('log').innerHTML='';
 
   hero=JSON.parse(JSON.stringify(HERO_BASE));
+  if(LIVE_ACTOR){
+    hero.maxHp=LIVE_ACTOR.maxHp;
+    hero.weapon.maxResonance=LIVE_ACTOR.maxResonance;
+    hero.weapon.resonanceRecovery=LIVE_ACTOR.resonanceRecovery;
+  }
   resonance=STORY_MODE?Math.min(hero.weapon.maxResonance,STORY_WEAPON.resonance):Math.round(hero.weapon.maxResonance*.75);
   if(hasWeaponBuild('deep_core'))resonance=Math.min(hero.weapon.maxResonance,resonance+15);
   hero.webbedTurns=0;

@@ -13,7 +13,12 @@ SCRIPT_PARTS = (
 
 def compose(root):
     source = root / 'src'
-    combat = (source / 'combat/story_combat.html').read_bytes()
+    combat_text = (source / 'combat/story_combat.html').read_text(encoding='utf8')
+    for module in ('combat_math_v1', 'legacy_combat_sources_v1'):
+        marker = '/* @include:' + module + ' */'
+        assert combat_text.count(marker) == 1, f'Expected one {marker}'
+        combat_text = combat_text.replace(marker, (source / ('core/' + module + '.js')).read_text(encoding='utf8'))
+    combat = combat_text.encode('utf8')
     includes = {
         '/* @include:combat-document */': 'const COMBAT_DOC_B64="' + b64encode(combat).decode('ascii') + '";',
         '/* @include:main-chapters-v47 */': (source / 'story/main_chapters_v47.js').read_text(encoding='utf8').removesuffix('\n'),

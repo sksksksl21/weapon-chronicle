@@ -2,7 +2,7 @@
 
 Current build assembles HTML header + one ordered JavaScript block + footer. Order is meaningful: global `state`, legacy renderers and functions are defined in the legacy runtime, later modules extend behavior, `bootstrap.js` starts the game **last**. The build is intentionally simple to keep offline HTML output.
 
-`tools/build_sources.py` owns the ordered manifest. Its two explicit include markers expand combat and chapter data at their original positions inside the runtime. `src/combat/story_combat.html` is the combat source; both the offline embedded document and root `combat_story.html` are generated from those exact bytes. `src/story/main_chapters_v47.js` contains the unchanged chapters 9–40 declaration. Build verification rejects drift in either generated HTML file. This extraction preserves the main baseline output SHA256 `c9be8a9a5b6ccfd93f85950a968a9a2e29e0ea5e98b3480cf16f4a6ade01c7a4` byte for byte.
+`tools/build_sources.py` owns the ordered manifest. Its two explicit include markers expand combat and chapter data at their original positions inside the runtime. `src/combat/story_combat.html` is the combat source. Its two explicit core include markers expand the shared arithmetic/adapter sources before both the offline embedded document and root `combat_story.html` are generated from the same assembled bytes. `src/story/main_chapters_v47.js` contains the unchanged chapters 9–40 declaration. Build verification rejects drift in either generated HTML file. This extraction preserves the main baseline output SHA256 `c9be8a9a5b6ccfd93f85950a968a9a2e29e0ea5e98b3480cf16f4a6ade01c7a4` byte for byte.
 
 ## Decomposition order (incremental)
 1. Baseline v5.2 equivalence: build byte equality and smoke/regression tests.

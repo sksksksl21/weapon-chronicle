@@ -33,6 +33,7 @@ const WC_LIVE_COMBAT_HANDOFF_V1=(()=>{
       partCatalog:input.partCatalog,
       ownerEquipment:input.ownerEquipment,
       gearCatalog:input.gearCatalog,
+      buffs:{defense:number(input.foodBuff?.defense)},
       legacyVitals:{
         rawSurvivalBeforeArmor,
         boldness:owner.boldness,
@@ -41,7 +42,7 @@ const WC_LIVE_COMBAT_HANDOFF_V1=(()=>{
     });
     const stats=math.calculateActorStats(sources);
     return Object.freeze({
-      maxHp:stats.maxHp,
+      maxHp:stats.maxHp+Math.max(0,number(input.foodBuff?.combatHp)),
       maxResonance:stats.maxResonance,
       resonanceRecovery:stats.resonanceRecovery,
       attack:stats.attack,
@@ -71,7 +72,8 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
         weapon:state.weapon,
         partCatalog:PART_CATALOG,
         ownerEquipment:state.ownerEquipment,
-        gearCatalog:OWNER_GEAR_CATALOG
+        gearCatalog:OWNER_GEAR_CATALOG,
+        foodBuff:state.foodBuff
       },WC_LEGACY_COMBAT_SOURCES_V1,WC_COMBAT_MATH_V1);
       frame.dataset.unifiedActorV1=JSON.stringify(snapshot);
     }catch(err){
