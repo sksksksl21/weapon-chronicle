@@ -133,8 +133,12 @@ function armorBody(){
  }).join("");
  const id=state.ownerEquipment?.[selectedArmor],item=OWNER_GEAR_CATALOG[id],title=ARMOR_SLOTS.find(x=>x[0]===selectedArmor)?.[1];
  const mods=item?.mods||{};
- const allowed=[["체력",mods.maxHp],["방어력",mods.defense],["생존",mods.survival],
-  ["회피",mods.evade],["저항",mods.resist],["공격속도",selectedArmor==="boots"?mods.speed:0]];
+ // The displayed protective/mobility totals use the same adapter as battles.
+ const actual=WC_LEGACY_COMBAT_SOURCES_V1.armorContribution(selectedArmor,id,OWNER_GEAR_CATALOG);
+ const allowed=[["체력",actual.maxHp],["방어력",actual.defense],["생존",mods.survival],
+  ["회피",mods.evade],["저항",mods.resist],["방어 보정(%)",actual.defensePct],
+  ["공격속도",selectedArmor==="boots"?actual.speed:0],
+  ["속도 보정(%)",selectedArmor==="boots"?actual.speedPct:0]];
  const effects=allowed.filter(x=>n(x[1])!==0).map(([name,val])=>name+" "+(val>0?"+":"")+val);
  return '<section class="wc3-panel"><h3>방어구 장착 상태</h3><div class="wc3-equipGrid">'+buttons+'</div></section>'+
  '<section class="wc3-panel"><h3>'+title+' 상세 정보</h3>'+
