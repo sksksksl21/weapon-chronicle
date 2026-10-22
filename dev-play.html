@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Weapon Chronicle · DEV Play</title>
+<style>html,body{margin:0;min-height:100%;background:#101a26;color:#e9d3aa;font-family:system-ui,sans-serif}main{padding:35vh 16px 16px;max-width:480px;margin:auto;text-align:center}small{display:block;margin:16px 0;color:#c5b8a5}button{background:#273d53;color:#fff;border:1px solid #b29a6d;border-radius:10px;padding:12px 20px}</style>
+</head><body><main><h2>Weapon Chronicle · 개발판</h2><small id="wcLoading">최신 dev 소스 읽는 중…</small><button id="wcRetry" hidden onclick="location.reload()">새로고침</button></main>
+<script type="module">
+const SCRIPT_PARTS=[
+"legacy/game_runtime.js","core/save_ledger_v48.js","core/action_checkpoint_v482.js","core/checkpoint_v483.js",
+"story/history_branch_v50.js","story/world_aftermath_v51.js","story/act1_history_v52.js",
+"core/combat_math_v1.js","core/legacy_combat_sources_v1.js","core/live_combat_handoff_v1.js","legacy/bootstrap.js"];
+const status=document.getElementById("wcLoading");
+const fetchText=async p=>{
+  const url=new URL("src/"+p,location.href);
+  url.searchParams.set("wcdev",String(Date.now()));
+  const r=await fetch(url,{cache:"no-store"});
+  if(!r.ok)throw Error(p+": HTTP "+r.status);
+  return await r.text();
+};
+const replaceOnce=(s,marker,content)=>{
+  if(s.split(marker).length!==2)throw Error("조립 토큰 오류: "+marker);
+  return s.replace(marker,content);
+};
+const base64=bytes=>new Promise((resolve,reject)=>{
+  const reader=new FileReader();
+  reader.onload=()=>resolve(String(reader.result).split(",")[1]);
+  reader.onerror=()=>reject(reader.error||Error("Base64 변환 실패"));
+  reader.readAsDataURL(new Blob([bytes],{type:"application/octet-stream"}));
+});
+try{
+  const paths=["combat/story_combat.html","story/main_chapters_v47.js",
+    "legacy/html_before_script.html","legacy/html_after_script.html",...SCRIPT_PARTS];
+  const contents=await Promise.all(paths.map(fetchText));
+  const data=Object.fromEntries(paths.map((p,i)=>[p,contents[i]]));
+  let combat=data["combat/story_combat.html"];
+  for(const name of ["combat_math_v1","legacy_combat_sources_v1"])
+    combat=replaceOnce(combat,"/* @include:"+name+" */",data["core/"+name+".js"]);
+  status.textContent="최신 게임 조립 중…";
+  const docB64=await base64(new TextEncoder().encode(combat));
+  let scripts=SCRIPT_PARTS.map(p=>data[p]);
+  const includes={
+    "/* @include:combat-document */":'const COMBAT_DOC_B64="'+docB64+'";',
+    "/* @include:main-chapters-v47 */":data["story/main_chapters_v47.js"].replace(/\n$/,"")
+  };
+  for(const [marker,content] of Object.entries(includes)){
+    if(scripts.reduce((n,s)=>n+s.split(marker).length-1,0)!==1)throw Error("조립 토큰 오류: "+marker);
+    scripts=scripts.map(s=>s.replace(marker,content));
+  }
+  const page=data["legacy/html_before_script.html"]+"<script>\n"+scripts.join("\n")+"\n<"+"/script>"+data["legacy/html_after_script.html"];
+  document.open();document.write(page);document.close();
+}catch(err){
+  console.error("DEV play build failed",err);
+  status.textContent="실행 실패: "+err.message;
+  document.getElementById("wcRetry").hidden=false;
+}
+</script></body></html>
