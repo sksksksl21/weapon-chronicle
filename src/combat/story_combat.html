@@ -2335,6 +2335,13 @@ function basicHeroValues(roll){
     return {hit,critical,damage:calcHeroDmg(critical?1.75:1)};
   }finally{heroPlan=oldPlan;selectedPre=oldCards;}
 }
+async function postSpeedHeroAttack(wasHit){
+  // The speed bonus is a basic strike, never another heavy move or pre-card.
+  // Reuse one-shot defense consumption and the normal bandit parry.
+  const previousPlan=heroPlan;
+  try{heroPlan='basic';return await postHeroAttack(wasHit);}
+  finally{heroPlan=previousPlan;}
+}
 async function resolveSpeedHeroRoll(roll,allowReaction,fromExchange=false){
   phase='speedResolve';
   const values=basicHeroValues(roll);
@@ -2344,6 +2351,8 @@ async function resolveSpeedHeroRoll(roll,allowReaction,fromExchange=false){
     enemy.hp=Math.max(0,enemy.hp-damage);
     addDamage(79,46,String(damage),values.critical?'gold':'red');
     log(`공속 추가공격 — ${damage} 피해.`,'good');
+    if(enemy.hp<=0){stageVictory();return true;}
+    if(!(await postSpeedHeroAttack(true)))return true;
   }else{
     addDamage(79,46,'MISS','gray');log('공속 추가공격 실패.','muted');
     if(allowReaction&&cardUses<maxCardUses&&hand.some(id=>CARD_DB[id].timing==='heroMiss')){
@@ -2351,6 +2360,7 @@ async function resolveSpeedHeroRoll(roll,allowReaction,fromExchange=false){
       $('reactMsg').textContent='추가 기본공격 실패. 이번 교전의 남은 카드 개입을 사용할 수 있다.';
       render();return true;
     }
+    if(!(await postSpeedHeroAttack(false)))return true;
   }
   pending=null;render();
   if(!fromExchange)return endTurn();
@@ -2599,7 +2609,17 @@ $('useAntidoteBtn').onclick=()=>useBattleItem('antidote');
 $('execBtn').onclick=executeTurn;
 $('battleDiscardBtn36').onclick=discardBattleCard36;
 $('resetBtn').onclick=resetRun;
-$('skipBtn').onclick=async()=>{ $('reactBar').className='reactBar'; if(phase==='heroReaction'){ phase='enemyResolve'; await resolveEnemyPhase(); } else if(phase==='enemyReaction'){ phase='postEnemy'; finishAfterEnemyReaction(); } };
+$('skipBtn').onclick=async()=>{
+  $('reactBar').className='reactBar';
+  if(phase==='heroReaction'){
+    if(pending?.speedBasic==='owner'){
+      // The enemy already acted in this exchange; never repeat its phase.
+      phase='speedResolve';pending=null;
+      if(!(await postSpeedHeroAttack(false)))return;
+      await endTurn();
+    }else{phase='enemyResolve';await resolveEnemyPhase();}
+  }else if(phase==='enemyReaction'){phase='postEnemy';await finishAfterEnemyReaction();}
+};
 if(!STORY_MODE) loadChronicle();
 renderChronicleButton();
 resetRun();

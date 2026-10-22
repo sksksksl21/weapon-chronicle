@@ -124,4 +124,36 @@ function boot(snapshot=actor,extra={}){
   assert.equal(bonusLoss.messages.filter(m=>m.result==='lose').length,1);
   assert.equal(bonusLoss.battle.get().phase,'done');
   console.log('PASS: speed ratios, tie/cap/reset, both extra-attack reactions and single card/recovery per exchange');
+
+  // Regression: skipping a speed-bonus miss must not replay the enemy action.
+  const skipped=durableArena(200,100);
+  skipped.testRolls.push(1,100);await skipped.battle.executeTurn();
+  skipped.battle.set({intent:'guard',hand:['reroll']});
+  skipped.testRolls.push(1,100);await skipped.battle.executeTurn();
+  assert.equal(skipped.battle.get().phase,'heroReaction');
+  await skipped.context.document.getElementById('skipBtn').onclick();
+  assert.equal(skipped.battle.get().turn,3);
+  assert.equal(skipped.battle.get().enemy.parryReady,false);
+  assert.equal(skipped.events.filter(x=>x.includes('방패 뒤에서 반격 자세')).length,1,'no repeat guard');
+
+  // The bonus basic strike must consume exactly one prepared guard/parry.
+  const parry=durableArena(200,100);
+  parry.testRolls.push(1,100);await parry.battle.executeTurn();
+  parry.battle.set({intent:'guard'});
+  parry.testRolls.push(1,1,100);await parry.battle.executeTurn();
+  assert.equal(parry.battle.get().enemy.parryReady,false);
+  assert.equal(parry.battle.get().turn,3);
+  assert.equal(parry.events.filter(x=>x.includes('도적 반격 실패')).length,1);
+  const pudding=boot({...actor,attackSpeed:200},{enemy:'slime',resonance:'50'});
+  pudding.battle.get().hero.hp=10000;
+  pudding.battle.get().enemy.hp=10000;
+  pudding.battle.get().enemy.unified={...pudding.battle.get().enemy.unified,attackSpeed:100};
+  pudding.battle.set({hand:[]});
+  pudding.testRolls.push(1,100);await pudding.battle.executeTurn();
+  pudding.battle.set({intent:'guard'});
+  pudding.testRolls.push(1,1);await pudding.battle.executeTurn();
+  assert.equal(pudding.battle.get().enemy.absorbReady,false);
+  assert.equal(pudding.battle.get().turn,3);
+  console.log('PASS: speed skip and one-use guard/parry regression');
+
 })().catch(error=>{console.error(error);process.exitCode=1;});
