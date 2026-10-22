@@ -48,9 +48,12 @@ Open the [DEV preview](https://sksksksl21.github.io/weapon-chronicle/play-dev.ht
 - Armor remains defensive/mobility-only, never adding attack, critical or
   penetration. Rolled effects and tier outlines are displayed in status, smith
   and merchant equipment views.
-- New variant rolls are deterministic per **item ID**, so persistent quantities
-  still work. Per-drop copies with independent rolls are a later inventory
-  migration, not claimed as implemented.
+- Static `wc5` variants remain deterministic; new armor-shop stock now mints
+  distinct `wc6` item IDs with independent stat rolls. A copy retains its exact
+  options after reload by reconstructing them from its embedded seed.
+  `rollCopy` also supports sword parts, but smith/reward acquisition hooks
+  still need to be connected before calling weapon drops fully integrated.
+  Original legacy inventory and save shapes remain unchanged.
 - See `docs/EQUIPMENT_TIERS_V1.md`.
 - Focused check: `npm run test:gear-rarity`; combat handoff:
   `npm run test:combat-adapter`. Android browser integration is still unverified.
