@@ -18,7 +18,7 @@ const gearCatalog={
   coat:{slot:"armor",mods:{maxHp:8,defense:7}},
   gloves:{slot:"gloves",mods:{defense:2,attack:3}},
   boots:{slot:"boots",mods:{speed:15,defense:-1}},
-  invalid:{slot:"helmet",mods:{attack:999}}
+  invalid:{slot:"helmet",mods:{attack:999,maxHp:10}}
 };
 const equipped={helmet:"helm",armor:"coat",gloves:"gloves",boots:"boots"};
 const weapon={parts,power:19,toughness:16,precision:13,handling:12,
@@ -50,7 +50,20 @@ console.log("PASS: eight parts, four armor slots, HP and resonance totals preser
 const swapped={...sourceInput,ownerEquipment:{...equipped,gloves:"invalid"}};
 const changed=math.calculateActorStats(bridge.fromLegacyLoadout(swapped));
 assert.equal(changed.attack,(10+19)*1.15,"wrong-slot gear must not contribute");
-assert.equal(changed.maxHp,112);
+assert.equal(changed.maxHp,112,"explicit gear-exclusive owner HP ignores invalid gear");
+// If a legacy aggregate contains wrong-slot gear HP, it must not leak back.
+const corruptedAggregate={...swapped,totalMaxHp:122};
+const invalidHp=math.calculateActorStats(bridge.fromLegacyLoadout(corruptedAggregate));
+assert.equal(invalidHp.maxHp,112);
+const withoutOwnerBase={...corruptedAggregate,ownerCombat:{attack:10,defense:4,speed:3,crit:2}};
+const fallbackHp=math.calculateActorStats(bridge.fromLegacyLoadout(withoutOwnerBase));
+assert.equal(fallbackHp.maxHp,112,"aggregate-only fallback strips wrong-slot HP");
+const validWithoutBase=math.calculateActorStats(bridge.fromLegacyLoadout({
+  ...sourceInput,ownerCombat:{attack:10,defense:4,speed:3,crit:2}
+}));
+assert.equal(validWithoutBase.maxHp,112,"normal legacy aggregate remains unchanged");
+assert.equal(JSON.stringify(sourceInput),snapshot,"HP correction must not mutate input");
+console.log("PASS: wrong-slot gear HP excluded with explicit base and aggregate fallback");
 const unknownWeapon={...weapon,parts:{...parts,blade:"old_unlisted_id"}};
 const unknownSources=bridge.fromLegacyLoadout({...sourceInput,weapon:unknownWeapon});
 const unknown=math.calculateActorStats(unknownSources);
