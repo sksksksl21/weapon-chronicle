@@ -128,7 +128,9 @@ function formatDetail(item){
  const unique=item.uniqueEffect;
  return '<div class="wc5-quality"><b class="wc5-grade wc5-grade-'+(item.rarity||"common")+'">'+
   (tier?.name||item.rarity||"노멀")+'</b>'+
-  (options.length?'<p>추가 옵션 '+options.map((v,i)=>(i+1)+". "+v).join(" · ")+'</p>':'<p>추가 옵션 없음 · 기본 수치는 개체별 변동</p>')+
+  (!item.generated?'<p>기존 원본 아이템 · 원래 능력치 유지 (신규 등급 옵션 체계는 생성형 변형에 적용)</p>':
+   options.length?'<p>추가 옵션 '+options.map((v,i)=>(i+1)+". "+v).join(" · ")+'</p>':
+   '<p>추가 옵션 없음 · 기본 수치에 품질 변동 적용</p>')+
   (unique?'<p class="wc5-unique">고유 효과 · '+unique.name+' — '+unique.description+
     ' ('+unique.key+' +'+unique.value+')</p>':'')+'</div>';
 }
