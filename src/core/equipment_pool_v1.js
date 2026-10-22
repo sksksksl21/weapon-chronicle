@@ -135,6 +135,25 @@ function formatDetail(item){
   (unique?'<p class="wc5-unique">고유 효과 · '+unique.name+' — '+unique.description+
     ' ('+unique.key+' +'+unique.value+')</p>':'')+'</div>';
 }
+function rarityClass(item){return "rarity-"+(TIERS.some(t=>t.id===item?.rarity)?item.rarity:(item?.rarity==="beyond"?"chronicle":"common"));}
+function decorateCardHTML(html,item){
+ if(typeof html!=="string")return html;
+ const cls=rarityClass(item);
+ return html.replace(/class="([^"]*\b(?:gearChoiceCard40|ownerGearSlot|smithChoiceBtn)\b[^"]*)"/,
+   (whole,c)=>'class="'+c+' '+cls+'"');
+}
+function decorateModalCards(){
+ const modal=typeof document!=="undefined"?document.getElementById("modal"):null;
+ if(!modal||typeof modal.querySelectorAll!=="function")return;
+ modal.querySelectorAll("[data-weapon-equip],[data-equip-gear],[data-owner-equip2]").forEach(el=>{
+   const id=el.dataset?.weaponEquip||el.dataset?.equipGear||el.dataset?.ownerEquip2;
+   const partSlot=W_SLOTS.find(slot=>PART_CATALOG[slot]?.[id]);
+   const item=partSlot?PART_CATALOG[partSlot][id]:OWNER_GEAR_CATALOG[id];
+   if(!item)return;
+   for(const t of TIERS)el.classList.remove("rarity-"+t.id);
+   el.classList.add(rarityClass(item));
+ });
+}
 function installStyle(){
  if(typeof document==="undefined"||document.getElementById("wc5-rarity-style"))return;
  const style=document.createElement("style");style.id="wc5-rarity-style";
@@ -241,7 +260,17 @@ if(typeof ownerGearCardHtml40==="function"){
  const original=ownerGearCardHtml40;
  ownerGearCardHtml40=function(id,...args){
   const html=original.call(this,id,...args);
-  return html.replace('<div class="effectLine">','<div class="effectLine">'+formatDetail(OWNER_GEAR_CATALOG[id]));
+  const item=OWNER_GEAR_CATALOG[id];
+  return decorateCardHTML(html.replace('<div class="effectLine">',
+    '<div class="effectLine">'+formatDetail(item)),item);
+ };
+}
+if(typeof openModal==="function"){
+ const oldModal=openModal;
+ openModal=function(...args){
+   const value=oldModal.apply(this,args);
+   try{decorateModalCards();}catch(e){console.warn("Rarity card decoration skipped",e);}
+   return value;
  };
 }
 if(typeof partDeltaHtml==="function"){
@@ -251,5 +280,5 @@ if(typeof partDeltaHtml==="function"){
  };
 }
 return Object.freeze({TIERS,W_SLOTS,A_SLOTS,expand,buildItem,formatDetail,result,randomFrom,
- rollCopy,restoreCopy,restoreFromSave});
+ rollCopy,restoreCopy,restoreFromSave,rarityClass,decorateCardHTML,decorateModalCards});
 })();
