@@ -22,18 +22,23 @@ For a **valid** loadout the adapter preserves explicitly supplied
 `totalMaxHp` (including all old valid Survival bonuses) while removing the
 already-included flat `maxHp` for recombination exactly once in the math core.
 This is the safe legacy-save baseline. If a known wrong-slot equipped item has
-a `maxHp` or `survival` bonus, the adapter requires `legacyVitals`, with:
+a `maxHp` or `survival` bonus, the adapter needs **either** a separately
+verified **gear-exclusive** `ownerCombat.maxHp`, **or** `legacyVitals` with:
 `rawSurvivalBeforeArmor` (legacy `survivalBase + life`, before equipment),
-`boldness`, and `age`. It then recomputes the entire original HP formula
-using **only valid equipped slots**, including the 58–170 clamp, and returns
-an HP input that yields the exact recomputed total after valid fixed gear HP
-is added by the core. The same reconstruction is available for valid loadouts.
-Without sufficient provenance, it fails with `RangeError` instead of silently
-giving a wrong-slot item an HP bonus or inventing a value.
+`boldness`, and `age`. The former trusts that the supplied owner base
+already excludes **all** equipment HP effects, and ignores the contaminated
+saved aggregate. The latter recomputes the original HP formula using **only
+valid equipped slots**, including the 58–170 clamp, and returns an HP input
+that yields the exact recomputed total after fixed gear HP is added by the
+core. It also works for valid loadouts.
 
-The caller must not interpret `ownerCombat.maxHp` alone as enough to
-reconstruct a corrupted/clamped legacy total, because gear Survival also
-contributes. Neither saved data nor the live combat runtime is mutated.
+Crucially, `ownerCombat.maxHp` must **never be estimated by subtracting flat
+item HP from a capped total**, because legacy Survival contributes another
+four HP per point and HP is rounded and bounded. Without either trustworthy
+input, the adapter throws `RangeError` rather than granting hidden HP to a
+wrong-slot item. If a valid Survival-bearing loadout has no aggregate
+`totalMaxHp`, it similarly requires `legacyVitals` for exact reconstruction.
+Neither saved data nor the live combat runtime is mutated.
 Unrecognized older sword part IDs retain their aggregate values.
 
 ### Current one-to-one source-field mapping
