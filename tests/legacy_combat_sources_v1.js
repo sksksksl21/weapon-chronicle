@@ -70,6 +70,17 @@ const cappedHp=math.calculateActorStats(bridge.fromLegacyLoadout({
   legacyVitals:{rawSurvivalBeforeArmor:50,boldness:70,age:55}
 }));
 assert.equal(cappedHp.maxHp,170,"upper HP clamp is reproduced");
+const floorHp=math.calculateActorStats(bridge.fromLegacyLoadout({
+  ...survivalSlot,legacyVitals:{rawSurvivalBeforeArmor:1,boldness:1,age:140}
+}));
+assert.equal(floorHp.maxHp,58,"lower legacy HP clamp is reproduced");
+const cappedSurvivalCatalog={...gearCatalog,
+  helm:{slot:"helmet",mods:{maxHp:4,survival:20}},
+  coat:{slot:"armor",mods:{maxHp:8,survival:20}}};
+const cappedSurvival=math.calculateActorStats(bridge.fromLegacyLoadout({
+  ...sourceInput,gearCatalog:cappedSurvivalCatalog,legacyVitals:uncappedProfile
+}));
+assert.equal(cappedSurvival.maxHp,145,"gear Survival is capped at 12 before HP conversion");
 const survivalOnly={...survivalSlot,ownerEquipment:{...survivalSlot.ownerEquipment,gloves:"survivor_helm"}};
 assert.throws(()=>bridge.fromLegacyLoadout(survivalOnly),RangeError,
   "invalid Survival alone must not survive via aggregate HP");
@@ -88,6 +99,13 @@ const recomputed=math.calculateActorStats(bridge.fromLegacyLoadout({
   ...validSurvivalInput,legacyVitals:uncappedProfile
 }));
 assert.equal(recomputed.maxHp,109,"valid gear Survival is included in recomputed HP");
+const mixedSurvival=math.calculateActorStats(bridge.fromLegacyLoadout({
+  ...validSurvivalInput,
+  ownerEquipment:{...equipped,gloves:"veteran_helm"},
+  legacyVitals:uncappedProfile
+}));
+assert.equal(mixedSurvival.maxHp,109,
+  "wrong-slot Survival must be removed without dropping valid gear Survival");
 assert.throws(()=>bridge.fromLegacyLoadout({
   ...validSurvivalInput,totalMaxHp:undefined
 }),RangeError,"missing aggregate cannot drop valid gear Survival HP");
