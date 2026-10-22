@@ -15,6 +15,29 @@ offline. Browser/Android manual smoke testing is still required; `play-dev.html`
 is not itself proof of battle correctness. If the preview gives 404, check that
 GitHub Pages is deploying `dev`, not `main`.
 
+## DEV status / skill-deck preview (2026-10-22)
+
+Open the [DEV preview](https://sksksksl21.github.io/weapon-chronicle/play-dev.html), then
+**상태 정보**. Tabs are **소유자 · 방어구 · 무기 · 스킬덱**.
+
+- The initial unnamed sailor is assigned a random named profile from twelve owners
+  with distinct base Martial / Survival / Social attributes and short backgrounds.
+  Existing named owners remain unchanged; successor story owners retain their authored identities.
+- Armor slots show protection / HP / mobility and never offensive modifiers.
+- Sword status displays a central assembled sword with four selectable parts on each side.
+- A battle deck has exactly ten unique equipped cards, shuffled into a four-card opening
+  hand; a separate 20-slot skill inventory holds unlockable cards. Click an inventory
+  card → **장착** → the intended equipped slot. Non-starter, unequipped cards can be
+  dismantled for one shard. Old story engravings unlock matching skill inventory cards.
+- Catalog has 21 existing combat-card IDs and four rarity levels. Ten cards are granted
+  initially. Future content may award skills via `WC_STATUS_SKILLDECK_V1.grant(id)`.
+  This API has no automatic exploration reward assignment yet.
+- Added `skillDeckData` is an additive saved field. `main` stays frozen.
+  Use `npm run test:status` for the focused Node check.
+- `index.html` is the old checked-in offline bundle until rebuilt and committed.
+  Test this version through `play-dev.html`; remote mobile rendering has not
+  been certified. Existing save data should be backed up before extensive testing.
+
 ## Quick start (Codespaces)
 Open **Code → Codespaces → Create codespace on main**. The container setup installs the Python Playwright testing dependency and a browser. From the Codespaces terminal:
 
