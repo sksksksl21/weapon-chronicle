@@ -43,10 +43,14 @@ const actor=math.calculateActorStats(sources);
 assert.equal(actor.maxHp,112);
 assert.equal(actor.maxResonance,86);
 assert.equal(actor.resonanceRecovery,11);
-assert.equal(actor.attack,(10+19+3)*1.15);
+assert.equal(actor.attack,(10+19)*1.15,"armor never increases damage");
 assert.equal(actor.defense,4+16+3+7+2-1);
 assert.equal(actor.attackSpeed,100+3+12+15);
 assert.equal(actor.critChance,2+13);
+assert.equal(sources.armor.gloves.attack,0);
+assert.equal(sources.armor.gloves.crit,0);
+assert.equal(sources.armor.gloves.penetration,0);
+assert.equal(sources.armor.gloves.attackPct,0);
 console.log("PASS: real legacy aggregate weapon totals decomposed/reassembled once");
 console.log("PASS: eight parts, four armor slots, HP and resonance totals preserved");
 const swapped={...sourceInput,ownerEquipment:{...equipped,gloves:"invalid"}};
@@ -97,6 +101,19 @@ const validWithoutBase=math.calculateActorStats(bridge.fromLegacyLoadout({
 assert.equal(validWithoutBase.maxHp,112,"normal legacy aggregate remains unchanged");
 assert.equal(JSON.stringify(sourceInput),snapshot,"HP correction must not mutate input");
 console.log("PASS: wrong-slot direct/Survival HP excluded; valid Survival retained; HP cap reproduced");
+// Valid armor may include obsolete offensive fields in old catalogs, but NONE apply.
+const oldAttackCatalog={...gearCatalog,gloves:{slot:"gloves",mods:{
+  attack:500,crit:25,penetration:99,attackPct:200,defense:2
+}}};
+const noArmorOffense=math.calculateActorStats(bridge.fromLegacyLoadout({...sourceInput,
+  gearCatalog:oldAttackCatalog}));
+assert.equal(noArmorOffense.attack,actor.attack);
+assert.equal(noArmorOffense.critChance,actor.critChance);
+assert.equal(noArmorOffense.penetration,actor.penetration);
+assert.equal(noArmorOffense.defense,actor.defense);
+assert.equal(bridge.armorContribution("helmet","veteran_helm",gearCatalog).attack,0);
+assert.throws(()=>bridge.armorContribution("blade","gloves",gearCatalog),RangeError);
+console.log("PASS: zero armor offense even for valid slots and malicious/legacy modifiers");
 const unknownWeapon={...weapon,parts:{...parts,blade:"old_unlisted_id"}};
 const unknownSources=bridge.fromLegacyLoadout({...sourceInput,weapon:unknownWeapon});
 const unknown=math.calculateActorStats(unknownSources);
