@@ -21,6 +21,8 @@ jobs:
         run: git diff --exit-code -- index.html combat_story.html
       - name: Unified combat math core assertions
         run: npm run test:combat-math
+      - name: Legacy combat source adapter assertions
+        run: npm run test:combat-adapter
   browser-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 20
