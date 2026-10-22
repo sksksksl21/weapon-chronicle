@@ -36,6 +36,11 @@ assert.equal(computed.attackSpeed,110);
 assert.equal(computed.critChance,2+8*.52+14);
 assert.equal(computed.penetration,0);
 assert.equal(JSON.stringify(input),frozenBefore,"handoff must not mutate active/save state");
+const foodInput={...input,foodBuff:{combatHp:12,defense:3}};
+const foodBefore=JSON.stringify(foodInput),foodSnapshot=handoff.calculate(foodInput,adapter,math);
+assert.equal(foodSnapshot.maxHp,112);
+assert.equal(foodSnapshot.defense,computed.defense+3);
+assert.equal(JSON.stringify(foodInput),foodBefore,"preview must not consume the single-use food buff");
 console.log("PASS: live encounter actor arithmetic uses all eight sword parts and four gear slots");
 
 // A misplaced helmet's HP, Survival, and attack bonuses must not survive

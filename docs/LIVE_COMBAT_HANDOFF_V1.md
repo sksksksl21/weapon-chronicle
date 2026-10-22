@@ -1,5 +1,7 @@
 # Live combat stat handoff, phase 3 (partial integration)
 
+Historical scope of PR #22. The subsequent live damage/speed integration is documented in [LIVE_COMBAT_RULES_V1.md](LIVE_COMBAT_RULES_V1.md).
+
 ## What changed
 - The real `launchStoryCombat` entry point now computes one stat snapshot from the current owner, recalculated sword (8 parts) and four validated gear slots.
 - `WC_LEGACY_COMBAT_SOURCES_V1` decomposes aggregated weapon totals and reproduces capped owner HP. `WC_COMBAT_MATH_V1` combines base/part/gear modifiers once.

@@ -767,10 +767,22 @@ body.storyMode .actions #resetBtn{display:none!important}
 </div>
 
 <script>
+/* @include:combat_math_v1 */
+/* @include:legacy_combat_sources_v1 */
 (()=>{
 const STORY_PARAMS=new URLSearchParams(location.search);
 const STORY_FRAME=window.frameElement;
 const STORY_MODE=(STORY_FRAME?.dataset?.storyMode==='1') || STORY_PARAMS.get('mode')==='story';
+// One validated, transient snapshot supplied by the owning game. Standalone
+// battles without it retain the previous rules for compatibility.
+const LIVE_ACTOR=(()=>{
+  if(!STORY_MODE)return null;
+  try{
+    const actor=JSON.parse(STORY_FRAME?.dataset?.unifiedActorV1||'null');
+    const keys=['maxHp','maxResonance','resonanceRecovery','attack','defense','attackSpeed','critChance','penetration'];
+    return actor&&keys.every(k=>Number.isFinite(actor[k])&&actor[k]>=0)&&actor.maxHp>=1&&actor.attackSpeed>=1?Object.freeze(actor):null;
+  }catch(e){return null;}
+})();
 const STORY_ENEMY=(STORY_FRAME?.dataset?.enemy) || STORY_PARAMS.get('enemy') || 'bandit';
 const STORY_STAGE=({bandit:0,spider:1,slime:2,ismaros:0,cyclops:0,v25_troy_reaver:0,v25_ismaros_guard:0,v25_lotus_keeper:0,v25_lotus_hunter:0,v25_cave_beast:1,v25_cyclops_first:0,v25_cyclops_final:0})[STORY_ENEMY]??0;
 const STORY_ENEMY_HP_SCALE=Math.max(.5,Math.min(2.5,Number(STORY_FRAME?.dataset?.enemyHpScale||STORY_PARAMS.get('enemyHpScale'))||1));
@@ -1029,6 +1041,7 @@ const MEMORY_POOL={
 };
 
 let hero, enemy, stageIndex, turn, deck, discard, exhausted, hand, selectedPre, cardUses, maxCardUses, phase, heroPlan, enemyIntent, heroMissPenaltyNext, pending, resonance;
+let speedGauge=null,speedResolvedThisTurn=false,finishingExchange=false;
 let discardChoice36=null, discardedThisTurn36=false;
 let overdriveArmed=false, overdriveRolled=false, usedThisTurn=[], coreLockedTurns=0, coreLockedThisTurn=false;
 let memoryMods, memoriesTaken, rewardChoices=[];
@@ -1158,11 +1171,17 @@ function stage(){ return (STORY_MODE&&STORY_BOSS[STORY_ENEMY])?STORY_BOSS[STORY_
 function makeEnemy(){
   const s=stage();
   const maxHp=STORY_MODE?Math.round(s.maxHp*STORY_ENEMY_HP_SCALE):s.maxHp;
-  return {
+  const result = {
     name:s.name,pow:s.pow,maxHp,hp:maxHp,attack:s.attack+(STORY_MODE?STORY_ENEMY_ATTACK_DELTA:0),defense:Math.max(0,s.defense+(STORY_MODE?STORY_ENEMY_DEFENSE_DELTA:0)),evasion:Math.max(0,s.evasion+(STORY_MODE?STORY_ENEMY_EVASION_DELTA:0)),crit:s.crit,
     staggered:false,guarded:false,exposed:false,
     parryReady:false,retreatTurns:0,absorbReady:false,splitTurns:0,splitStacks:0
   };
+  if(LIVE_ACTOR){
+    result.unified=WC_COMBAT_MATH_V1.calculateActorStats(WC_LEGACY_COMBAT_SOURCES_V1.enemyFromLegacy({
+      ...result,speed:s.speed??0,penetration:s.penetration??0
+    }));
+  }
+  return result;
 }
 function weighted(arr){ let total=0; arr.forEach(([,w])=>total+=w); let r=Math.random()*total; for(const [v,w] of arr){ r-=w; if(r<=0) return v; } return arr[0][0]; }
 function chooseEnemyIntent(){
@@ -1480,20 +1499,32 @@ function calcHeroHit(){
 function calcHeroCrit(){
   if(heroPlan==='defend'||heroPlan==='dodge') return 0;
   let c=2 + hero.weapon.precision*.72 + hero.martial*.52 + effectiveHandling()*.18 +(heroPlan==='heavy'?5:0)+(enemy.staggered?4:0)+memoryMods.crit+(hasWeaponBuild('duelist')?4:0);
+  if(LIVE_ACTOR)c=LIVE_ACTOR.critChance+(heroPlan==='heavy'?5:0)+(enemy.staggered?4:0)+memoryMods.crit+(hasWeaponBuild('duelist')?4:0);
   if(preHas('blood')) c+=isUpgraded('blood')?40:30;
   if(preHas('giant')) c+=20;
   if(preHas('mainCyclops')) c+=20;
   if(preHas('miracle')) c+=20;
   if(enemy.exposed) c+=weakness().crit+memoryMods.exposeCrit;
   if(hasCombo('legendAim')) c+=10;
-  return clamp(c,3,70);
+  return LIVE_ACTOR?clamp(c,0,100):clamp(c,3,70);
 }
-function calcHeroDmg(){
+function liveDamage(raw,side,critMultiplier=1,temporaryMultiplier=1,ignoreDefense=false){
+  const attacker=side==='owner'?LIVE_ACTOR:enemy.unified;
+  const defender=side==='owner'?enemy.unified:LIVE_ACTOR;
+  const input={damage:raw,critMultiplier,defense:ignoreDefense?0:defender.defense,penetration:attacker.penetration};
+  // Convert existing guard/absorption reductions to a temporary shield AFTER
+  // permanent defense. Critical/card damage has already been applied before it.
+  const hit=WC_COMBAT_MATH_V1.resolveDamage(input);
+  const temporaryDefense=hit.afterDefense*(1-clamp(temporaryMultiplier,0,1));
+  return Math.max(0,Math.round(WC_COMBAT_MATH_V1.resolveDamage({...input,temporaryDefense}).finalDamage));
+}
+function calcHeroDmg(critMultiplier=1){
   if(heroPlan==='defend'||heroPlan==='dodge') return [0,0];
   const mass=Math.max(0,hero.weapon.weight-1.0)*3.5;
   let base=hero.weapon.power + hero.martial*.72 + mass - enemy.defense*.42;
+  if(LIVE_ACTOR)base=LIVE_ACTOR.attack+mass;
   if(hasWeaponBuild('duelist'))base*=.94;
-  if(preHas('storyGap')) base+=enemy.defense*.32;
+  if(!LIVE_ACTOR&&preHas('storyGap')) base+=enemy.defense*.32;
   let mn=Math.max(2,Math.floor(base-2)),mx=Math.ceil(base+3);
   if(heroPlan==='heavy'){
     const control=clamp(.05+(effectiveHandling()-8)*.015,-.03,.12);
@@ -1514,11 +1545,14 @@ function calcHeroDmg(){
   if(enemy.exposed){mn*=weakness().damage;mx*=weakness().damage}
   if(hero.hp/hero.maxHp<=.35){mn*=memoryMods.lowHpDamage;mx*=memoryMods.lowHpDamage}
 
-  if(stageIndex===0 && enemy.parryReady){const parryMult=(hasWeaponBuild('breaker')&&heroPlan==='heavy')?0.80:0.55;mn*=parryMult;mx*=parryMult}
+  let temporaryMultiplier=1;
+  if(stageIndex===0 && enemy.parryReady){const parryMult=(hasWeaponBuild('breaker')&&heroPlan==='heavy')?0.80:0.55;temporaryMultiplier*=parryMult;}
   if(stageIndex===2 && !enemy.exposed){
-    mn*=.65;mx*=.65;
-    if(enemy.absorbReady){const corePierce=(hasWeaponBuild('deep_core')||hasWeaponBuild('cycle_core'))&&selectedPre.length>0;mn*=corePierce?0.78:0.60;mx*=corePierce?0.78:0.60}
+    temporaryMultiplier*=.65;
+    if(enemy.absorbReady){const corePierce=(hasWeaponBuild('deep_core')||hasWeaponBuild('cycle_core'))&&selectedPre.length>0;temporaryMultiplier*=corePierce?0.78:0.60;}
   }
+  if(LIVE_ACTOR)return [mn,mx].map(raw=>liveDamage(raw,'owner',critMultiplier,temporaryMultiplier,preHas('storyGap')));
+  mn*=temporaryMultiplier;mx*=temporaryMultiplier;
   return [Math.max(1,Math.round(mn)),Math.max(1,Math.round(mx))];
 }
 function calcEnemyHit(){
@@ -1534,9 +1568,22 @@ function calcEnemyHit(){
   if(preHas('escapeMemory')) h-=35;
   return clamp(h,10,90);
 }
-function calcEnemyDmg(){
+function calcEnemyDmg(critMultiplier=1){
   if(enemyIntent==='guard'||enemyIntent==='web') return [0,0];
   let d=(stage().damage[enemyIntent]||stage().damage.light).slice();
+  if(LIVE_ACTOR){
+    d=d.map(raw=>Math.max(0,enemy.unified.attack+raw-stage().attack));
+    let temporaryMultiplier=1;
+    if(heroPlan==='defend'){
+      temporaryMultiplier*=clamp(.68-(hero.weapon.toughness*.014+hero.survival*.012+effectiveHandling()*.005),.38,.62);
+      if(hasWeaponBuild('bulwark'))temporaryMultiplier*=.88;
+    }
+    if(enemy.staggered)d=d.map(raw=>raw*.7);
+    if(stageIndex===2)d=d.map(raw=>raw*(1+puddingRage()*.08+(enemy.splitTurns>0?enemy.splitStacks*.08:0)));
+    if(preHas('gritMemory'))temporaryMultiplier*=.50;
+    if(heroPlan==='defend'&&(hero.armor?.block||0)>0)temporaryMultiplier*=clamp(1-hero.armor.block/100,.55,1);
+    return d.map(raw=>liveDamage(raw,'enemy',critMultiplier,temporaryMultiplier));
+  }
   if(heroPlan==='defend'){
     const guard=clamp(.68-(hero.weapon.toughness*.014+hero.survival*.012+effectiveHandling()*.005),.38,.62);
     d=[Math.ceil(d[0]*guard),Math.ceil(d[1]*guard)];
@@ -1902,7 +1949,8 @@ async function animateCounter(){
   const r=roll100();
   await heroAttackAnim();
   if(r<=cc){
-    const dmg=hasCombo('guardCounter')?ri(13,20):ri(8,14);
+    const raw=hasCombo('guardCounter')?ri(13,20):ri(8,14);
+    const dmg=LIVE_ACTOR?liveDamage(raw,'owner'):raw;
     enemy.hp=Math.max(0,enemy.hp-dmg);
     enemySprite().classList.add('hit');
     addDamage(79,48,String(dmg),'red');
@@ -1960,7 +2008,8 @@ async function resolveBanditParry(wasHit){
   const parryChance=(hasWeaponBuild('breaker')&&heroPlan==='heavy')?45:70;
   if(r<=parryChance){
     await enemyAttackAnim();
-    const dmg=ri(6,9);
+    const raw=ri(6,9);
+    const dmg=LIVE_ACTOR?liveDamage(raw,'enemy'):raw;
     hero.hp=Math.max(0,hero.hp-dmg);
     ownerTookDamage(dmg);
     heroSprite().classList.add('hit');
@@ -2000,6 +2049,7 @@ function consumeAfterHeroActionStatuses(){
 }
 
 function startTurn(){
+  speedResolvedThisTurn=false;
   if(turn>1 && $("banner").textContent==="전투 준비") $("banner").style.display="none";
   if(turn>1){
     const gain=turnResonanceRecovery();
@@ -2035,6 +2085,7 @@ async function executeTurn(){
   const r=roll100(); pending={heroRoll:r}; await resolveHeroRoll(r,true);
 }
 async function resolveHeroRoll(r, allowReaction){
+  if(pending?.speedBasic==='owner')return resolveSpeedHeroRoll(r,allowReaction);
   const hit=calcHeroHit(),crit=calcHeroCrit();
   const critLine=Math.min(hit,crit);
 
@@ -2043,11 +2094,10 @@ async function resolveHeroRoll(r, allowReaction){
     showBanner(chain?'CHAIN · '+chain.name:'치명타!');battleImpact36('치명타!');
     await heroAttackAnim();
 
-    let dmg=ri(...calcHeroDmg());
     let mult=1.75;
     if(hasCombo('legendAim')) mult=2.15;
     if(hasCombo('bloodOver')) mult=2.35;
-    dmg=Math.round(dmg*mult);
+    const dmg=LIVE_ACTOR?ri(...calcHeroDmg(mult)):Math.round(ri(...calcHeroDmg())*mult);
 
     enemy.hp=Math.max(0,enemy.hp-dmg);
     enemySprite().classList.add('hit');
@@ -2140,8 +2190,8 @@ async function resolveBanditCombo(){
     const r=roll100();
     await enemyAttackAnim();
     if(r<=hit){
-      let dmg=ri(d[0],d[1]);
-      if(r<=crit) dmg=Math.round(dmg*1.5);
+      let dmg=LIVE_ACTOR?ri(...calcEnemyDmg(r<=crit?1.5:1)):ri(d[0],d[1]);
+      if(!LIVE_ACTOR&&r<=crit) dmg=Math.round(dmg*1.5);
       if(preHas('feint') && Math.random()<(isUpgraded('feint')?.70:.55)) dmg=0;
       hero.hp=Math.max(0,hero.hp-dmg);
       ownerTookDamage(dmg);
@@ -2166,7 +2216,7 @@ async function resolveBanditCombo(){
     render();
     return;
   }
-  endTurn();
+  return endTurn();
 }
 
 async function resolveEnemyPhase(){
@@ -2185,8 +2235,7 @@ async function resolveEnemyPhase(){
     hero.webbedTurns=1;
     log(`거미줄에 묶였다 — 다음 ${hero.name} 공격 명중 ${hasWeaponBuild('duelist')?'-12%':'-25%'}.`+(hasWeaponBuild('duelist')?' 결투형 조작성이 구속 페널티를 줄였다.':''),'bad');
     render();
-    endTurn();
-    return;
+    return endTurn();
   }
 
   if(enemyIntent==='guard'){
@@ -2204,8 +2253,7 @@ async function resolveEnemyPhase(){
       log('블랙 푸딩이 몸을 응집 — 다음 유효 공격 피해를 추가 흡수.','warn');
     }
     render();
-    endTurn();
-    return;
+    return endTurn();
   }
 
   const hit=calcEnemyHit(),crit=enemy.crit+(enemyIntent==='heavy'?3:0);
@@ -2224,15 +2272,14 @@ async function resolveEnemyPhase(){
       grantMoment('escapeMemory','강력한 공격을 회피해 죽음의 궤적을 기억했다.');
       exposeEnemy();
     }
-    endTurn();
-    return;
+    return endTurn();
   }
 
   if(r<=hit){
     showBanner(r<=crit?'적 치명타':'적 공격');if(r<=crit)battleImpact36('위험!');
     await enemyAttackAnim();
-    let dmg=ri(...calcEnemyDmg());
-    if(r<=crit) dmg=Math.round(dmg*1.6);
+    let dmg=LIVE_ACTOR?ri(...calcEnemyDmg(r<=crit?1.6:1)):ri(...calcEnemyDmg());
+    if(!LIVE_ACTOR&&r<=crit) dmg=Math.round(dmg*1.6);
     if(preHas('feint') && Math.random()<(isUpgraded('feint')?.70:.55)){
       dmg=0;
       log('흘려내기 성공 — 피해 무효.','good');
@@ -2264,8 +2311,7 @@ async function resolveEnemyPhase(){
       render();
       return;
     }
-    endTurn();
-    return;
+    return endTurn();
   }
 
   showBanner('적 실패');
@@ -2277,16 +2323,82 @@ async function resolveEnemyPhase(){
     log('적 대실패 — 경직.','warn');
   }
   if(enemyIntent==='heavy') exposeEnemy();
-  endTurn();
+  return endTurn();
 }
-function finishAfterEnemyReaction(){ if(enemy.hp<=0){ stageVictory(); return; } endTurn(); }
-function endTurn(){
+function finishAfterEnemyReaction(){ if(enemy.hp<=0){ stageVictory(); return; } return endTurn(); }
+function basicHeroValues(roll){
+  const oldPlan=heroPlan,oldCards=selectedPre;
+  try{
+    // Extra attacks are basic attacks; never replay a heavy move/pre-card.
+    heroPlan='basic';selectedPre=[];
+    const hit=calcHeroHit(),critical=roll<=Math.min(hit,calcHeroCrit());
+    return {hit,critical,damage:calcHeroDmg(critical?1.75:1)};
+  }finally{heroPlan=oldPlan;selectedPre=oldCards;}
+}
+async function resolveSpeedHeroRoll(roll,allowReaction,fromExchange=false){
+  phase='speedResolve';
+  const values=basicHeroValues(roll);
+  await heroAttackAnim();
+  if(roll<=values.hit){
+    const damage=ri(...values.damage);
+    enemy.hp=Math.max(0,enemy.hp-damage);
+    addDamage(79,46,String(damage),values.critical?'gold':'red');
+    log(`공속 추가공격 — ${damage} 피해.`,'good');
+  }else{
+    addDamage(79,46,'MISS','gray');log('공속 추가공격 실패.','muted');
+    if(allowReaction&&cardUses<maxCardUses&&hand.some(id=>CARD_DB[id].timing==='heroMiss')){
+      pending={heroRoll:roll,speedBasic:'owner'};phase='heroReaction';
+      $('reactMsg').textContent='추가 기본공격 실패. 이번 교전의 남은 카드 개입을 사용할 수 있다.';
+      render();return true;
+    }
+  }
+  pending=null;render();
+  if(!fromExchange)return endTurn();
+  return false;
+}
+async function resolveSpeedBasic(side){
+  if(side==='owner')return resolveSpeedHeroRoll(roll100(),true,true);
+  const oldIntent=enemyIntent;
+  let hit,critical,damage;
+  const roll=roll100();
+  try{
+    enemyIntent='light';hit=calcEnemyHit();critical=roll<=Math.min(hit,enemy.unified.critChance);
+    damage=calcEnemyDmg(critical?1.6:1);
+  }finally{enemyIntent=oldIntent;}
+  await enemyAttackAnim();
+  // Keep the same defender's guard/dodge and committed defensive card.
+  if(roll>hit||(heroPlan==='dodge'&&roll>hit-18)){
+    addDamage(24,44,'MISS','gray');log('적 공속 추가공격 회피.','good');return false;
+  }
+  let amount=ri(...damage);
+  if(preHas('feint')&&Math.random()<(isUpgraded('feint')?.70:.55))amount=0;
+  hero.hp=Math.max(0,hero.hp-amount);ownerTookDamage(amount);
+  addDamage(24,44,String(amount),critical?'gold':'red');log(`적 공속 추가공격 — ${amount} 피해.`,'bad');render();
+  if(hero.hp>0&&amount>0&&cardUses<maxCardUses&&hand.some(id=>CARD_DB[id].timing==='enemyHit')){
+    pending={enemyDamage:amount};phase='enemyReaction';
+    $('reactMsg').textContent='추가 기본공격 피격. 이번 교전의 남은 카드 개입을 사용할 수 있다.';
+    render();return true;
+  }
+  return false;
+}
+async function endTurn(){
+  if(finishingExchange||phase==='done')return;
+  finishingExchange=true;
+  try{
+  if(LIVE_ACTOR&&!speedResolvedThisTurn&&hero.hp>0&&enemy.hp>0){
+    speedResolvedThisTurn=true;phase='speedResolve';
+    speedGauge=WC_COMBAT_MATH_V1.advanceSpeedGauge(speedGauge,LIVE_ACTOR.attackSpeed,enemy.unified.attackSpeed);
+    if(speedGauge.extraBasicAttack&&await resolveSpeedBasic(speedGauge.extraBasicAttack))return;
+  }
+  if(hero.hp<=0){runEnd();return;}
+  if(enemy.hp<=0){stageVictory();return;}
   phase='pre';
   enemy.staggered=false;
   enemy.guarded=false;
   if(ownerMind.damageMemory>0) ownerMind.damageMemory--;
   turn++;
   startTurn();
+  }finally{finishingExchange=false;}
 }
 function pickRewardChoices(){
   // Overdrive is disabled: keep its legacy definition but never offer a no-op reward.
@@ -2402,12 +2514,18 @@ function runEnd(){
   $('overlay').classList.add('show');
 }
 function resetRun(){
+  speedGauge=null;speedResolvedThisTurn=false;finishingExchange=false;
   $('overlay').classList.remove('show');
   $('rewardBox').className='rewardBox';
   $('nextBtn').style.display='block';
   $('log').innerHTML='';
 
   hero=JSON.parse(JSON.stringify(HERO_BASE));
+  if(LIVE_ACTOR){
+    hero.maxHp=LIVE_ACTOR.maxHp;
+    hero.weapon.maxResonance=LIVE_ACTOR.maxResonance;
+    hero.weapon.resonanceRecovery=LIVE_ACTOR.resonanceRecovery;
+  }
   resonance=STORY_MODE?Math.min(hero.weapon.maxResonance,STORY_WEAPON.resonance):Math.round(hero.weapon.maxResonance*.75);
   if(hasWeaponBuild('deep_core'))resonance=Math.min(hero.weapon.maxResonance,resonance+15);
   hero.webbedTurns=0;

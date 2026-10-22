@@ -12,7 +12,8 @@
     "test:story": "bash scripts/test-story.sh",
     "test:combat-math": "node tests/combat_math_v1.js",
     "test:combat-adapter": "node tests/legacy_combat_sources_v1.js",
-    "test:combat-handoff": "node tests/live_combat_handoff_v1.js"
+    "test:combat-handoff": "node tests/live_combat_handoff_v1.js",
+    "test:live-combat": "node tests/live_combat_damage_v1.js"
   },
   "engines": {
     "node": ">=22"
