@@ -16,8 +16,8 @@ const gearCatalog={
 };
 const input={
   owner:{name:"테스트 소유자",age:24,boldness:50},
-  effectiveOwner:{martial:9,survival:8},
-  rawOwner:{survival:8},
+  effectiveOwner:{martial:9,survival:8,mult:1},
+  rawOwner:{survival:8,parts:{weapon:1,armor:2}},
   armorSurvival:2,
   maxHp:100,
   weapon:{parts,power:20,toughness:16,handling:10,precision:14,maxResonance:70,resonanceRecovery:9},
@@ -30,20 +30,24 @@ const computed=handoff.calculate(input,adapter,math);
 assert.equal(computed.maxHp,100);
 assert.equal(computed.maxResonance,70);
 assert.equal(computed.resonanceRecovery,9);
-assert.equal(computed.attack,9*.72+20+5);
-assert.equal(computed.defense,8+16+2);
+assert.equal(computed.attack,8*.72+20+5);
+assert.equal(computed.defense,6+16+2);
 assert.equal(computed.attackSpeed,110);
-assert.equal(computed.critChance,2+9*.52+14);
+assert.equal(computed.critChance,2+8*.52+14);
 assert.equal(computed.penetration,0);
 assert.equal(JSON.stringify(input),frozenBefore,"handoff must not mutate active/save state");
 console.log("PASS: live encounter actor arithmetic uses all eight sword parts and four gear slots");
 
 // A misplaced helmet's HP, Survival, and attack bonuses must not survive
 // the real capped owner HP formula or leak through to the live handoff.
-const wrong={...input,ownerEquipment:{...input.ownerEquipment,gloves:"wrong_helmet"}};
+const wrong={...input,
+  rawOwner:{survival:9,parts:{weapon:1,armor:3}},
+  effectiveOwner:{martial:9,survival:9,mult:1},
+  armorSurvival:3,
+  ownerEquipment:{...input.ownerEquipment,gloves:"wrong_helmet"}};
 const wrongSnapshot=handoff.calculate(wrong,adapter,math);
 assert.equal(wrongSnapshot.maxHp,96); // 65 + (6 baseline + 1 valid helmet Survival)*4 + 3 HP
-assert.equal(wrongSnapshot.attack,9*.72+20);
-assert.equal(wrongSnapshot.defense,8+16+2);
+assert.equal(wrongSnapshot.attack,8*.72+20);
+assert.equal(wrongSnapshot.defense,6+16+2);
 assert.equal(JSON.stringify(wrong.ownerEquipment.gloves),"wrong_helmet");
 console.log("PASS: wrong-slot gear ignored without modifying saved equipment");
