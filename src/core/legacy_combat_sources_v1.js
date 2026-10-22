@@ -2,6 +2,7 @@
  * Non-live adapter: preserves v5.2 saves and historical part IDs.
  * The caller must supply ownerCombat BASE stats (not gear-inclusive) and the
  * runtime's CURRENT totalMaxHp (which already includes equipped gear maxHp).
+ * If saved slots may be invalid, supply legacyVitals to reproduce original HP caps.
  */
 const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
   "use strict";
@@ -37,7 +38,7 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
     };
   }
   function fromLegacyLoadout({ownerCombat={},totalMaxHp,weapon={},partCatalog={},
-    ownerEquipment={},gearCatalog={},buffs={}}={}) {
+    ownerEquipment={},gearCatalog={},buffs={},legacyVitals}={}) {
     const weaponParts = {};
     for (const slot of SWORD) {
       weaponParts[slot] = swordPartValues(modsOf(partCatalog,slot,weapon.parts?.[slot]));
@@ -49,9 +50,53 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
       const mods = entry?.slot === slot ? (entry.mods||{}) : {};
       armor[slot] = armorValues(mods);
     }
+    // Legacy ownerVitalCaps: clamp(round(65 + rawSurvival*4 +
+    // boldness/age modifiers + fixed equipment HP), 58, 170).
+    // rawOwnerStats includes clamp(round(sum(gear.survival)), 0, 12).
+    // A capped saved aggregate alone cannot be inverted after an invalid slot.
+    const suspiciousHpSlot = ARMOR.find(slot=>{
+      const item = gearCatalog?.[ownerEquipment?.[slot]];
+      return item && item.slot !== slot &&
+        (num(item.mods?.maxHp) !== 0 || num(item.mods?.survival) !== 0);
+    });
     const gearHp = ARMOR.reduce((sum,slot)=>sum+armor[slot].maxHp,0);
-    const baseHp = totalMaxHp === undefined ? num(ownerCombat.maxHp)+gearHp : num(totalMaxHp);
-    const owner = {...ownerCombat, maxHp:Math.max(1,baseHp-gearHp)};
+    let baseHp;
+    if (legacyVitals !== undefined && legacyVitals !== null) {
+      if (!Number.isFinite(Number(legacyVitals.rawSurvivalBeforeArmor))) {
+        throw new TypeError("legacyVitals.rawSurvivalBeforeArmor is required");
+      }
+      const validSurvival = ARMOR.reduce((sum,slot)=>{
+        const itemId = ownerEquipment?.[slot];
+        const item = gearCatalog?.[itemId];
+        return sum + (item?.slot === slot ? num(item?.mods?.survival) : 0);
+      },0);
+      const armorSurvival = Math.max(0,Math.min(12,Math.round(validSurvival)));
+      const rawSurvival = Math.max(1,num(legacyVitals.rawSurvivalBeforeArmor)+armorSurvival);
+      const boldness = Number(legacyVitals.boldness)||50;
+      const age = Math.max(16,Number(legacyVitals.age)||24);
+      const uncapped = 65 + rawSurvival*4 + (boldness-50)*.08 - Math.max(0,age-34)*.45 + gearHp;
+      const total = Math.max(58,Math.min(170,Math.round(uncapped)));
+      // The pure core separately adds valid gear's flat HP, exactly once.
+      baseHp = total - gearHp;
+    } else {
+      if (suspiciousHpSlot) {
+        throw new RangeError("Cannot undo wrong-slot legacy Survival/HP from capped maxHp (" +
+          suspiciousHpSlot + "); provide legacyVitals for exact owner HP reconstruction");
+      }
+      // Valid legacy aggregate is already capped and Survival-inclusive.
+      // If only owner-only HP exists, a valid Survival gear contribution is
+      // still nontrivial: require the aggregate or an exact legacy profile.
+      const hasTotal = totalMaxHp !== undefined && totalMaxHp !== null;
+      const validSurvival = ARMOR.reduce((sum,slot)=>{
+        const item = gearCatalog?.[ownerEquipment?.[slot]];
+        return sum + (item?.slot === slot ? num(item?.mods?.survival) : 0);
+      },0);
+      if (!hasTotal && (ownerCombat.maxHp === undefined || validSurvival !== 0)) {
+        throw new RangeError("Provide totalMaxHp or legacyVitals to retain capped gear Survival HP");
+      }
+      baseHp = (hasTotal ? num(totalMaxHp) : num(ownerCombat.maxHp)+gearHp) - gearHp;
+    }
+    const owner = {...ownerCombat, maxHp:Math.max(1,baseHp)};
     // state.weapon's values already INCLUDE every equipped component.
     // Strip mapped component contributions now, so the core adds them once.
     const totals = {

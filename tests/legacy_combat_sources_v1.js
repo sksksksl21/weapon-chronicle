@@ -18,7 +18,9 @@ const gearCatalog={
   coat:{slot:"armor",mods:{maxHp:8,defense:7}},
   gloves:{slot:"gloves",mods:{defense:2,attack:3}},
   boots:{slot:"boots",mods:{speed:15,defense:-1}},
-  invalid:{slot:"helmet",mods:{attack:999}}
+  invalid:{slot:"helmet",mods:{attack:999,maxHp:10}},
+  veteran_helm:{slot:"helmet",mods:{attack:999,maxHp:4,survival:2}},
+  survivor_helm:{slot:"helmet",mods:{survival:2}}
 };
 const equipped={helmet:"helm",armor:"coat",gloves:"gloves",boots:"boots"};
 const weapon={parts,power:19,toughness:16,precision:13,handling:12,
@@ -48,9 +50,53 @@ assert.equal(actor.critChance,2+13);
 console.log("PASS: real legacy aggregate weapon totals decomposed/reassembled once");
 console.log("PASS: eight parts, four armor slots, HP and resonance totals preserved");
 const swapped={...sourceInput,ownerEquipment:{...equipped,gloves:"invalid"}};
-const changed=math.calculateActorStats(bridge.fromLegacyLoadout(swapped));
-assert.equal(changed.attack,(10+19)*1.15,"wrong-slot gear must not contribute");
-assert.equal(changed.maxHp,112);
+const uncappedProfile={rawSurvivalBeforeArmor:5,boldness:50,age:24};
+const invalidWithProfile=math.calculateActorStats(bridge.fromLegacyLoadout({
+  ...swapped,legacyVitals:uncappedProfile
+}));
+assert.equal(invalidWithProfile.maxHp,97,"invalid flat HP must not survive reconstruction");
+assert.equal(invalidWithProfile.attack,(10+19)*1.15,"wrong-slot gear attack must not contribute");
+assert.throws(()=>bridge.fromLegacyLoadout(swapped),RangeError,
+  "aggregate with invalid HP gear cannot be safely inverted");
+const survivalSlot={...swapped,ownerEquipment:{...swapped.ownerEquipment,gloves:"veteran_helm"},
+  totalMaxHp:124};
+const survivalWithProfile=math.calculateActorStats(bridge.fromLegacyLoadout({
+  ...survivalSlot,legacyVitals:uncappedProfile
+}));
+assert.equal(survivalWithProfile.maxHp,97,"invalid Survival*4 and flat HP are excluded");
+assert.throws(()=>bridge.fromLegacyLoadout(survivalSlot),RangeError);
+const cappedHp=math.calculateActorStats(bridge.fromLegacyLoadout({
+  ...survivalSlot,totalMaxHp:170,
+  legacyVitals:{rawSurvivalBeforeArmor:50,boldness:70,age:55}
+}));
+assert.equal(cappedHp.maxHp,170,"upper HP clamp is reproduced");
+const survivalOnly={...survivalSlot,ownerEquipment:{...survivalSlot.ownerEquipment,gloves:"survivor_helm"}};
+assert.throws(()=>bridge.fromLegacyLoadout(survivalOnly),RangeError,
+  "invalid Survival alone must not survive via aggregate HP");
+const survivalOnlyWithProfile=math.calculateActorStats(bridge.fromLegacyLoadout({
+  ...survivalOnly,legacyVitals:uncappedProfile
+}));
+assert.equal(survivalOnlyWithProfile.maxHp,97);
+// A valid loadout with actual Survival modifiers must retain all +4 HP points.
+const validSurvivalCatalog={...gearCatalog,
+  helm:{slot:"helmet",mods:{maxHp:4,survival:1,defense:3}},
+  coat:{slot:"armor",mods:{maxHp:8,survival:2,defense:7}}};
+const validSurvivalInput={...sourceInput,gearCatalog:validSurvivalCatalog,totalMaxHp:109};
+const retained=math.calculateActorStats(bridge.fromLegacyLoadout(validSurvivalInput));
+assert.equal(retained.maxHp,109,"valid aggregate preserves Survival-derived HP");
+const recomputed=math.calculateActorStats(bridge.fromLegacyLoadout({
+  ...validSurvivalInput,legacyVitals:uncappedProfile
+}));
+assert.equal(recomputed.maxHp,109,"valid gear Survival is included in recomputed HP");
+assert.throws(()=>bridge.fromLegacyLoadout({
+  ...validSurvivalInput,totalMaxHp:undefined
+}),RangeError,"missing aggregate cannot drop valid gear Survival HP");
+const validWithoutBase=math.calculateActorStats(bridge.fromLegacyLoadout({
+  ...sourceInput,ownerCombat:{attack:10,defense:4,speed:3,crit:2}
+}));
+assert.equal(validWithoutBase.maxHp,112,"normal legacy aggregate remains unchanged");
+assert.equal(JSON.stringify(sourceInput),snapshot,"HP correction must not mutate input");
+console.log("PASS: wrong-slot direct/Survival HP excluded; valid Survival retained; HP cap reproduced");
 const unknownWeapon={...weapon,parts:{...parts,blade:"old_unlisted_id"}};
 const unknownSources=bridge.fromLegacyLoadout({...sourceInput,weapon:unknownWeapon});
 const unknown=math.calculateActorStats(unknownSources);
