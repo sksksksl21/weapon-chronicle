@@ -30,7 +30,7 @@ const computed=handoff.calculate(input,adapter,math);
 assert.equal(computed.maxHp,100);
 assert.equal(computed.maxResonance,70);
 assert.equal(computed.resonanceRecovery,9);
-assert.equal(computed.attack,8*.72+20+5);
+assert.equal(computed.attack,8*.72+20,"glove attack ignored");
 assert.equal(computed.defense,6+16+2);
 assert.equal(computed.attackSpeed,110);
 assert.equal(computed.critChance,2+8*.52+14);
@@ -67,6 +67,8 @@ let messageListener;
 let legacyCalls=0;
 const context={
   window:{addEventListener:(type,fn)=>{if(type==="message")messageListener=fn;}},
+  render:()=>{},openModal:()=>{},smithStatHtml:()=>{},wc41WeaponFactHtml:()=>{},
+  partDeltaHtml:()=>{},gearSummaryHtml:()=>{},
   console,
   state:{owner:input.owner,weapon:input.weapon,maxHp:input.maxHp,ownerEquipment:input.ownerEquipment},
   PART_CATALOG:input.partCatalog,
