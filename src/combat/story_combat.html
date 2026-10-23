@@ -772,6 +772,7 @@ body.storyMode .actions #resetBtn{display:none!important}
 <script>
 /* @include:combat_math_v1 */
 /* @include:legacy_combat_sources_v1 */
+/* @include:direct_combat_stats_v2 */
 (()=>{
 const STORY_PARAMS=new URLSearchParams(location.search);
 const STORY_FRAME=window.frameElement;
@@ -782,7 +783,7 @@ const LIVE_ACTOR=(()=>{
   if(!STORY_MODE)return null;
   try{
     const actor=JSON.parse(STORY_FRAME?.dataset?.unifiedActorV1||'null');
-    const keys=['maxHp','maxResonance','resonanceRecovery','attack','defense','attackSpeed','critChance','penetration'];
+    const keys=['maxHp','maxResonance','resonanceRecovery','minAttack','maxAttack','hitChance','critChance','critDamageBonus','penetration','attackSpeed','defense','evade','blockChance','blockAmount','critChanceResist','critDamageResist'];
     return actor&&keys.every(k=>Number.isFinite(actor[k])&&actor[k]>=0)&&actor.maxHp>=1&&actor.attackSpeed>=1?Object.freeze(actor):null;
   }catch(e){return null;}
 })();
@@ -1180,9 +1181,12 @@ function makeEnemy(){
     parryReady:false,retreatTurns:0,absorbReady:false,splitTurns:0,splitStacks:0
   };
   if(LIVE_ACTOR){
-    result.unified=WC_COMBAT_MATH_V1.calculateActorStats(WC_LEGACY_COMBAT_SOURCES_V1.enemyFromLegacy({
-      ...result,speed:s.speed??0,penetration:s.penetration??0
-    }));
+    result.unified=WC_DIRECT_COMBAT_V2.calculate({
+      owner:{martial:100,survival:100,stableSurvival:100,baseHp:result.maxHp},
+      weapon:{minAttack:Math.max(0,result.attack*.9),maxAttack:Math.max(0,result.attack*1.1),
+       defense:result.defense,hitBonus:(s.hitChance??70)-70,critBonus:result.crit-5,
+       penetration:s.penetration??0,speedPct:s.speed??0,evade:result.evasion}
+    });
   }
   return result;
 }
@@ -1482,6 +1486,19 @@ function hasWeaponBuild(id){return weaponBuilds().some(x=>x.id===id);}
 function buildNames(){const b=weaponBuilds();return b.length?b.map(x=>x.name).join(' + '):'균형형';}
 function calcHeroHit(){
   if(heroPlan==='defend'||heroPlan==='dodge') return 0;
+  if(LIVE_ACTOR){
+    let h=LIVE_ACTOR.hitChance-enemy.unified.evade+heroMissPenaltyNext+memoryMods.hit;
+    if(heroPlan==='heavy')h-=12;
+    if(hero.webbedTurns>0)h-=25;
+    if(enemy.staggered)h+=15;
+    if(preHas('aim1')||preHas('aim2'))h+=isUpgraded(preHas('aim1')?'aim1':'aim2')?35:25;
+    if(preHas('storyGap'))h+=20;
+    if(preHas('mainCyclops'))h+=30;
+    if(preHas('miracle'))h+=20;
+    if(enemy.exposed)h+=weakness().hit+memoryMods.exposeHit;
+    if(hasCombo('legendAim'))h+=10;
+    return clamp(h,0,100);
+  }
   const burden=weaponWeightBurden();
   const reach=(hero.weapon.length-90)*.10;
   let h=34 + hero.martial*3.2 + hero.weapon.precision*2.0 + effectiveHandling()*1.15 + reach - effectiveEnemyEvasion()*2.45 - burden*1.8;
@@ -1502,6 +1519,17 @@ function calcHeroHit(){
 }
 function calcHeroCrit(){
   if(heroPlan==='defend'||heroPlan==='dodge') return 0;
+  if(LIVE_ACTOR){
+    let c=LIVE_ACTOR.critChance-enemy.unified.critChanceResist+
+      (heroPlan==='heavy'?5:0)+(enemy.staggered?4:0)+memoryMods.crit;
+    if(preHas('blood'))c+=isUpgraded('blood')?40:30;
+    if(preHas('giant'))c+=20;
+    if(preHas('mainCyclops'))c+=20;
+    if(preHas('miracle'))c+=20;
+    if(enemy.exposed)c+=weakness().crit+memoryMods.exposeCrit;
+    if(hasCombo('legendAim'))c+=10;
+    return clamp(c,0,100);
+  }
   let c=2 + hero.weapon.precision*.72 + hero.martial*.52 + effectiveHandling()*.18 +(heroPlan==='heavy'?5:0)+(enemy.staggered?4:0)+memoryMods.crit+(hasWeaponBuild('duelist')?4:0);
   if(LIVE_ACTOR)c=LIVE_ACTOR.critChance+(heroPlan==='heavy'?5:0)+(enemy.staggered?4:0)+memoryMods.crit+(hasWeaponBuild('duelist')?4:0);
   if(preHas('blood')) c+=isUpgraded('blood')?40:30;
@@ -1515,15 +1543,32 @@ function calcHeroCrit(){
 function liveDamage(raw,side,critMultiplier=1,temporaryMultiplier=1,ignoreDefense=false){
   const attacker=side==='owner'?LIVE_ACTOR:enemy.unified;
   const defender=side==='owner'?enemy.unified:LIVE_ACTOR;
-  const input={damage:raw,critMultiplier,defense:ignoreDefense?0:defender.defense,penetration:attacker.penetration};
-  // Convert existing guard/absorption reductions to a temporary shield AFTER
-  // permanent defense. Critical/card damage has already been applied before it.
-  const hit=WC_COMBAT_MATH_V1.resolveDamage(input);
-  const temporaryDefense=hit.afterDefense*(1-clamp(temporaryMultiplier,0,1));
-  return Math.max(0,Math.round(WC_COMBAT_MATH_V1.resolveDamage({...input,temporaryDefense}).finalDamage));
+  const criticalBase=side==='owner'?1.75:1.6;
+  const critical=critMultiplier>1?
+    (1+Math.max(0,attacker.critDamageBonus-defender.critDamageResist)/100)*(critMultiplier/criticalBase):1;
+  const preDefense=Math.max(0,raw)*Math.max(0,critical);
+  const effectiveDefense=ignoreDefense?0:Math.max(0,defender.defense-attacker.penetration);
+  const armored=preDefense<=0?0:Math.max(1,preDefense-effectiveDefense);
+  const blocked=roll100()<=defender.blockChance?defender.blockAmount:0;
+  return Math.max(0,Math.round(Math.max(0,armored-blocked)*clamp(temporaryMultiplier,0,1)));
 }
 function calcHeroDmg(critMultiplier=1){
   if(heroPlan==='defend'||heroPlan==='dodge') return [0,0];
+  if(LIVE_ACTOR){
+    let mult=heroPlan==='heavy'?1.6:1;
+    if(preHas('over'))mult*=isUpgraded('over')?2.25:2;
+    if(preHas('giant'))mult*=2;
+    if(preHas('last'))mult*=3;
+    if(preHas('openingShard'))mult*=enemy.exposed?1.6:1.15;
+    if(hasCombo('aimOver'))mult*=1.25;
+    if(enemy.exposed)mult*=weakness().damage;
+    if(hero.hp/hero.maxHp<=.35)mult*=memoryMods.lowHpDamage;
+    let temporaryMultiplier=1;
+    if(stageIndex===0&&enemy.parryReady)temporaryMultiplier*=.55;
+    if(stageIndex===2&&!enemy.exposed)temporaryMultiplier*=enemy.absorbReady?.39:.65;
+    return [LIVE_ACTOR.minAttack,LIVE_ACTOR.maxAttack].map(d=>
+      liveDamage(d*mult,'owner',critMultiplier,temporaryMultiplier,preHas('storyGap')));
+  }
   const mass=Math.max(0,hero.weapon.weight-1.0)*3.5;
   let base=hero.weapon.power + hero.martial*.72 + mass - enemy.defense*.42;
   if(LIVE_ACTOR)base=LIVE_ACTOR.attack+mass;
@@ -1561,6 +1606,16 @@ function calcHeroDmg(critMultiplier=1){
 }
 function calcEnemyHit(){
   if(enemyIntent==='guard'||enemyIntent==='web') return 0;
+  if(LIVE_ACTOR){
+    let h=enemy.unified.hitChance-LIVE_ACTOR.evade+(enemyIntent==='heavy'?-8:0);
+    if(enemyIntent==='combo')h-=6;
+    if(heroPlan==='dodge')h-=18;
+    if(enemy.staggered)h-=15;
+    if(preHas('guard'))h-=isUpgraded('guard')?40:30;
+    if(preHas('storyPrayer'))h-=25;
+    if(preHas('escapeMemory'))h-=35;
+    return clamp(h,0,100);
+  }
   const burden=weaponWeightBurden();
   let avoid=hero.survival*.9 + effectiveHandling()*.65 - burden*.7 + (heroPlan==='dodge'?9:0)+(heroPlan==='defend'?4:0) + (hero.armor?.evasion||0);
   let h=52+(effectiveEnemyAttack()-avoid)*3.15+(enemyIntent==='heavy'?-8:0);
@@ -1576,17 +1631,13 @@ function calcEnemyDmg(critMultiplier=1){
   if(enemyIntent==='guard'||enemyIntent==='web') return [0,0];
   let d=(stage().damage[enemyIntent]||stage().damage.light).slice();
   if(LIVE_ACTOR){
-    d=d.map(raw=>Math.max(0,enemy.unified.attack+raw-stage().attack));
-    let temporaryMultiplier=1;
-    if(heroPlan==='defend'){
-      temporaryMultiplier*=clamp(.68-(hero.weapon.toughness*.014+hero.survival*.012+effectiveHandling()*.005),.38,.62);
-      if(hasWeaponBuild('bulwark'))temporaryMultiplier*=.88;
-    }
-    if(enemy.staggered)d=d.map(raw=>raw*.7);
-    if(stageIndex===2)d=d.map(raw=>raw*(1+puddingRage()*.08+(enemy.splitTurns>0?enemy.splitStacks*.08:0)));
-    if(preHas('gritMemory'))temporaryMultiplier*=.50;
-    if(heroPlan==='defend'&&(hero.armor?.block||0)>0)temporaryMultiplier*=clamp(1-hero.armor.block/100,.55,1);
-    return d.map(raw=>liveDamage(raw,'enemy',critMultiplier,temporaryMultiplier));
+    const baseline=Math.max(0,stage().attack);
+    const scaled=d.map(raw=>Math.max(0,enemy.unified.minAttack+(raw-baseline)));
+    let temporaryMultiplier=heroPlan==='defend'?.5:1;
+    if(enemy.staggered)temporaryMultiplier*=.7;
+    if(stageIndex===2)temporaryMultiplier*=1+puddingRage()*.08+(enemy.splitTurns>0?enemy.splitStacks*.08:0);
+    if(preHas('gritMemory'))temporaryMultiplier*=.5;
+    return scaled.map(raw=>liveDamage(raw,'enemy',critMultiplier,Math.min(1,temporaryMultiplier)));
   }
   if(heroPlan==='defend'){
     const guard=clamp(.68-(hero.weapon.toughness*.014+hero.survival*.012+effectiveHandling()*.005),.38,.62);
