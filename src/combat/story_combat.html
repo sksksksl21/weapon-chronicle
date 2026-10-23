@@ -1262,7 +1262,7 @@ function reasonForHeroAction(action,mood,forced){
   if(action==="defend")
     return `신중성 ${hero.caution} · 손해를 줄이는 판단을 선택했다.`;
   if(action==="dodge")
-    return `생존 ${hero.survival} · 무기의 조작성을 살려 공격 궤적에서 벗어난다.`;
+    return `회피율과 신중성을 활용해 공격 궤적에서 벗어난다.`;
   return `현재 상황을 크게 무리하지 않고 기본 공격으로 풀어간다.`;
 }
 
@@ -1275,12 +1275,12 @@ function chooseHeroPlan(){
     basic:32 + hero.martial*1.3 + hero.aggression*.16,
     heavy:8 + hero.aggression*.46 + hero.boldness*.28,
     defend:10 + hero.caution*.58,
-    dodge:9 + hero.caution*.28 + hero.survival*1.10 + hero.weapon.handling*.55
+    dodge:9 + hero.caution*.28 + hero.survival*1.10 + (LIVE_ACTOR?LIVE_ACTOR.evade:hero.weapon.handling)*.55
   };
 
   if(enemyIntent==="heavy"){
     s.defend+=20+hero.caution*.22;
-    s.dodge+=18+hero.survival*.75+hero.weapon.handling*.55;
+    s.dodge+=18+hero.survival*.75+(LIVE_ACTOR?LIVE_ACTOR.evade:hero.weapon.handling)*.55;
     if(hero.boldness>=65) s.heavy+=8;
   }
   if(enemyIntent==="guard"){
@@ -1831,16 +1831,16 @@ function useBattleItem(id){
 }
 function render(){
   $('heroName').textContent=hero.name;
-  hero.pow=hero.martial*1.4+hero.survival*.8+hero.weapon.power*.65+hero.weapon.precision*.35+hero.weapon.handling*.3+hero.weapon.toughness*.25;
+  hero.pow=LIVE_ACTOR?(LIVE_ACTOR.minAttack+LIVE_ACTOR.maxAttack)/2:stage().pow;
   if(LIVE_ACTOR){
-    $('heroPow').innerHTML=`<span>공 ${LIVE_ACTOR.attack.toFixed(1)} · 방 ${LIVE_ACTOR.defense.toFixed(1)}</span><span>속 ${LIVE_ACTOR.attackSpeed.toFixed(0)} · 치 ${LIVE_ACTOR.critChance.toFixed(0)}% · 관 ${LIVE_ACTOR.penetration.toFixed(1)}</span>`;
+    $('heroPow').innerHTML=`<span>공 ${LIVE_ACTOR.minAttack.toFixed(0)}~${LIVE_ACTOR.maxAttack.toFixed(0)} · 방 ${LIVE_ACTOR.defense.toFixed(0)}</span><span>속 ${LIVE_ACTOR.attackSpeed.toFixed(0)} · 치 ${LIVE_ACTOR.critChance.toFixed(0)}% · 관 ${LIVE_ACTOR.penetration.toFixed(1)}</span>`;
   }else $('heroPow').textContent=`전투력 ${hero.pow.toFixed(1)}`;
   $('heroFill').style.width=(hero.hp/hero.maxHp*100)+'%';
   $('heroHp').textContent=`${hero.hp.toFixed(1)} / ${hero.maxHp.toFixed(1)}`;
 
   $('enemyName').textContent=stage().name;
   if(enemy.unified){
-    $('enemyPow').innerHTML=`<span>공 ${enemy.unified.attack.toFixed(1)} · 방 ${enemy.unified.defense.toFixed(1)}</span><span>속 ${enemy.unified.attackSpeed.toFixed(0)} · 치 ${enemy.unified.critChance.toFixed(0)}% · 관 ${enemy.unified.penetration.toFixed(1)}</span>`;
+    $('enemyPow').innerHTML=`<span>공 ${enemy.unified.minAttack.toFixed(0)}~${enemy.unified.maxAttack.toFixed(0)} · 방 ${enemy.unified.defense.toFixed(0)}</span><span>속 ${enemy.unified.attackSpeed.toFixed(0)} · 치 ${enemy.unified.critChance.toFixed(0)}% · 관 ${enemy.unified.penetration.toFixed(1)}</span>`;
   }else $('enemyPow').textContent=`전투력 ${stage().pow.toFixed(1)}`;
   $('enemyFill').style.width=(enemy.hp/enemy.maxHp*100)+'%';
   $('enemyHp').textContent=`${enemy.hp.toFixed(1)} / ${enemy.maxHp.toFixed(1)}`;
@@ -2020,7 +2020,7 @@ async function animateCounter(){
   showBanner(hasCombo('guardCounter')?'CHAIN · 철벽 반격':'반격');
   await sleep(120);
   const usedCounter=usedThisTurn.find(x=>cardBase(x)==='counter');
-  const baseCounter=52 + hero.martial*1.4 + hero.weapon.precision*.75 + effectiveHandling()*.8 + (hasWeaponBuild('duelist')?8:0);
+  const baseCounter=LIVE_ACTOR?LIVE_ACTOR.hitChance:52 + hero.martial*1.4 + hero.weapon.precision*.75 + effectiveHandling()*.8 + (hasWeaponBuild('duelist')?8:0);
   const normal=(usedCounter&&isUpgraded(usedCounter))?Math.max(80,baseCounter+10):baseCounter;
   const cc=hasCombo('guardCounter')?95:clamp(normal+memoryMods.counterChance,35,90);
   const r=roll100();
@@ -2261,7 +2261,7 @@ async function resolveHeroRoll(r, allowReaction){
 async function resolveBanditCombo(){
   phase='enemyResolve';
   showBanner('연속 베기');
-  const hit=calcEnemyHit(),crit=enemy.crit,d=calcEnemyDmg();
+  const hit=calcEnemyHit(),crit=LIVE_ACTOR?Math.max(0,enemy.unified.critChance-LIVE_ACTOR.critChanceResist):enemy.crit,d=calcEnemyDmg();
   let total=0;
 
   for(let i=1;i<=2;i++){
@@ -2308,7 +2308,7 @@ async function resolveEnemyPhase(){
   }
 
   if(stageIndex===1 && enemyIntent==='web'){
-    if(Math.random()*100 < (hero.armor?.resist||0)){showBanner('상태 저항');log('장비와 장신구가 거미줄 구속을 버텨냈다.','good');render();endTurn();return;}
+    if(Math.random()*100 < (LIVE_ACTOR?.statusResist??hero.armor?.resist??0)){showBanner('상태 저항');log('장비와 장신구가 거미줄 구속을 버텨냈다.','good');render();endTurn();return;}
     showBanner('거미줄');
     hero.webbedTurns=1;
     log(`거미줄에 묶였다 — 다음 ${hero.name} 공격 명중 ${hasWeaponBuild('duelist')?'-12%':'-25%'}.`+(hasWeaponBuild('duelist')?' 결투형 조작성이 구속 페널티를 줄였다.':''),'bad');
@@ -2334,7 +2334,7 @@ async function resolveEnemyPhase(){
     return endTurn();
   }
 
-  const hit=calcEnemyHit(),crit=enemy.crit+(enemyIntent==='heavy'?3:0);
+  const hit=calcEnemyHit(),crit=(LIVE_ACTOR?Math.max(0,enemy.unified.critChance-LIVE_ACTOR.critChanceResist):enemy.crit)+(enemyIntent==='heavy'?3:0);
   const r=roll100();
   const dodged=heroPlan==='dodge' && r>hit-18;
 
@@ -2370,7 +2370,7 @@ async function resolveEnemyPhase(){
     log(`${stage().name} ${r<=crit?'치명타':'적중'} — ${dmg} 피해.`,'bad');
 
     if(stageIndex===1 && enemyIntent==='light' && dmg>0){
-      if(Math.random()*100 < (hero.armor?.resist||0)) log('상태 저항 — 독이 퍼지기 전에 버텨냈다.','good');
+      if(Math.random()*100 < (LIVE_ACTOR?.statusResist??hero.armor?.resist??0)) log('상태 저항 — 독이 퍼지기 전에 버텨냈다.','good');
       else {hero.poisonTurns=Math.max(hero.poisonTurns,3);log('독니 적중 — 3턴 동안 독 피해.','bad');}
     }
 
@@ -2440,7 +2440,7 @@ async function resolveSpeedBasic(side){
   let hit,critical,damage;
   const roll=roll100();
   try{
-    enemyIntent='light';hit=calcEnemyHit();critical=roll<=Math.min(hit,enemy.unified.critChance);
+    enemyIntent='light';hit=calcEnemyHit();critical=roll<=Math.min(hit,Math.max(0,enemy.unified.critChance-LIVE_ACTOR.critChanceResist));
     damage=calcEnemyDmg(critical?1.6:1);
   }finally{enemyIntent=oldIntent;}
   await enemyAttackAnim();
