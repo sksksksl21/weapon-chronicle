@@ -189,10 +189,10 @@ function armorBody(){
 }
 function partEffects(mods){
  const v=WC_DIRECT_COMBAT_V2.migrateLegacyPart(mods||{},"weapon");
- const fields=[["최소공격",v.minAttack],["최대공격",v.maxAttack],
-  ["방어력",v.defense],["명중",v.hitBonus],["치명타확률",v.critBonus],
-  ["치명타피해",v.critDamageBonus],["관통력",v.penetration],
-  ["공격속도",v.speedPct],["공명",v.maxResonance],
+ const fields=[["최소 공격력",v.minAttack],["최대 공격력",v.maxAttack],
+  ["방어력",v.defense],["명중 %p",v.hitBonus],["치명타 확률 %p",v.critBonus],
+  ["치명타 추가 피해 %",v.critDamageBonus],["관통",v.penetration],
+  ["속도 증가 %",v.speedPct],["공명 최대",v.maxResonance],
   ["공명 회복",v.resonanceRecovery],["공격력 보정 %",v.attackPct*100],
   ["방어력 보정 %",v.defensePct*100]];
  return fields.filter(([,value])=>Math.abs(n(value))>0.00001)

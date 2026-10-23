@@ -136,11 +136,11 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
     const frame=$("combatFrame");
     // A failed preview must never block the underlying game/combat.
     try{
-      const snapshot=wcCurrentUnifiedStats();
-      frame.dataset.unifiedActorV1=JSON.stringify(snapshot);
+      const snapshot=wcDirectCurrentStats();
+      frame.dataset.unifiedActorV1=JSON.stringify({...snapshot,version:'direct-v2'});
     }catch(err){
       delete frame.dataset.unifiedActorV1;
-      console.warn("Unified combat handoff skipped; legacy combat retained:",err);
+      console.warn("Direct combat handoff failed:",err);
     }
     return wcLaunchCombatBeforeHandoff.apply(this,args);
   };
