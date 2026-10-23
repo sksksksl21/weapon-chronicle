@@ -1432,7 +1432,7 @@ function reasonForHeroAction(action,mood,forced){
   if(action==="defend")
     return `신중성 ${hero.caution} · 손해를 줄이는 판단을 선택했다.`;
   if(action==="dodge")
-    return `생존 ${hero.survival} · 무기의 조작성을 살려 공격 궤적에서 벗어난다.`;
+    return `생존 ${hero.survival} · 회피 능력으로 공격 궤적에서 벗어난다.`;
   return `현재 상황을 크게 무리하지 않고 기본 공격으로 풀어간다.`;
 }
 
@@ -1445,12 +1445,12 @@ function chooseHeroPlan(){
     basic:32 + hero.martial*1.3 + hero.aggression*.16,
     heavy:8 + hero.aggression*.46 + hero.boldness*.28,
     defend:10 + hero.caution*.58,
-    dodge:9 + hero.caution*.28 + hero.survival*1.10 + hero.weapon.handling*.55
+    dodge:9 + hero.caution*.28 + hero.survival*1.10 + LIVE_ACTOR.evade*.55
   };
 
   if(enemyIntent==="heavy"){
     s.defend+=20+hero.caution*.22;
-    s.dodge+=18+hero.survival*.75+hero.weapon.handling*.55;
+    s.dodge+=18+hero.survival*.75+LIVE_ACTOR.evade*.55;
     if(hero.boldness>=65) s.heavy+=8;
   }
   if(enemyIntent==="guard"){
@@ -1653,7 +1653,7 @@ function weaponBuilds(){
   return b;
 }
 function hasWeaponBuild(id){return !LIVE_ACTOR&&weaponBuilds().some(x=>x.id===id);}
-function buildNames(){const b=weaponBuilds();return b.length?b.map(x=>x.name).join(' + '):'균형형';}
+function buildNames(){return '장비 직접 능력치';}
 function calcHeroHit(){
  if(heroPlan==='defend'||heroPlan==='dodge')return 0;
  let h=LIVE_ACTOR.hitChance-enemy.unified.evade-(enemy.retreatTurns>0?15:0);
@@ -1777,7 +1777,7 @@ function renderCombatOdds(){
   const hd=calcHeroDmg();
   const eh=calcEnemyHit();
   const ed=calcEnemyDmg();
-  const ec=enemy.crit+(enemyIntent==='heavy'?3:0);
+  const ec=Math.max(0,enemy.unified.critChance-LIVE_ACTOR.critChanceResist)+(enemyIntent==='heavy'?3:0);
 
   $('turnText').textContent=turn;
 
@@ -1920,16 +1920,16 @@ function useBattleItem(id){
 }
 function render(){
   $('heroName').textContent=hero.name;
-  hero.pow=hero.martial*1.4+hero.survival*.8+hero.weapon.power*.65+hero.weapon.precision*.35+hero.weapon.handling*.3+hero.weapon.toughness*.25;
+  hero.pow=(LIVE_ACTOR.minAttack+LIVE_ACTOR.maxAttack)/2+LIVE_ACTOR.defense;
   if(LIVE_ACTOR){
-    $('heroPow').innerHTML=`<span>공 ${LIVE_ACTOR.attack.toFixed(1)} · 방 ${LIVE_ACTOR.defense.toFixed(1)}</span><span>속 ${LIVE_ACTOR.attackSpeed.toFixed(0)} · 치 ${LIVE_ACTOR.critChance.toFixed(0)}% · 관 ${LIVE_ACTOR.penetration.toFixed(1)}</span>`;
+    $('heroPow').innerHTML=`<span>최소공격 ${LIVE_ACTOR.minAttack.toFixed(1)} · 최대공격 ${LIVE_ACTOR.maxAttack.toFixed(1)} · 방어력 ${LIVE_ACTOR.defense.toFixed(1)}</span><span>공격속도 ${LIVE_ACTOR.attackSpeed.toFixed(0)} · 치명타확률 ${LIVE_ACTOR.critChance.toFixed(0)}% · 관통력 ${LIVE_ACTOR.penetration.toFixed(1)}</span>`;
   }else $('heroPow').textContent=`전투력 ${hero.pow.toFixed(1)}`;
   $('heroFill').style.width=(hero.hp/hero.maxHp*100)+'%';
   $('heroHp').textContent=`${hero.hp.toFixed(1)} / ${hero.maxHp.toFixed(1)}`;
 
   $('enemyName').textContent=stage().name;
   if(enemy.unified){
-    $('enemyPow').innerHTML=`<span>공 ${enemy.unified.attack.toFixed(1)} · 방 ${enemy.unified.defense.toFixed(1)}</span><span>속 ${enemy.unified.attackSpeed.toFixed(0)} · 치 ${enemy.unified.critChance.toFixed(0)}% · 관 ${enemy.unified.penetration.toFixed(1)}</span>`;
+    $('enemyPow').innerHTML=`<span>최소공격 ${enemy.unified.minAttack.toFixed(1)} · 최대공격 ${enemy.unified.maxAttack.toFixed(1)} · 방어력 ${enemy.unified.defense.toFixed(1)}</span><span>공격속도 ${enemy.unified.attackSpeed.toFixed(0)} · 치명타확률 ${enemy.unified.critChance.toFixed(0)}% · 관통력 ${enemy.unified.penetration.toFixed(1)}</span>`;
   }else $('enemyPow').textContent=`전투력 ${stage().pow.toFixed(1)}`;
   $('enemyFill').style.width=(enemy.hp/enemy.maxHp*100)+'%';
   $('enemyHp').textContent=`${enemy.hp.toFixed(1)} / ${enemy.maxHp.toFixed(1)}`;
@@ -2424,7 +2424,7 @@ async function resolveEnemyPhase(){
 
   const hit=calcEnemyHit(),crit=Math.max(0,enemy.unified.critChance-LIVE_ACTOR.critChanceResist)+(enemyIntent==='heavy'?3:0);
   const r=roll100();
-  const dodged=heroPlan==='dodge' && r>hit-18;
+  const dodged=heroPlan==='dodge' && r>hit;
 
   if(dodged){
     showBanner('회피');
@@ -2540,7 +2540,7 @@ async function resolveSpeedBasic(side){
   }finally{enemyIntent=oldIntent;}
   await enemyAttackAnim();
   // Keep the same defender's guard/dodge and committed defensive card.
-  if(roll>hit||(heroPlan==='dodge'&&roll>hit-18)){
+  if(roll>hit){
     addDamage(24,44,'MISS','gray');log('적 공속 추가공격 회피.','good');return false;
   }
   let amount=finalBlockDamage(ri(...damage),'enemy');
