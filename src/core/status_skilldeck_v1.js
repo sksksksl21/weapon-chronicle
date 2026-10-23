@@ -111,24 +111,18 @@ function ownerBody(){
  const lv=Math.max(1,Math.floor(n(d.level)||1)),xp=n(d.combatXp),need=combatXpNeed(lv);
  const r=wcDirectOwnerRates(),s=wcDirectCurrentStats();
  const fmt=x=>String(Math.round(n(x)*10)/10);
- const main=[
-  ["공격력",s.minAttack+" ~ "+s.maxAttack],
-  ["방어력",s.defense],
-  ["명중",fmt(s.hitChance)+"%"],
-  ["속도",s.attackSpeed],
-  ["치명타 확률",fmt(s.critChance)+"%"],
-  ["치명타 피해",fmt(s.critMultiplier)+"배"]
- ];
- const detail=[
-  ["최대 HP",s.maxHp],["관통",fmt(s.penetration)],
-  ["치명타 확률 저항",fmt(s.critChanceResist)+"%p"],
-  ["치명타 추가피해 저항",fmt(s.critDamageResist)+"%p"],
-  ["상태이상 저항",fmt(s.statusResist)+"%"],
-  ["회피",fmt(s.evade)+"%"],["막기 확률",fmt(s.blockChance)+"%"],
-  ["막기량",fmt(s.blockAmount)],["최대 공명",fmt(s.maxResonance)],
-  ["교전당 공명 회복",fmt(s.resonanceRecovery)]
- ];
- const abilities=[
+ const attackStats=[
+ ["최소공격",fmt(s.minAttack)],["최대공격",fmt(s.maxAttack)],
+ ["명중",fmt(s.hitChance)+"%"],["치명타확률",fmt(s.critChance)+"%"],
+ ["치명타피해",fmt(s.critMultiplier*100)+"%"],["관통력",fmt(s.penetration)],
+ ["공격속도",fmt(s.attackSpeed)],["공명",fmt(n(state.weapon?.resonance))+" / "+fmt(s.maxResonance)]
+];
+const defenseStats=[
+ ["방어력",fmt(s.defense)],["회피율",fmt(s.evade)+"%"],
+ ["막기확률",fmt(s.blockChance)+"%"],["막기피해감소",fmt(s.blockAmount)],
+ ["치명저항율",fmt(s.critChanceResist)+"%"],["치명피해감소",fmt(s.critDamageResist)+"%"]
+];
+const abilities=[
   ["무예",r.martial,"공격 장비 성능 "+r.martial+"%"],
   ["생존",r.survival,"방어 장비 성능 "+r.survival+"%"],
   ["처세",r.social,"사건·교섭 능력"]
@@ -145,37 +139,21 @@ function ownerBody(){
  '<div class="wc3-avatar">◈</div><div><h3>'+escapeHtml(state.owner.name)+'</h3><small>'+
  escapeHtml(state.owner.role||"소유자")+' · '+n(state.owner.age)+'세 · 제'+n(state.generation)+'대</small></div></div>'+
  '<p class="wc3-story">'+escapeHtml(state.owner.background||"아직 기록된 과거가 없다.")+'</p></section>'+
- '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>현재 장착</h3><small>부위를 눌러 상세 확인</small></div>'+
- '<div class="wc3-ownerEquipGrid">'+
- [["helmet","투구"],["armor","갑옷"],["gloves","장갑"],["boots","신발"]].map(([slot,label])=>{
-   const id=state.ownerEquipment?.[slot],entry=OWNER_GEAR_CATALOG[id];
-   return '<button data-wc3-tab="gear" class="wc3-ownerEquip rarity-'+(entry?.rarity||"common")+
-    '"><b>'+label+'</b><small>'+escapeHtml(entry?.name||"미장착")+'</small></button>';
- }).join("")+
- '<button data-wc3-tab="weapon" class="wc3-ownerEquip wc3-ownerWeapon"><b>검</b><small>8파츠 상세</small></button>'+
- '</div></section>'+
  '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>소유자 기본 능력</h3><small>현재 발휘율 · 0~100</small></div>'+
  '<div class="wc3-abilityGrid">'+abilities.map(([title,v,note])=>
   '<div class="wc3-ability"><b>'+title+'</b><strong>'+v+'<small>/100</small></strong>'+
   '<div class="wc3-meter"><i style="width:'+Math.max(0,Math.min(100,v))+'%"></i></div>'+
   '<small>'+note+'</small></div>').join("")+'</div></section>'+
- '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>전투 능력치</h3><small>핵심 6개</small></div>'+
- stats(main)+
- '<details class="wc3-directDetails"><summary>방어·저항·공명 상세 펼치기</summary>'+
- stats(detail)+
- '<div class="wc3-formula"><b>장비 자체 성능 → 소유자 발휘율 → 최종값</b>'+
- '<p>장비 공격 '+fmt(s.breakdown.gearMinAttack)+' ~ '+fmt(s.breakdown.gearMaxAttack)+
- ' × 무예 '+r.martial+'% → '+s.minAttack+' ~ '+s.maxAttack+'</p>'+
- '<p>장비 방어 '+fmt(s.breakdown.gearDefense)+' × 생존 '+r.survival+'% → '+s.defense+'</p>'+
- '<p>기본 명중 '+fmt(s.breakdown.baseHitChance)+'% + 장비 명중 '+
- fmt(s.breakdown.gearHitBonus)+'%p × 무예 '+r.martial+'% → '+fmt(s.hitChance)+'%</p></div>'+
- '</details></section>'+
+ '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>공격 능력치</h3><small>8항목</small></div>'+
+ stats(attackStats)+'</section>'+
+ '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>방어 능력치</h3><small>핵심 4항목 · 전체 6항목은 방어 탭</small></div>'+
+ stats(defenseStats.slice(0,4))+'</section>'+
  '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>현재 자원</h3></div>'+stats(resources)+'</section>'+
  '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>성장 경험치</h3></div>'+
  statRows([["레벨","Lv. "+lv],["전투 경험치",xp+" / "+need],
  ["생활 경험치",n(d.lifeXp)],["개인 명성",n(d.reputation)]])+
  '<div class="wc3-xp"><i style="width:'+Math.max(0,Math.min(100,xp/need*100))+'%"></i></div></section>'+
- '<p class="wc3-migrationNote">개편 중: 개인 성장 수치는 구형 데이터에서 임시 이관한 값입니다. 전투 엔진 전체 적용 전까지 표시와 전투 결과가 다를 수 있습니다.</p>';
+ '';
 }
 function armorBody(){
  const buttons=ARMOR_SLOTS.map(([id,title,role])=>{
@@ -317,7 +295,7 @@ function css(){
 }
 function draw(tab){
  ensureV26Progression();recalcWeapon();ensureOwner();ensureDeck();css();tab=["owner","gear","weapon","combat"].includes(tab)?tab:"owner";
- const tabs=[["owner","소유자"],["gear","방어구"],["weapon","무기"],["combat","스킬덱"]];
+ const tabs=[["owner","소유자"],["weapon","무기"],["gear","방어"],["combat","스킬"]];
  const nav='<div class="tabRow">'+tabs.map(([id,label])=>'<button class="tabBtn'+(id===tab?' active':'')+
  '" data-wc3-tab="'+id+'">'+label+'</button>').join("")+'</div>';
  const body=tab==="owner"?ownerBody():tab==="gear"?armorBody():tab==="weapon"?weaponBody():skillBody();
