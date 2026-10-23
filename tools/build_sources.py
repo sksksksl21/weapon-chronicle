@@ -6,7 +6,6 @@ SCRIPT_PARTS = (
     'core/action_checkpoint_v482.js', 'core/checkpoint_v483.js',
     'story/history_branch_v50.js', 'story/world_aftermath_v51.js',
     'story/act1_history_v52.js',
-    'core/combat_math_v1.js', 'core/legacy_combat_sources_v1.js',
     'core/direct_combat_stats_v2.js', 'core/direct_combat_runtime_v2.js',
     'core/live_combat_handoff_v1.js', 'core/equipment_pool_v1.js',
     'core/merchant_stock_v1.js', 'core/status_skilldeck_v1.js', 'legacy/bootstrap.js',
@@ -16,7 +15,7 @@ SCRIPT_PARTS = (
 def compose(root):
     source = root / 'src'
     combat_text = (source / 'combat/story_combat.html').read_text(encoding='utf8')
-    for module in ('combat_math_v1', 'legacy_combat_sources_v1'):
+    for module in ('direct_combat_stats_v2',):
         marker = '/* @include:' + module + ' */'
         assert combat_text.count(marker) == 1, f'Expected one {marker}'
         combat_text = combat_text.replace(marker, (source / ('core/' + module + '.js')).read_text(encoding='utf8'))

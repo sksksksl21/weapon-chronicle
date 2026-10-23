@@ -65,6 +65,28 @@ function calculate({owner={},weapon={},parts={},armor={},base=BASE}={}){
  };
  return Object.freeze(result);
 }
+
+/* Shared direct-stat mitigation for the UI, real combat and deterministic tests.
+ * Shield/guard is applied after permanent defense. Zero attack stays zero. */
+function mitigateDamage({damage=0,critMultiplier=1,cardMultiplier=1,defense=0,
+ penetration=0,temporaryDefense=0,blockAmount=0}={}){
+ const base=Math.max(0,n(damage));
+ const raw=base*Math.max(0,n(critMultiplier,1))*Math.max(0,n(cardMultiplier,1));
+ const effectiveDefense=Math.max(0,n(defense)-Math.max(0,n(penetration)));
+ const afterDefense=base>0?Math.max(1,raw-effectiveDefense):0;
+ return Object.freeze({raw,effectiveDefense,afterDefense,
+  finalDamage:Math.round(Math.max(0,afterDefense-Math.max(0,n(temporaryDefense))-Math.max(0,n(blockAmount))))});
+}
+function advanceSpeedGauge(previous,ownerSpeed,enemySpeed){
+ const a=Math.max(1,n(ownerSpeed,100)),b=Math.max(1,n(enemySpeed,100));
+ const faster=a>b?"owner":b>a?"enemy":null;
+ if(!faster)return Object.freeze({faster:null,gauge:0,rate:0,extraBasicAttack:null});
+ const rate=Math.min(.5,(Math.max(a,b)-Math.min(a,b))/Math.max(a,b));
+ const value=(previous?.faster===faster?Math.max(0,n(previous.gauge)):0)+rate;
+ const extraBasicAttack=value>=1-1e-9?faster:null;
+ return Object.freeze({faster,rate,gauge:extraBasicAttack?Math.max(0,value-1):value,extraBasicAttack});
+}
+
 function resolveStrike({attacker={},defender={},hitRoll,critRoll,blockRoll,damageRoll,
   cardMultiplier=1,temporaryDefense=0}={}){
  const hit=clamp(n(attacker.hitChance)-n(defender.evade),0,100);
@@ -78,11 +100,11 @@ function resolveStrike({attacker={},defender={},hitRoll,critRoll,blockRoll,damag
  const min=Math.max(0,n(attacker.minAttack)),max=Math.max(min,n(attacker.maxAttack));
  const base=min+(max-min)*clamp(n(damageRoll,0),0,1);
  if(base<=0)return Object.freeze({hit:true,crit,blocked,damage:0});
- const preDefense=base*Math.max(0,n(cardMultiplier,1))*(crit?1+criticalExtra/100:1);
- const effectiveDefense=Math.max(0,n(defender.defense)-Math.max(0,n(attacker.penetration)));
- const damage=Math.max(0,Math.max(1,preDefense-effectiveDefense)-
-  (blocked?Math.max(0,n(defender.blockAmount)):0)-Math.max(0,n(temporaryDefense)));
- return Object.freeze({hit:true,crit,blocked,damage:Math.round(damage),effectiveDefense});
+ const result=mitigateDamage({damage:base,cardMultiplier,
+  critMultiplier:crit?1+criticalExtra/100:1,defense:defender.defense,
+  penetration:attacker.penetration,temporaryDefense,
+  blockAmount:blocked?defender.blockAmount:0});
+ return Object.freeze({hit:true,crit,blocked,damage:result.finalDamage,effectiveDefense:result.effectiveDefense});
 }
 // Explicit old-data migration only, not the combat model.
 // Legacy weapon totals already include its eight parts. Subtract once.
@@ -136,6 +158,6 @@ function migrateLegacyLoadout({weapon={},partCatalog={},equipment={},gearCatalog
  });
  return {weapon:migrateLegacyPart(residual,"weapon"),parts,armor};
 }
-return Object.freeze({PART_SLOTS,ARMOR_SLOTS,BASE,calculate,resolveStrike,migrateLegacyPart,migrateLegacyLoadout});
+return Object.freeze({PART_SLOTS,ARMOR_SLOTS,BASE,calculate,resolveStrike,mitigateDamage,advanceSpeedGauge,migrateLegacyPart,migrateLegacyLoadout});
 })();
 if(typeof module!=="undefined"&&module.exports)module.exports=WC_DIRECT_COMBAT_V2;

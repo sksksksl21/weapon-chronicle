@@ -1,77 +1,5 @@
-/* Live handoff: compose the current loadout into ONE combat arithmetic snapshot.
- * This phase only transfers calculated values to the story-combat frame.
- * Damage, AI/card windows, saves and round timing remain legacy until separately reviewed.
- */
-const WC_LIVE_COMBAT_HANDOFF_V1=(()=>{
-  "use strict";
-  function number(n, fallback=0){const x=Number(n);return Number.isFinite(x)?x:fallback;}
-  function calculate(input, adapter, math) {
-    if(!input||!adapter||!math)throw new TypeError("Combat handoff requires runtime, adapter and math");
-    const eff=input.effectiveOwner||{},raw=input.rawOwner||{},owner=input.owner||{};
-    const gearSurvival=number(input.armorSurvival);
-    const rawSurvivalBeforeArmor=Math.max(1,number(raw.survival,1)-gearSurvival);
-    // Existing owner martial effectiveness remains the compatibility source
-    // until all five owner attributes have an approved combat curve.
-    // The blade, eight sword parts and four armor slots are NOT folded
-    // into this flat owner attack again.
-    // The legacy effective attributes ALREADY incorporate weapon-fit and
-    // equipped Survival bonuses. Remove those effects before the sword and
-    // armor are added by the unified core, or they would count twice.
-    const mental=number(eff.mult,1);
-    const ownerMartial=Math.max(0,number(eff.martial)-number(raw.parts?.weapon)*mental);
-    const ownerSurvival=Math.max(0,number(eff.survival)-gearSurvival*mental);
-    const sources=adapter.fromLegacyLoadout({
-      ownerCombat:{
-        attack:ownerMartial*.72,
-        defense:ownerSurvival,
-        speed:0,
-        crit:2+ownerMartial*.52,
-        penetration:0
-      },
-      totalMaxHp:input.maxHp,
-      weapon:input.weapon,
-      partCatalog:input.partCatalog,
-      ownerEquipment:input.ownerEquipment,
-      gearCatalog:input.gearCatalog,
-      buffs:{defense:number(input.foodBuff?.defense)},
-      legacyVitals:{
-        rawSurvivalBeforeArmor,
-        boldness:owner.boldness,
-        age:owner.age
-      }
-    });
-    const stats=math.calculateActorStats(sources);
-    return Object.freeze({
-      maxHp:stats.maxHp+Math.max(0,number(input.foodBuff?.combatHp)),
-      maxResonance:stats.maxResonance,
-      resonanceRecovery:stats.resonanceRecovery,
-      attack:stats.attack,
-      defense:stats.defense,
-      attackSpeed:stats.attackSpeed,
-      critChance:stats.critChance,
-      penetration:stats.penetration
-    });
-  }
-  return Object.freeze({calculate});
-})();
-if(typeof module!=="undefined"&&module.exports)module.exports=WC_LIVE_COMBAT_HANDOFF_V1;
-
 if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
   // Shared exact calculation: the same equipment snapshot drives the HUD and battle.
-  function wcCurrentUnifiedStats(weaponOverride=null,gearOverride=null){
-    return WC_LIVE_COMBAT_HANDOFF_V1.calculate({
-      owner:state.owner,
-      effectiveOwner:effectiveOwnerStats(),
-      rawOwner:rawOwnerStats(),
-      armorSurvival:armorSurvivalValue(),
-      maxHp:state.maxHp,
-      weapon:weaponOverride||state.weapon,
-      partCatalog:PART_CATALOG,
-      ownerEquipment:gearOverride||state.ownerEquipment,
-      gearCatalog:OWNER_GEAR_CATALOG,
-      foodBuff:state.foodBuff
-    },WC_LEGACY_COMBAT_SOURCES_V1,WC_COMBAT_MATH_V1);
-  }
   function wcRenderUnifiedStats(){
     const aside=document.querySelector(".wc41-weaponAside");
     if(!aside||!state?.weapon)return;
@@ -104,17 +32,20 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
         details.appendChild(legacy);
       }else aside.prepend(panel);
     }
-    const s=wcCurrentUnifiedStats();
+    const s=wcDirectCurrentStats();
     const fmt=v=>String(Math.round(Number(v)*10)/10);
     const grid=[
-      ["공격력",s.attack],["방어력",s.defense],
-      ["공격속도",s.attackSpeed],["치명타 확률",s.critChance+"%"],
-      ["관통력",s.penetration],["최대 체력",s.maxHp],
-      ["최대 공명",s.maxResonance],["공명 회복/T",s.resonanceRecovery]
+      ["최소공격",s.minAttack],["최대공격",s.maxAttack],
+      ["명중",s.hitChance+"%"],["치명타확률",s.critChance+"%"],
+      ["치명타피해",s.critMultiplier+"배"],["관통력",s.penetration],
+      ["공격속도",s.attackSpeed],["공명",s.maxResonance],
+      ["방어력",s.defense],["회피율",s.evade+"%"],
+      ["막기확률",s.blockChance+"%"],["막기피해감소",s.blockAmount],
+      ["치명저항율",s.critChanceResist+"%"],["치명피해감소",s.critDamageResist]
     ];
     const partCount=Object.keys(PART_CATALOG).filter(k=>Boolean(state.weapon?.parts?.[k])).length;
     const gearCount=["helmet","armor","gloves","boots"].filter(k=>OWNER_GEAR_CATALOG[state.ownerEquipment?.[k]]?.slot===k).length;
-    panel.innerHTML='<div class="wcCombatTitle">통합 전투 능력치</div>'+
+    panel.innerHTML='<div class="wcCombatTitle">직접 전투 능력치</div>'+
       '<div class="wcCombatGrid">'+grid.map(([k,v])=>'<div><span>'+k+'</span><b>'+(
         typeof v==="number"?fmt(v):v)+'</b></div>').join('')+'</div>'+
       '<div class="wcCombatParts">검 파츠 '+partCount+'/8 · 방어구 '+gearCount+'/4 반영</div>';
@@ -133,11 +64,11 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
     const frame=$("combatFrame");
     // A failed preview must never block the underlying game/combat.
     try{
-      const snapshot=wcCurrentUnifiedStats();
-      frame.dataset.unifiedActorV1=JSON.stringify(snapshot);
+      const snapshot=wcDirectCurrentStats();
+      frame.dataset.unifiedActorV1=JSON.stringify({...snapshot,version:'direct-v2'});
     }catch(err){
       delete frame.dataset.unifiedActorV1;
-      console.warn("Unified combat handoff skipped; legacy combat retained:",err);
+      console.warn("Direct combat handoff failed:",err);
     }
     return wcLaunchCombatBeforeHandoff.apply(this,args);
   };
@@ -156,24 +87,24 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
     return Number.isFinite(x)?String(Math.round(x*10)/10):"—";
   };
   const wcStatFields=[
-    ["공격력","attackRange"],["방어력","defense"],["명중","hitChance"],
-    ["속도","attackSpeed"],["치명타 확률","critChance"],["치명타 피해","critMultiplier"],
-    ["관통","penetration"],["최대 체력","maxHp"],["회피","evade"],
-    ["막기 확률","blockChance"],["막기량","blockAmount"],
-    ["치명 확률 저항","critChanceResist"],["치명 피해 저항","critDamageResist"],
-    ["상태 저항","statusResist"],["최대 공명","maxResonance"],["교전 공명 회복","resonanceRecovery"]
+    ["최소공격","minAttack"],["최대공격","maxAttack"],["명중","hitChance"],
+    ["치명타확률","critChance"],["치명타피해","critMultiplier"],
+    ["관통력","penetration"],["공격속도","attackSpeed"],["공명","maxResonance"],
+    ["방어력","defense"],["회피율","evade"],["막기확률","blockChance"],
+    ["막기피해감소","blockAmount"],["치명저항율","critChanceResist"],
+    ["치명피해감소","critDamageResist"]
   ];
   function wcStatValue(stats,key){
     if(key==="attackRange")return wcFmt(stats.minAttack)+" ~ "+wcFmt(stats.maxAttack);
     if(key==="critMultiplier")return wcFmt(stats.critMultiplier)+"배";
     return wcFmt(stats[key])+(
       ["hitChance","critChance","evade","blockChance","statusResist"].includes(key)?"%":
-      ["critChanceResist","critDamageResist"].includes(key)?"%p":"");
+      ["critChanceResist","critDamageResist"].includes(key)?"%":"");
   }
   function wcStatTiles(stats,compact=false){
     const fields=compact?wcStatFields.slice(0,5):wcStatFields;
-    const groupOf=key=>["attackRange","hitChance","critChance","critMultiplier","penetration"].includes(key)?"공격":(
-      ["defense","maxHp","evade","blockChance","blockAmount","critChanceResist","critDamageResist","statusResist"].includes(key)?"방어 · 생존":"속도 · 공명");
+    const groupOf=key=>["minAttack","maxAttack","hitChance","critChance","critMultiplier","penetration","attackSpeed","maxResonance"].includes(key)?"공격":(
+      ["defense","evade","blockChance","blockAmount","critChanceResist","critDamageResist"].includes(key)?"방어":"공격");
     return [...new Set(fields.map(([,key])=>groupOf(key)))].map(group=>
       '<section class="wc2-statGroup"><h4>'+group+'</h4>'+
       '<div class="wc2-stats'+(compact?' wc2-compact':'')+'">'+
@@ -198,9 +129,9 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
       const id=state.ownerEquipment?.[slot],entry=OWNER_GEAR_CATALOG[id];
       const valid=entry?.slot===slot;
       const v=WC_DIRECT_COMBAT_V2.migrateLegacyPart(valid?entry.mods:{},"armor",slot);
-      const effects=[["최소 공격력",v.minAttack],["최대 공격력",v.maxAttack],
+      const effects=[["최소공격",v.minAttack],["최대공격",v.maxAttack],
         ["방어력",v.defense],["HP",v.maxHp],["명중",v.hitBonus],
-        ["치명",v.critBonus],["관통",v.penetration],["공속",v.speedPct],
+        ["치명",v.critBonus],["관통력",v.penetration],["공속",v.speedPct],
         ["회피",v.evade],["저항",v.statusResist],["막기",v.blockChance]]
         .filter(([,n])=>Number(n)!==0)
         .map(([name,n])=>name+" "+(n>0?"+":"")+wcFmt(n));
@@ -252,9 +183,9 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
     const old=document.querySelector(".wc41-weaponAside .wcLegacyStats");
     if(old)old.hidden=true;
     const main=[
-      ["공격력",wcStatValue(stats,"attackRange")],["방어력",wcStatValue(stats,"defense")],
-      ["명중",wcStatValue(stats,"hitChance")],["속도",wcStatValue(stats,"attackSpeed")],
-      ["치명타",wcStatValue(stats,"critChance")],["치명 피해",wcStatValue(stats,"critMultiplier")]
+      ["최소공격",wcStatValue(stats,"minAttack")],["최대공격",wcStatValue(stats,"maxAttack")],
+      ["명중",wcStatValue(stats,"hitChance")],["공격속도",wcStatValue(stats,"attackSpeed")],
+      ["치명타확률",wcStatValue(stats,"critChance")],["치명타피해",wcStatValue(stats,"critMultiplier")]
     ];
     const html='<div class="wcCombatTitle">직접 전투 능력치 · 현재 소유자</div>'+
       '<div class="wcCombatGrid">'+main.map(([name,v])=>
@@ -271,10 +202,10 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
     const previous=WC_DIRECT_COMBAT_V2.migrateLegacyPart(
       PART_CATALOG[slot]?.[state.weapon?.parts?.[slot]]?.mods||{},"weapon",slot);
     const next=WC_DIRECT_COMBAT_V2.migrateLegacyPart(entry.mods||{},"weapon",slot);
-    const labels=[["minAttack","최소 공격력"],["maxAttack","최대 공격력"],
-      ["defense","방어력"],["hitBonus","명중 %p"],["critBonus","치명 %p"],
-      ["critDamageBonus","치명 추가 피해 %"],["penetration","관통"],
-      ["speedPct","속도 증가 %"],["maxResonance","공명"],["resonanceRecovery","공명 회복"]];
+    const labels=[["minAttack","최소공격"],["maxAttack","최대공격"],
+      ["defense","방어력"],["hitBonus","명중"],["critBonus","치명 %p"],
+      ["critDamageBonus","치명 추가 피해 %"],["penetration","관통력"],
+      ["speedPct","공격속도"],["maxResonance","공명"],["resonanceRecovery","공명 회복"]];
     const bits=labels.map(([key,label])=>{
       const delta=Number(next[key]||0)-Number(previous[key]||0);
       if(!Number.isFinite(delta)||Math.abs(delta)<.0001)return "";
