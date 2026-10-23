@@ -13,7 +13,8 @@ function boot(snapshot){
  const nodes=new Map(),events=[],timers=[];
  const elem=()=>({style:{},classList:{add(){},remove(){}},children:[],dataset:{},
   appendChild(){},removeChild(){},remove(){},innerHTML:"",textContent:""});
- const context={console,URLSearchParams,location:{search:""},
+ const math=Object.create(Math);math.random=()=>.5;
+ const context={console,URLSearchParams,Math:math,location:{search:""},
   window:{frameElement:{dataset:{storyMode:"1",enemy:"bandit",hp:"90",maxHp:"100",
    resonance:"50",mind:"100",...(snapshot?{unifiedActorV1:JSON.stringify(snapshot)}:{})}},
    parent:{postMessage(){}}},
