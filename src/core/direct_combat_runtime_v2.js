@@ -34,6 +34,11 @@ function wcDirectCurrentStats(weaponOverride=null,gearOverride=null){
  const owner={...rates,baseHp:Math.max(1,Number(state.maxHp||1)-
    hpFromGear*rates.stableSurvival/100)};
  const result=WC_DIRECT_COMBAT_V2.calculate({owner,...items});
- return Object.freeze({...result,ownerRates:Object.freeze(rates),
+ // Food is a current modifier, not an equipped part or a new saved stat.
+ const food=typeof state==="object"?state.foodBuff:null;
+ const current={...result,
+  maxHp:result.maxHp+Math.max(0,Number(food?.combatHp)||0),
+  defense:result.defense+Math.max(0,Number(food?.defense)||0)};
+ return Object.freeze({...current,ownerRates:Object.freeze(rates),
   migration:Object.freeze({version:"legacy-v5.2-preview",audited:false})});
 }
