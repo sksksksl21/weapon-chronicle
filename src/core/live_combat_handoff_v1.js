@@ -59,18 +59,12 @@ if(typeof module!=="undefined"&&module.exports)module.exports=WC_LIVE_COMBAT_HAN
 if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
   // Shared exact calculation: the same equipment snapshot drives the HUD and battle.
   function wcCurrentUnifiedStats(weaponOverride=null,gearOverride=null){
-    return WC_LIVE_COMBAT_HANDOFF_V1.calculate({
-      owner:state.owner,
-      effectiveOwner:effectiveOwnerStats(),
-      rawOwner:rawOwnerStats(),
-      armorSurvival:armorSurvivalValue(),
-      maxHp:state.maxHp,
-      weapon:weaponOverride||state.weapon,
-      partCatalog:PART_CATALOG,
-      ownerEquipment:gearOverride||state.ownerEquipment,
-      gearCatalog:OWNER_GEAR_CATALOG,
-      foodBuff:state.foodBuff
-    },WC_LEGACY_COMBAT_SOURCES_V1,WC_COMBAT_MATH_V1);
+    const calculated=wcDirectCurrentStats(weaponOverride,gearOverride);
+    return Object.freeze({
+      ...calculated,
+      maxHp:calculated.maxHp+Math.max(0,Number(state.foodBuff?.combatHp)||0),
+      defense:calculated.defense+Math.max(0,Number(state.foodBuff?.defense)||0)
+    });
   }
   function wcRenderUnifiedStats(){
     const aside=document.querySelector(".wc41-weaponAside");
@@ -98,7 +92,7 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
         const details=document.createElement("details");
         details.className="wcLegacyStats";
         const summary=document.createElement("summary");
-        summary.textContent="검 자체 특성 · 위력 / 정밀 / 견고 / 조작성";
+        summary.textContent="저장 호환용 이전 수치";
         details.appendChild(summary);
         legacy.replaceWith(panel,details);
         details.appendChild(legacy);
@@ -107,10 +101,12 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
     const s=wcCurrentUnifiedStats();
     const fmt=v=>String(Math.round(Number(v)*10)/10);
     const grid=[
-      ["공격력",s.attack],["방어력",s.defense],
-      ["공격속도",s.attackSpeed],["치명타 확률",s.critChance+"%"],
-      ["관통력",s.penetration],["최대 체력",s.maxHp],
-      ["최대 공명",s.maxResonance],["공명 회복/T",s.resonanceRecovery]
+      ["최소공격",s.minAttack],["최대공격",s.maxAttack],
+      ["명중",s.hitChance+"%"],["치명타확률",s.critChance+"%"],
+      ["치명타피해",(s.critMultiplier*100)+"%"],["관통력",s.penetration],
+      ["공격속도",s.attackSpeed],["공명",s.maxResonance],
+      ["방어력",s.defense],["회피율",s.evade+"%"],
+      ["막기확률",s.blockChance+"%"],["막기피해감소",s.blockAmount]
     ];
     const partCount=Object.keys(PART_CATALOG).filter(k=>Boolean(state.weapon?.parts?.[k])).length;
     const gearCount=["helmet","armor","gloves","boots"].filter(k=>OWNER_GEAR_CATALOG[state.ownerEquipment?.[k]]?.slot===k).length;
@@ -131,14 +127,9 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
   const wcLaunchCombatBeforeHandoff=launchStoryCombat;
   launchStoryCombat=function(...args){
     const frame=$("combatFrame");
-    // A failed preview must never block the underlying game/combat.
-    try{
-      const snapshot=wcCurrentUnifiedStats();
-      frame.dataset.unifiedActorV1=JSON.stringify(snapshot);
-    }catch(err){
-      delete frame.dataset.unifiedActorV1;
-      console.warn("Unified combat handoff skipped; legacy combat retained:",err);
-    }
+    const snapshot=wcCurrentUnifiedStats();
+    if(!frame)throw new Error("Combat frame missing");
+    frame.dataset.unifiedActorV1=JSON.stringify(snapshot);
     return wcLaunchCombatBeforeHandoff.apply(this,args);
   };
   window.addEventListener("message",event=>{
@@ -156,24 +147,23 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
     return Number.isFinite(x)?String(Math.round(x*10)/10):"—";
   };
   const wcStatFields=[
-    ["공격력","attackRange"],["방어력","defense"],["명중","hitChance"],
-    ["속도","attackSpeed"],["치명타 확률","critChance"],["치명타 피해","critMultiplier"],
-    ["관통","penetration"],["최대 체력","maxHp"],["회피","evade"],
-    ["막기 확률","blockChance"],["막기량","blockAmount"],
-    ["치명 확률 저항","critChanceResist"],["치명 피해 저항","critDamageResist"],
-    ["상태 저항","statusResist"],["최대 공명","maxResonance"],["교전 공명 회복","resonanceRecovery"]
+    ["최소공격","minAttack"],["최대공격","maxAttack"],["명중","hitChance"],
+    ["치명타확률","critChance"],["치명타피해","critMultiplier"],["관통력","penetration"],
+    ["공격속도","attackSpeed"],["공명","maxResonance"],
+    ["방어력","defense"],["회피율","evade"],["막기확률","blockChance"],
+    ["막기피해감소","blockAmount"],["치명저항율","critChanceResist"],
+    ["치명피해감소","critDamageResist"]
   ];
   function wcStatValue(stats,key){
     if(key==="attackRange")return wcFmt(stats.minAttack)+" ~ "+wcFmt(stats.maxAttack);
-    if(key==="critMultiplier")return wcFmt(stats.critMultiplier)+"배";
+    if(key==="critMultiplier")return wcFmt(stats.critMultiplier*100)+"%";
     return wcFmt(stats[key])+(
-      ["hitChance","critChance","evade","blockChance","statusResist"].includes(key)?"%":
-      ["critChanceResist","critDamageResist"].includes(key)?"%p":"");
+      ["hitChance","critChance","evade","blockChance","critChanceResist","critDamageResist"].includes(key)?"%":
+      [].includes(key)?"%p":"");
   }
   function wcStatTiles(stats,compact=false){
     const fields=compact?wcStatFields.slice(0,5):wcStatFields;
-    const groupOf=key=>["attackRange","hitChance","critChance","critMultiplier","penetration"].includes(key)?"공격":(
-      ["defense","maxHp","evade","blockChance","blockAmount","critChanceResist","critDamageResist","statusResist"].includes(key)?"방어 · 생존":"속도 · 공명");
+    const groupOf=key=>["minAttack","maxAttack","hitChance","critChance","critMultiplier","penetration","attackSpeed","maxResonance"].includes(key)?"공격":"방어";
     return [...new Set(fields.map(([,key])=>groupOf(key)))].map(group=>
       '<section class="wc2-statGroup"><h4>'+group+'</h4>'+
       '<div class="wc2-stats'+(compact?' wc2-compact':'')+'">'+
@@ -252,9 +242,9 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
     const old=document.querySelector(".wc41-weaponAside .wcLegacyStats");
     if(old)old.hidden=true;
     const main=[
-      ["공격력",wcStatValue(stats,"attackRange")],["방어력",wcStatValue(stats,"defense")],
-      ["명중",wcStatValue(stats,"hitChance")],["속도",wcStatValue(stats,"attackSpeed")],
-      ["치명타",wcStatValue(stats,"critChance")],["치명 피해",wcStatValue(stats,"critMultiplier")]
+      ["최소공격",wcStatValue(stats,"minAttack")],["최대공격",wcStatValue(stats,"maxAttack")],
+      ["명중",wcStatValue(stats,"hitChance")],["공격속도",wcStatValue(stats,"attackSpeed")],
+      ["치명타확률",wcStatValue(stats,"critChance")],["치명타피해",wcStatValue(stats,"critMultiplier")]
     ];
     const html='<div class="wcCombatTitle">직접 전투 능력치 · 현재 소유자</div>'+
       '<div class="wcCombatGrid">'+main.map(([name,v])=>
