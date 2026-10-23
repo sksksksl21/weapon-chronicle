@@ -59,12 +59,7 @@ if(typeof module!=="undefined"&&module.exports)module.exports=WC_LIVE_COMBAT_HAN
 if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
   // Shared exact calculation: the same equipment snapshot drives the HUD and battle.
   function wcCurrentUnifiedStats(weaponOverride=null,gearOverride=null){
-    const calculated=wcDirectCurrentStats(weaponOverride,gearOverride);
-    return Object.freeze({
-      ...calculated,
-      maxHp:calculated.maxHp+Math.max(0,Number(state.foodBuff?.combatHp)||0),
-      defense:calculated.defense+Math.max(0,Number(state.foodBuff?.defense)||0)
-    });
+    return wcDirectCurrentStats(weaponOverride,gearOverride);
   }
   function wcRenderUnifiedStats(){
     const aside=document.querySelector(".wc41-weaponAside");
