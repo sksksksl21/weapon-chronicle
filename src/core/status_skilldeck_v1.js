@@ -156,14 +156,22 @@ const abilities=[
  '';
 }
 function armorBody(){
- const buttons=ARMOR_SLOTS.map(([id,title,role])=>{
-  const gearId=state.ownerEquipment?.[id],item=OWNER_GEAR_CATALOG[gearId];
-  return '<button class="wc3-equip'+(selectedArmor===id?' active':'')+' rarity-'+(item?.rarity||"common")+
-   '" data-wc3-armor="'+id+'"><b>'+title+
-   '</b><small>'+escapeHtml(item?.name||"미장착")+'</small><em>'+role+'</em>'+
-   (item?'<small>'+escapeHtml(RARITY_DEF[item.rarity]?.name||"노멀")+'</small>':"")+'</button>';
- }).join("");
- const id=state.ownerEquipment?.[selectedArmor],item=OWNER_GEAR_CATALOG[id],title=ARMOR_SLOTS.find(x=>x[0]===selectedArmor)?.[1];
+ const armorButton=(slot)=>{
+ const [,title,role]=ARMOR_SLOTS.find(x=>x[0]===slot);
+ const gearId=state.ownerEquipment?.[slot],item=OWNER_GEAR_CATALOG[gearId];
+ return '<button class="wc3-equip'+(selectedArmor===slot?' active':'')+' rarity-'+(item?.rarity||"common")+
+  '" data-wc3-armor="'+slot+'"><b>'+title+'</b><small>'+
+  escapeHtml(item?.name||"미장착")+'</small><em>'+role+'</em></button>';
+};
+const portrait='<svg viewBox="0 0 120 220" role="img" aria-label="현재 소유자 형상" xmlns="http://www.w3.org/2000/svg">'+
+ '<circle cx="60" cy="35" r="23" fill="#d7bda0" stroke="#725b4c" stroke-width="3"/>'+
+ '<path d="M35 67 Q60 55 85 67 L101 125 88 137 83 199 66 206 60 147 54 206 37 199 32 137 19 125Z" fill="#526678" stroke="#334859" stroke-width="3"/>'+
+ '<path d="M37 67L60 103 83 67" fill="none" stroke="#d7bda0" stroke-width="5"/></svg>';
+const layout='<div class="wc3-armorGrid"><div class="wc3-armorCol">'+
+ armorButton("helmet")+armorButton("gloves")+'</div>'+
+ '<div class="wc3-ownerFigure">'+portrait+'<small>'+escapeHtml(state.owner?.name||"소유자")+'</small></div>'+
+ '<div class="wc3-armorCol">'+armorButton("armor")+armorButton("boots")+'</div></div>';
+const id=state.ownerEquipment?.[selectedArmor],item=OWNER_GEAR_CATALOG[id],title=ARMOR_SLOTS.find(x=>x[0]===selectedArmor)?.[1];
  const mods=item?.mods||{};
  const actual=WC_DIRECT_COMBAT_V2.migrateLegacyPart(mods,"armor",selectedArmor);
  const values=[
@@ -171,13 +179,20 @@ function armorBody(){
   ["방어력",actual.defense],["체력",actual.maxHp],
   ["명중 %p",actual.hitBonus],["치명타 %p",actual.critBonus],
   ["치명타 피해 %",actual.critDamageBonus],["관통",actual.penetration],
-  ["회피 %p",actual.evade],["상태 저항 %p",actual.statusResist],
-  ["막기 %p",actual.blockChance],["막기량",actual.blockAmount],
+  ["회피율 %p",actual.evade],["상태저항 %p",actual.statusResist],
+  ["막기확률 %p",actual.blockChance],["막기피해감소",actual.blockAmount],
   ["공격속도 증가 %",actual.speedPct],["방어력 보정",actual.defensePct*100]
  ];
  const effects=values.filter(([,v])=>Math.abs(n(v))>0.00001).map(([label,v])=>
    label+" "+(v>0?"+":"")+Math.round(v*10)/10);
- return '<section class="wc3-panel"><h3>방어구 장착 상태</h3><div class="wc3-equipGrid">'+buttons+'</div></section>'+
+ const s=wcDirectCurrentStats(),fmt=x=>String(Math.round(n(x)*10)/10);
+ const defenseStats=[["방어력",fmt(s.defense)],["회피율",fmt(s.evade)+"%"],
+  ["막기확률",fmt(s.blockChance)+"%"],["막기피해감소",fmt(s.blockAmount)],
+  ["치명저항율",fmt(s.critChanceResist)+"%"],["치명피해감소",fmt(s.critDamageResist)+"%"]];
+ return '<section class="wc3-panel"><h3>방어 능력치 · 6항목</h3>'+
+ '<div class="wc3-directGrid">'+defenseStats.map(([name,value])=>
+ '<div class="wc3-directStat"><small>'+name+'</small><strong>'+value+'</strong></div>').join("")+'</div></section>'+
+ '<section class="wc3-panel"><h3>방어구 장착 상태 · 4부위</h3>'+layout+'</section>'+
  '<section class="wc3-panel"><h3>'+title+' 상세 정보</h3>'+
  '<div class="wc3-detail"><h4>'+escapeHtml(item?.name||"비어 있음")+'</h4>'+
  '<small>'+escapeHtml(item?.rarity||"미장착")+'</small><p>'+escapeHtml(item?.desc||"이 부위에 방어구를 장착할 수 있습니다.")+'</p>'+
@@ -189,9 +204,9 @@ function armorBody(){
 function partEffects(mods){
  const v=WC_DIRECT_COMBAT_V2.migrateLegacyPart(mods||{},"weapon");
  const fields=[["최소 공격력",v.minAttack],["최대 공격력",v.maxAttack],
-  ["방어력",v.defense],["명중 %p",v.hitBonus],["치명타 확률 %p",v.critBonus],
-  ["치명타 추가 피해 %",v.critDamageBonus],["관통",v.penetration],
-  ["속도 증가 %",v.speedPct],["공명 최대",v.maxResonance],
+  ["방어력",v.defense],["명중 %p",v.hitBonus],["치명타확률 %p",v.critBonus],
+  ["치명타피해 %",v.critDamageBonus],["관통력",v.penetration],
+  ["공격속도 %",v.speedPct],["공명",v.maxResonance],
   ["공명 회복",v.resonanceRecovery],["공격력 보정 %",v.attackPct*100],
   ["방어력 보정 %",v.defensePct*100]];
  return fields.filter(([,value])=>Math.abs(n(value))>0.00001)
@@ -280,6 +295,10 @@ function css(){
  '.wc3-equip.active,.wc3-part.active,.wc3-card.active{border-color:#3d756e;box-shadow:inset 0 0 0 1px #3d756e}' +
  '.wc3-detail{border:1px solid #ceb99a;padding:9px;border-radius:8px;background:#fffbf1;font-size:11px}' +
  '.wc3-primary{background:#274d57!important;color:#fff!important;padding:9px;border-radius:7px;border:0}' +
+ '.wc3-armorGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(72px,.9fr) minmax(0,1fr);gap:5px;align-items:stretch}' +
+ '.wc3-armorCol{display:grid;grid-template-rows:repeat(2,minmax(110px,1fr));gap:7px}.wc3-armorCol .wc3-equip{min-height:110px;overflow-wrap:anywhere}' +
+ '.wc3-ownerFigure{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:9px;background:linear-gradient(#f4e7d5,#d8c4a5);padding:4px}' +
+ '.wc3-ownerFigure svg{display:block;width:100%;max-height:245px}.wc3-ownerFigure small{text-align:center;overflow-wrap:anywhere}' +
  '.wc3-weaponGrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(78px,.85fr) minmax(0,1fr);gap:5px;align-items:stretch}' +
  '.wc3-partCol{display:grid;grid-template-rows:repeat(4,minmax(62px,1fr));gap:5px}.wc3-part{font-size:10px;padding:5px;overflow-wrap:anywhere}' +
  '.wc3-part b{display:block;margin-bottom:4px}.wc3-part small{line-height:1.3;font-size:9px}.wc3-sword{display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:8px;background:linear-gradient(#efe4d0,#d9c6a5)}' +
