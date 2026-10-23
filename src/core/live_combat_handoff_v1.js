@@ -171,12 +171,12 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
     if(key==="critMultiplier")return wcFmt(stats.critMultiplier)+"배";
     return wcFmt(stats[key])+(
       ["hitChance","critChance","evade","blockChance","statusResist"].includes(key)?"%":
-      ["critChanceResist","critDamageResist"].includes(key)?"%p":"");
+      ["critChanceResist","critDamageResist"].includes(key)?"%":"");
   }
   function wcStatTiles(stats,compact=false){
     const fields=compact?wcStatFields.slice(0,5):wcStatFields;
     const groupOf=key=>["minAttack","maxAttack","hitChance","critChance","critMultiplier","penetration","attackSpeed","maxResonance"].includes(key)?"공격":(
-      ["defense","evade","blockChance","blockAmount","critChanceResist","critDamageResist"].includes(key)?"방어 · 생존":"속도 · 공명");
+      ["defense","evade","blockChance","blockAmount","critChanceResist","critDamageResist"].includes(key)?"방어":"공격");
     return [...new Set(fields.map(([,key])=>groupOf(key)))].map(group=>
       '<section class="wc2-statGroup"><h4>'+group+'</h4>'+
       '<div class="wc2-stats'+(compact?' wc2-compact':'')+'">'+
@@ -201,9 +201,9 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
       const id=state.ownerEquipment?.[slot],entry=OWNER_GEAR_CATALOG[id];
       const valid=entry?.slot===slot;
       const v=WC_DIRECT_COMBAT_V2.migrateLegacyPart(valid?entry.mods:{},"armor",slot);
-      const effects=[["최소 공격력",v.minAttack],["최대 공격력",v.maxAttack],
+      const effects=[["최소공격",v.minAttack],["최대공격",v.maxAttack],
         ["방어력",v.defense],["HP",v.maxHp],["명중",v.hitBonus],
-        ["치명",v.critBonus],["관통",v.penetration],["공속",v.speedPct],
+        ["치명",v.critBonus],["관통력",v.penetration],["공속",v.speedPct],
         ["회피",v.evade],["저항",v.statusResist],["막기",v.blockChance]]
         .filter(([,n])=>Number(n)!==0)
         .map(([name,n])=>name+" "+(n>0?"+":"")+wcFmt(n));
@@ -274,10 +274,10 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
     const previous=WC_DIRECT_COMBAT_V2.migrateLegacyPart(
       PART_CATALOG[slot]?.[state.weapon?.parts?.[slot]]?.mods||{},"weapon",slot);
     const next=WC_DIRECT_COMBAT_V2.migrateLegacyPart(entry.mods||{},"weapon",slot);
-    const labels=[["minAttack","최소 공격력"],["maxAttack","최대 공격력"],
-      ["defense","방어력"],["hitBonus","명중 %p"],["critBonus","치명 %p"],
-      ["critDamageBonus","치명 추가 피해 %"],["penetration","관통"],
-      ["speedPct","속도 증가 %"],["maxResonance","공명"],["resonanceRecovery","공명 회복"]];
+    const labels=[["minAttack","최소공격"],["maxAttack","최대공격"],
+      ["defense","방어력"],["hitBonus","명중"],["critBonus","치명 %p"],
+      ["critDamageBonus","치명 추가 피해 %"],["penetration","관통력"],
+      ["speedPct","공격속도"],["maxResonance","공명"],["resonanceRecovery","공명 회복"]];
     const bits=labels.map(([key,label])=>{
       const delta=Number(next[key]||0)-Number(previous[key]||0);
       if(!Number.isFinite(delta)||Math.abs(delta)<.0001)return "";
