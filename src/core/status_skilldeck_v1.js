@@ -111,102 +111,81 @@ function ownerBody(){
  const lv=Math.max(1,Math.floor(n(d.level)||1)),xp=n(d.combatXp),need=combatXpNeed(lv);
  const r=wcDirectOwnerRates(),s=wcDirectCurrentStats();
  const fmt=x=>String(Math.round(n(x)*10)/10);
- const main=[
-  ["공격력",s.minAttack+" ~ "+s.maxAttack],
-  ["방어력",s.defense],
-  ["명중",fmt(s.hitChance)+"%"],
-  ["속도",s.attackSpeed],
-  ["치명타 확률",fmt(s.critChance)+"%"],
-  ["치명타 피해",fmt(s.critMultiplier)+"배"]
+ const attack=[
+  ["최소공격",fmt(s.minAttack)],["최대공격",fmt(s.maxAttack)],
+  ["명중",fmt(s.hitChance)+"%"],["치명타확률",fmt(s.critChance)+"%"],
+  ["치명타피해",fmt(s.critMultiplier)+"배"],["관통력",fmt(s.penetration)],
+  ["공격속도",fmt(s.attackSpeed)],
+  ["공명",fmt(state.weapon?.resonance)+" / "+fmt(s.maxResonance)]
  ];
- const detail=[
-  ["최대 HP",s.maxHp],["관통",fmt(s.penetration)],
-  ["치명타 확률 저항",fmt(s.critChanceResist)+"%p"],
-  ["치명타 추가피해 저항",fmt(s.critDamageResist)+"%p"],
-  ["상태이상 저항",fmt(s.statusResist)+"%"],
-  ["회피",fmt(s.evade)+"%"],["막기 확률",fmt(s.blockChance)+"%"],
-  ["막기량",fmt(s.blockAmount)],["최대 공명",fmt(s.maxResonance)],
-  ["교전당 공명 회복",fmt(s.resonanceRecovery)]
+ const defense=[
+  ["방어력",fmt(s.defense)],["회피율",fmt(s.evade)+"%"],
+  ["막기확률",fmt(s.blockChance)+"%"],["막기피해감소",fmt(s.blockAmount)],
+  ["치명저항율",fmt(s.critChanceResist)+"%"],
+  ["치명피해감소",fmt(s.critDamageResist)+"%"]
  ];
- const abilities=[
-  ["무예",r.martial,"공격 장비 성능 "+r.martial+"%"],
-  ["생존",r.survival,"방어 장비 성능 "+r.survival+"%"],
-  ["처세",r.social,"사건·교섭 능력"]
- ];
- const resources=[
-  ["체력",Math.max(0,n(state.hp))+" / "+s.maxHp],
-  ["정신",Math.max(0,n(state.mind))+" / 100"],
-  ["공명",Math.max(0,n(state.weapon?.resonance))+" / "+n(state.weapon?.maxResonance)],
-  ["검 내구",Math.max(0,n(state.weapon?.dur))+" / "+n(state.weapon?.maxDur)]
- ];
- const stats=list=>'<div class="wc3-directGrid">'+list.map(([title,value])=>
-   '<div class="wc3-directStat"><small>'+title+'</small><strong>'+escapeHtml(value)+'</strong></div>').join("")+'</div>';
+ const stats=list=>'<div class="wc3-directGrid">'+list.map(([name,value])=>
+  '<div class="wc3-directStat"><small>'+name+'</small><strong>'+escapeHtml(value)+'</strong></div>').join("")+'</div>';
+ const abilities=[["무예",r.martial],["생존",r.survival],["처세",r.social]];
  return '<section class="wc3-hero"><div class="wc3-profile">'+
  '<div class="wc3-avatar">◈</div><div><h3>'+escapeHtml(state.owner.name)+'</h3><small>'+
  escapeHtml(state.owner.role||"소유자")+' · '+n(state.owner.age)+'세 · 제'+n(state.generation)+'대</small></div></div>'+
  '<p class="wc3-story">'+escapeHtml(state.owner.background||"아직 기록된 과거가 없다.")+'</p></section>'+
- '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>현재 장착</h3><small>부위를 눌러 상세 확인</small></div>'+
- '<div class="wc3-ownerEquipGrid">'+
- [["helmet","투구"],["armor","갑옷"],["gloves","장갑"],["boots","신발"]].map(([slot,label])=>{
-   const id=state.ownerEquipment?.[slot],entry=OWNER_GEAR_CATALOG[id];
-   return '<button data-wc3-tab="gear" class="wc3-ownerEquip rarity-'+(entry?.rarity||"common")+
-    '"><b>'+label+'</b><small>'+escapeHtml(entry?.name||"미장착")+'</small></button>';
- }).join("")+
- '<button data-wc3-tab="weapon" class="wc3-ownerEquip wc3-ownerWeapon"><b>검</b><small>8파츠 상세</small></button>'+
- '</div></section>'+
- '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>소유자 기본 능력</h3><small>현재 발휘율 · 0~100</small></div>'+
- '<div class="wc3-abilityGrid">'+abilities.map(([title,v,note])=>
+ '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>소유자 기본 능력</h3><small>장비 성능 발휘율 · 0~100</small></div>'+
+ '<div class="wc3-abilityGrid">'+abilities.map(([title,v])=>
   '<div class="wc3-ability"><b>'+title+'</b><strong>'+v+'<small>/100</small></strong>'+
-  '<div class="wc3-meter"><i style="width:'+Math.max(0,Math.min(100,v))+'%"></i></div>'+
-  '<small>'+note+'</small></div>').join("")+'</div></section>'+
- '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>전투 능력치</h3><small>핵심 6개</small></div>'+
- stats(main)+
- '<details class="wc3-directDetails"><summary>방어·저항·공명 상세 펼치기</summary>'+
- stats(detail)+
- '<div class="wc3-formula"><b>장비 자체 성능 → 소유자 발휘율 → 최종값</b>'+
- '<p>장비 공격 '+fmt(s.breakdown.gearMinAttack)+' ~ '+fmt(s.breakdown.gearMaxAttack)+
- ' × 무예 '+r.martial+'% → '+s.minAttack+' ~ '+s.maxAttack+'</p>'+
- '<p>장비 방어 '+fmt(s.breakdown.gearDefense)+' × 생존 '+r.survival+'% → '+s.defense+'</p>'+
- '<p>기본 명중 '+fmt(s.breakdown.baseHitChance)+'% + 장비 명중 '+
- fmt(s.breakdown.gearHitBonus)+'%p × 무예 '+r.martial+'% → '+fmt(s.hitChance)+'%</p></div>'+
- '</details></section>'+
- '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>현재 자원</h3></div>'+stats(resources)+'</section>'+
- '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>성장 경험치</h3></div>'+
- statRows([["레벨","Lv. "+lv],["전투 경험치",xp+" / "+need],
- ["생활 경험치",n(d.lifeXp)],["개인 명성",n(d.reputation)]])+
- '<div class="wc3-xp"><i style="width:'+Math.max(0,Math.min(100,xp/need*100))+'%"></i></div></section>'+
- '<p class="wc3-migrationNote">개편 중: 개인 성장 수치는 구형 데이터에서 임시 이관한 값입니다. 전투 엔진 전체 적용 전까지 표시와 전투 결과가 다를 수 있습니다.</p>';
+  '<div class="wc3-meter"><i style="width:'+Math.max(0,Math.min(100,v))+'%"></i></div></div>').join("")+'</div></section>'+
+ '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>공격 능력치</h3><small>8항목</small></div>'+
+ stats(attack)+'</section>'+
+ '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>방어 능력치</h3><small>기본 4항목</small></div>'+
+ stats(defense.slice(0,4))+
+ '<details class="wc3-directDetails"><summary>치명 관련 방어 2항목</summary>'+stats(defense.slice(4))+'</details></section>'+
+ '<section class="wc3-panel"><h3>현재 상태</h3>'+stats([
+ ["체력",fmt(state.hp)+" / "+fmt(s.maxHp)],
+ ["정신",fmt(state.mind)+" / 100"],
+ ["검 내구",fmt(state.weapon?.dur)+" / "+fmt(state.weapon?.maxDur)],
+ ["공명회복",fmt(s.resonanceRecovery)]
+ ])+'</section>'+
+ '<section class="wc3-panel"><h3>성장 기록</h3>'+statRows([
+ ["레벨","Lv. "+lv],["전투 경험치",xp+" / "+need],
+ ["생활 경험치",n(d.lifeXp)],["개인 명성",n(d.reputation)]
+ ])+'</section>';
 }
 function armorBody(){
- const buttons=ARMOR_SLOTS.map(([id,title,role])=>{
-  const gearId=state.ownerEquipment?.[id],item=OWNER_GEAR_CATALOG[gearId];
-  return '<button class="wc3-equip'+(selectedArmor===id?' active':'')+' rarity-'+(item?.rarity||"common")+
-   '" data-wc3-armor="'+id+'"><b>'+title+
-   '</b><small>'+escapeHtml(item?.name||"미장착")+'</small><em>'+role+'</em>'+
-   (item?'<small>'+escapeHtml(RARITY_DEF[item.rarity]?.name||"노멀")+'</small>':"")+'</button>';
- }).join("");
- const id=state.ownerEquipment?.[selectedArmor],item=OWNER_GEAR_CATALOG[id],title=ARMOR_SLOTS.find(x=>x[0]===selectedArmor)?.[1];
- const mods=item?.mods||{};
- const actual=WC_DIRECT_COMBAT_V2.migrateLegacyPart(mods,"armor",selectedArmor);
- const values=[
-  ["최소 공격력",actual.minAttack],["최대 공격력",actual.maxAttack],
-  ["방어력",actual.defense],["체력",actual.maxHp],
-  ["명중 %p",actual.hitBonus],["치명타 %p",actual.critBonus],
-  ["치명타 피해 %",actual.critDamageBonus],["관통",actual.penetration],
-  ["회피 %p",actual.evade],["상태 저항 %p",actual.statusResist],
-  ["막기 %p",actual.blockChance],["막기량",actual.blockAmount],
-  ["공격속도 증가 %",actual.speedPct],["방어력 보정",actual.defensePct*100]
+ const entries=ARMOR_SLOTS.map(([slot,title,role])=>{
+  const gearId=state.ownerEquipment?.[slot],item=OWNER_GEAR_CATALOG[gearId];
+  return '<button class="wc3-equip'+(selectedArmor===slot?' active':'')+
+   ' rarity-'+(item?.rarity||"common")+'" data-wc3-armor="'+slot+
+   '"><b>'+title+'</b><small>'+escapeHtml(item?.name||"미장착")+'</small>'+
+   '<em>'+role+'</em></button>';
+ });
+ const id=state.ownerEquipment?.[selectedArmor],item=OWNER_GEAR_CATALOG[id];
+ const title=ARMOR_SLOTS.find(x=>x[0]===selectedArmor)?.[1]||"방어구";
+ const actual=WC_DIRECT_COMBAT_V2.migrateLegacyPart(item?.mods||{},"armor",selectedArmor);
+ const fields=[
+  ["방어력",actual.defense],["회피율",actual.evade],["막기확률",actual.blockChance],
+  ["막기피해감소",actual.blockAmount],["치명저항율",actual.critChanceResist],
+  ["치명피해감소",actual.critDamageResist],["체력",actual.maxHp],
+  ["공격속도",actual.speedPct],["최소공격",actual.minAttack],["최대공격",actual.maxAttack],
+  ["명중",actual.hitBonus]
  ];
- const effects=values.filter(([,v])=>Math.abs(n(v))>0.00001).map(([label,v])=>
-   label+" "+(v>0?"+":"")+Math.round(v*10)/10);
- return '<section class="wc3-panel"><h3>방어구 장착 상태</h3><div class="wc3-equipGrid">'+buttons+'</div></section>'+
- '<section class="wc3-panel"><h3>'+title+' 상세 정보</h3>'+
- '<div class="wc3-detail"><h4>'+escapeHtml(item?.name||"비어 있음")+'</h4>'+
- '<small>'+escapeHtml(item?.rarity||"미장착")+'</small><p>'+escapeHtml(item?.desc||"이 부위에 방어구를 장착할 수 있습니다.")+'</p>'+
- '<p>'+escapeHtml(effects.join(" · ")||"추가 효과 없음")+'</p>'+
- (item&&typeof WC_EQUIPMENT_POOL_V1!=="undefined"?WC_EQUIPMENT_POOL_V1.formatDetail(item):"")+'</div>'+
- '<button class="wc3-primary" data-wc3-armor-equip="'+selectedArmor+'">장비 선택 / 교체</button></section>'+
- '<p class="wc3-note">투구·갑옷·신발은 보호·기동, 장갑은 공격 보조도 가능합니다. 공격형 옵션은 무예, 방어형 옵션은 생존으로 발휘됩니다.</p>';
+ const effects=fields.filter(([,v])=>Math.abs(n(v))>.00001)
+  .map(([label,v])=>label+" "+(v>0?"+":"")+Math.round(v*10)/10);
+ const silhouette='<svg viewBox="0 0 160 300" role="img" aria-label="소유자 전신 실루엣" xmlns="http://www.w3.org/2000/svg">'+
+ '<circle cx="80" cy="44" r="24" fill="#725f4c"/>'+
+ '<path d="M63 75 Q80 68 97 75 L115 146 L105 174 L96 162 L98 194 L119 266 L96 274 L77 202 L62 270 L39 266 L58 194 L60 160 L51 174 L41 146 Z" fill="#725f4c"/>'+
+ '<path d="M65 88 L97 88 M80 73 L80 166" stroke="#e4d2b4" stroke-width="3" fill="none"/>'+
+ '</svg>';
+ return '<section class="wc3-panel"><div class="wc3-sectionTitle"><h3>방어구 장착 현황</h3><small>좌측 2종 · 우측 2종</small></div>'+
+ '<div class="wc3-armorLayout"><div class="wc3-armorSide">'+entries.slice(0,2).join("")+'</div>'+
+ '<div class="wc3-ownerFigure">'+silhouette+'</div>'+
+ '<div class="wc3-armorSide">'+entries.slice(2).join("")+'</div></div></section>'+
+ '<section class="wc3-panel"><h3>'+title+' 상세</h3><div class="wc3-detail">'+
+ '<h4>'+escapeHtml(item?.name||"미장착")+'</h4>'+
+ '<p>'+escapeHtml(item?.desc||"장비가 없습니다.")+'</p>'+
+ '<p>'+escapeHtml(effects.join(" · ")||"전투 옵션 없음")+'</p>'+
+ (item&&typeof WC_EQUIPMENT_POOL_V1!=="undefined"?WC_EQUIPMENT_POOL_V1.formatDetail(item):"")+
+ '</div><button class="wc3-primary" data-wc3-armor-equip="'+selectedArmor+'">장비 선택 / 교체</button></section>';
 }
 function partEffects(mods){
  const v=WC_DIRECT_COMBAT_V2.migrateLegacyPart(mods||{},"weapon");
@@ -229,7 +208,7 @@ function weaponBody(){
    (item?'<small>'+escapeHtml(RARITY_DEF[item.rarity]?.name||"노멀")+'</small>':"")+'</button>';
  });
  const selectedId=state.weapon.parts?.[selectedPart],p=PART_CATALOG[selectedPart]?.[selectedId];
- const visual=typeof weaponArt41==="function"?weaponArt41({},"wc41-smithSword"):'<div class="wc3-swordFallback">⚔</div>';
+ const visual=typeof weaponArt41==="function"?weaponArt41({},"wc41-smithSword"):'<div class="wc3-swordFallback" aria-label="검 형상">│</div>';
  return '<section class="wc3-panel"><h3>현재 무기 · 8파츠</h3><div class="wc3-weaponGrid">'+
   '<div class="wc3-partCol">'+buttons.slice(0,4).join("")+'</div>'+
   '<div class="wc3-sword">'+visual+'</div>'+
@@ -312,12 +291,14 @@ function css(){
  '.wc3-card:disabled{opacity:.45}.wc3-rarity{font-size:10px;padding:2px;border-radius:3px}' +
  '.wc3-rare{color:#3270a8}.wc3-unique{color:#8c4aaf}.wc3-legend{color:#b16c15}' +
  '.wc3-actions{display:flex;gap:7px;margin:9px 0}.wc3-actions button{padding:8px;border-radius:7px;border:1px solid #bfa47c}' +
- '@media(max-width:390px){.wc3-deckGrid{grid-template-columns:repeat(5,minmax(0,1fr))}.wc3-card strong{font-size:9px}}';
+ '.wc3-armorLayout{display:grid;grid-template-columns:minmax(0,1fr) minmax(75px,.9fr) minmax(0,1fr);gap:5px;align-items:stretch}' +
+ '.wc3-armorSide{display:grid;grid-template-rows:repeat(2,minmax(95px,1fr));gap:6px}.wc3-ownerFigure{display:flex;align-items:center;justify-content:center;border:1px solid #c0ad91;background:linear-gradient(#efe4d0,#d9c6a5);border-radius:9px;min-width:0}.wc3-ownerFigure svg{width:100%;height:100%;max-height:260px}' +
+ '@media(max-width:390px){.wc3-deckGrid{grid-template-columns:repeat(5,minmax(0,1fr))}.wc3-card strong{font-size:9px}.wc3-armorSide .wc3-equip{padding:5px}.wc3-ownerFigure svg{max-height:220px}}';
  document.head.appendChild(el);
 }
 function draw(tab){
  ensureV26Progression();recalcWeapon();ensureOwner();ensureDeck();css();tab=["owner","gear","weapon","combat"].includes(tab)?tab:"owner";
- const tabs=[["owner","소유자"],["gear","방어구"],["weapon","무기"],["combat","스킬덱"]];
+ const tabs=[["owner","소유자"],["weapon","무기"],["gear","방어"],["combat","스킬"]];
  const nav='<div class="tabRow">'+tabs.map(([id,label])=>'<button class="tabBtn'+(id===tab?' active':'')+
  '" data-wc3-tab="'+id+'">'+label+'</button>').join("")+'</div>';
  const body=tab==="owner"?ownerBody():tab==="gear"?armorBody():tab==="weapon"?weaponBody():skillBody();
