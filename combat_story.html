@@ -1564,7 +1564,8 @@ function makeEnemy(){
       owner:{martial:100,survival:100,stableSurvival:100,baseHp:result.maxHp},
       weapon:{minAttack:Math.max(0,result.attack*.9),maxAttack:Math.max(0,result.attack*1.1),
        defense:result.defense,hitBonus:(s.hitChance??70)-70,critBonus:result.crit-5,
-       penetration:s.penetration??0,speedPct:s.speed??0,evade:result.evasion}
+       penetration:s.penetration??0,speedPct:s.speed??0,evade:result.evasion,
+       critDamageBonus:s.critDamageBonus??60}
     });
   }
   return result;
@@ -1853,6 +1854,12 @@ function currentOverdriveRisk(){
 function weaponWeightBurden(){ return Math.max(0,(hero.weapon.weight-1.15)*10); }
 function effectiveHandling(){ return hero.weapon.handling + (turn===1?hero.weapon.firstHandling:0); }
 function weaponBuilds(){
+  if(LIVE_ACTOR){
+    const w=LIVE_ACTOR,b=[];
+    if(w.maxResonance>=100&&w.resonanceRecovery<=8)b.push({id:'deep_core',name:'심층공명형'});
+    if(w.maxResonance<=75&&w.resonanceRecovery>=13)b.push({id:'cycle_core',name:'순환공명형'});
+    return b;
+  }
   const w=hero.weapon,b=[];
   if(w.power>=18&&w.weight>=1.42)b.push({id:'breaker',name:'파쇄형'});
   if(w.precision>=17&&w.handling>=15&&w.weight<=1.36)b.push({id:'duelist',name:'결투형'});
@@ -2715,7 +2722,7 @@ async function resolveEnemyPhase(){
 
   const hit=calcEnemyHit(),crit=(LIVE_ACTOR?Math.max(0,enemy.unified.critChance-LIVE_ACTOR.critChanceResist):enemy.crit)+(enemyIntent==='heavy'?3:0);
   const r=roll100();
-  const dodged=heroPlan==='dodge' && r>hit-18;
+  const dodged=heroPlan==='dodge' && r>(LIVE_ACTOR?hit:hit-18);
 
   if(dodged){
     showBanner('회피');
@@ -2824,7 +2831,7 @@ async function resolveSpeedBasic(side){
   }finally{enemyIntent=oldIntent;}
   await enemyAttackAnim();
   // Keep the same defender's guard/dodge and committed defensive card.
-  if(roll>hit||(heroPlan==='dodge'&&roll>hit-18)){
+  if(roll>hit||(heroPlan==='dodge'&&roll>(LIVE_ACTOR?hit:hit-18))){
     addDamage(24,44,'MISS','gray');log('적 공속 추가공격 회피.','good');return false;
   }
   let amount=ri(...damage);
