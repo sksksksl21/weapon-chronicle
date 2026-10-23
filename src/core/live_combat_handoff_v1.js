@@ -82,16 +82,9 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
       panel=document.createElement("section");
       panel.id="wcUnifiedCombatStats";
       panel.setAttribute("aria-label","통합 전투 능력치");
-      const legacy=aside.querySelector(".weaponStats");
-      if(legacy){
-        const details=document.createElement("details");
-        details.className="wcLegacyStats";
-        const summary=document.createElement("summary");
-        summary.textContent="저장 호환용 이전 수치";
-        details.appendChild(summary);
-        legacy.replaceWith(panel,details);
-        details.appendChild(legacy);
-      }else aside.prepend(panel);
+      // Retired four-stat panel is removed, not merely collapsed.
+      aside.querySelector(".weaponStats")?.remove();
+      aside.prepend(panel);
     }
     const s=wcCurrentUnifiedStats();
     const fmt=v=>String(Math.round(Number(v)*10)/10);
@@ -150,7 +143,6 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
     ["치명피해감소","critDamageResist"]
   ];
   function wcStatValue(stats,key){
-    if(key==="attackRange")return wcFmt(stats.minAttack)+" ~ "+wcFmt(stats.maxAttack);
     if(key==="critMultiplier")return wcFmt(stats.critMultiplier*100)+"%";
     return wcFmt(stats[key])+(
       ["hitChance","critChance","evade","blockChance","critChanceResist","critDamageResist"].includes(key)?"%":
@@ -234,8 +226,7 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
     wcUIStyle();
     const stats=wcSafeUnified(),el=document.getElementById("wcUnifiedCombatStats");
     if(!stats||!el)return;
-    const old=document.querySelector(".wc41-weaponAside .wcLegacyStats");
-    if(old)old.hidden=true;
+    document.querySelector(".wc41-weaponAside .wcLegacyStats")?.remove();
     const main=[
       ["최소공격",wcStatValue(stats,"minAttack")],["최대공격",wcStatValue(stats,"maxAttack")],
       ["명중",wcStatValue(stats,"hitChance")],["공격속도",wcStatValue(stats,"attackSpeed")],
