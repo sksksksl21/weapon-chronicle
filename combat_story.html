@@ -49,7 +49,10 @@ body{display:flex;justify-content:center}
 .side{display:flex;flex-direction:column;gap:4px;min-width:0}
 .nrow{display:flex;justify-content:space-between;align-items:flex-end;gap:4px}
 .nm{font-size:11px;font-weight:1000}
-.pow{font-size:10px;color:#7d6f5e;font-weight:800;white-space:nowrap}
+.pow{font-size:9px;color:#7d6f5e;font-weight:800;white-space:normal;line-height:1.3}
+.statusGrid .nrow{display:block;min-width:0}
+.statusGrid .pow{margin-top:3px}
+.statusGrid .pow span{display:block;overflow-wrap:anywhere}
 .bar{height:18px;border:2px solid #bca98a;border-radius:6px;overflow:hidden;background:#c9bfae;position:relative}
 .fill{height:100%}
 .fill.hero{background:#2e9b84}
@@ -601,9 +604,9 @@ body.storyMode .actions #resetBtn{display:none!important}
 <body>
 <div class="app">
   <section class="panel topbar">
-    <div class="title">Weapon Chronicle · 전투 v4.6.1</div>
+    <div class="title">Weapon Chronicle · 전투 DEV</div>
     <div class="meta">
-      <span>스토리 전투 · Core Deck</span>
+      <span>스토리 전투 · 순환 손패</span>
       <button class="topMini" id="chronicleBtn">연대기 0</button>
     </div>
   </section>
@@ -700,7 +703,7 @@ body.storyMode .actions #resetBtn{display:none!important}
     </div>
     <div class="overdriveBar">
       <button class="odBtn" id="overdriveBtn">OVERDRIVE · OFF</button>
-      <div class="odRisk" id="overdriveRisk">사용/버림 합계 턴당 1장 · 보충 없음</div>
+      <div class="odRisk" id="overdriveRisk">매 턴 손패 1장 보충 · 최대 4장 · 턴당 개입 1회</div>
     </div>
     <details class="battleItemsFold361"><summary>전투 소모품 <span>붕대 · 응급약 · 해독약</span></summary>
       <div class="itemBar" id="itemBar">
@@ -869,6 +872,12 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
   const SWORD = Object.freeze(["blade","guard","tang","grip","wrap","pommel","seat","scabbard"]);
   const ARMOR = Object.freeze(["helmet","armor","gloves","boots"]);
   const FLATS = Object.freeze(["attack","defense","speed","crit","penetration","maxResonance","resonanceRecovery"]);
+  // Defensive equipment never grants offensive stats, even when older
+  // catalog entries contain an attack/critical/penetration field. Preserve
+  // original save/catalog data; ignore only those effects in unified combat.
+  const BOOT_MOBILITY = Object.freeze({
+    rope_sandals:4,traveler_boots:6,iron_greaves:-3,climber_boots:8
+  });
   function num(value) {
     if (value === "" || value === null || value === undefined) return 0;
     const n = Number(value);
@@ -889,13 +898,20 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
       attackPct:num(mods.attackPct), defensePct:num(mods.defensePct), speedPct:num(mods.speedPct)
     };
   }
-  function armorValues(mods) {
+  function armorValues(mods,slot,itemId) {
+    const footwear=slot==="boots";
     return {
-      attack:num(mods.attack), defense:num(mods.defense),
-      speed:num(mods.speed), crit:num(mods.crit),
-      penetration:num(mods.penetration), maxHp:num(mods.maxHp),
-      attackPct:num(mods.attackPct), defensePct:num(mods.defensePct), speedPct:num(mods.speedPct)
+      attack:0, crit:0, penetration:0, attackPct:0,
+      defense:num(mods.defense), maxHp:num(mods.maxHp),
+      defensePct:num(mods.defensePct),
+      speed:footwear ? num(mods.speed)+num(BOOT_MOBILITY[itemId]) : 0,
+      speedPct:footwear ? num(mods.speedPct) : 0
     };
+  }
+  function armorContribution(slot,itemId,gearCatalog={}) {
+    if(!ARMOR.includes(slot))throw new RangeError("Unknown armor slot: "+slot);
+    const entry=itemId&&gearCatalog?.[itemId],valid=entry?.slot===slot;
+    return armorValues(valid?(entry.mods||{}):{},slot,valid?itemId:null);
   }
   function fromLegacyLoadout({ownerCombat={},totalMaxHp,weapon={},partCatalog={},
     ownerEquipment={},gearCatalog={},buffs={},legacyVitals}={}) {
@@ -905,10 +921,8 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
     }
     const armor = {};
     for (const slot of ARMOR) {
-      const entry = ownerEquipment?.[slot] && gearCatalog?.[ownerEquipment[slot]];
-      // The saved equipped item must actually belong to the expected slot.
-      const mods = entry?.slot === slot ? (entry.mods||{}) : {};
-      armor[slot] = armorValues(mods);
+      // One role mapping for combat and equipment details.
+      armor[slot] = armorContribution(slot,ownerEquipment?.[slot],gearCatalog);
     }
     // Legacy ownerVitalCaps: clamp(round(65 + rawSurvival*4 +
     // boldness/age modifiers + fixed equipment HP), 58, 170).
@@ -968,6 +982,13 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
     };
     const base = {};
     for (const key of FLATS) {
+      // Legacy recalcWeapon aggregates power/precision/toughness/handling and
+      // resonance, but has NO aggregate penetration field. New part affixes
+      // own penetration directly; do not subtract those from a missing total.
+      if(key==="penetration"&&(weapon.penetration===undefined||weapon.penetration===null)){
+        base[key]=0;
+        continue;
+      }
       base[key] = totals[key] - SWORD.reduce((sum,slot)=>sum+weaponParts[slot][key],0);
     }
     // Explicit baseline permanent bonuses remain separate from part modifiers.
@@ -985,9 +1006,151 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
       }
     };
   }
-  return Object.freeze({SWORD,ARMOR,fromLegacyLoadout,enemyFromLegacy});
+  return Object.freeze({SWORD,ARMOR,armorContribution,fromLegacyLoadout,enemyFromLegacy});
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = WC_LEGACY_COMBAT_SOURCES_V1;
+
+/* Weapon Chronicle: 2026-10-21 approved direct-stat combat arithmetic.
+ * Independent from the legacy battle bridge. No owner attack/defense flat bonus.
+ * Percentage conventions: attackPct/defensePct = decimal fractions (0.10=10%).
+ * hit/crit/evade/block bonuses = percentage points (10=10%p).
+ * speedPct/critDamageBonus = percentages (20=20%).
+ * Legacy migration is explicitly separated below. No weight/length bonuses.
+ */
+const WC_DIRECT_COMBAT_V2=(()=>{
+"use strict";
+const PART_SLOTS=Object.freeze(["blade","guard","tang","grip","wrap","pommel","seat","scabbard"]);
+const ARMOR_SLOTS=Object.freeze(["helmet","armor","gloves","boots"]);
+const BASE=Object.freeze({hitChance:70,critChance:5,evade:0,statusResist:0,blockChance:0});
+const n=(v,otherwise=0)=>v===null||v===undefined||v===""?otherwise:(Number.isFinite(Number(v))?Number(v):otherwise);
+const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+const sum=(arr,key)=>arr.reduce((total,item)=>total+n(item?.[key]),0);
+const rounded=v=>Math.round(v*1000)/1000;
+function calculate({owner={},weapon={},parts={},armor={},base=BASE}={}){
+ const m=clamp(n(owner.martial),0,100)/100;
+ const s=clamp(n(owner.survival),0,100)/100;
+ const stable=clamp(n(owner.stableSurvival,owner.survival),0,100)/100;
+ const weaponParts=PART_SLOTS.map(k=>parts[k]||{});
+ const armorPieces=ARMOR_SLOTS.map(k=>armor[k]||{});
+ const attackItems=[weapon,...weaponParts,armor.gloves||{}];
+ const defenseItems=[weapon,...weaponParts,...armorPieces];
+ const atkPct=sum(attackItems,"attackPct");
+ const defPct=sum(defenseItems,"defensePct");
+ const gearMin=sum(attackItems,"minAttack")*(1+atkPct);
+ const gearMax=sum(attackItems,"maxAttack")*(1+atkPct);
+ const unscaledMin=Math.max(0,Math.min(gearMin,gearMax));
+ const unscaledMax=Math.max(0,Math.max(gearMin,gearMax));
+ const gearDefense=Math.max(0,sum(defenseItems,"defense")*(1+defPct));
+ const atkMin=Math.round(unscaledMin*m),atkMax=Math.round(unscaledMax*m);
+ const pct=x=>clamp(x,0,100);
+ const critExtra=Math.max(0,sum(attackItems,"critDamageBonus")*m);
+ const hpBonus=sum(armorPieces,"maxHp");
+ const resSources=[weapon,...weaponParts];
+ const result={
+  martial:Math.round(m*100),survival:Math.round(s*100),
+  minAttack:atkMin,maxAttack:Math.max(atkMin,atkMax),
+  hitChance:pct(n(base.hitChance,70)+sum(attackItems,"hitBonus")*m),
+  critChance:pct(n(base.critChance,5)+sum(attackItems,"critBonus")*m),
+  critDamageBonus:rounded(critExtra),critMultiplier:rounded(1+critExtra/100),
+  penetration:rounded(Math.max(0,sum(attackItems,"penetration")*m)),
+  defense:Math.round(gearDefense*s),
+  maxHp:Math.max(1,Math.round(n(owner.baseHp,1)+hpBonus*stable)),
+  critChanceResist:pct(sum(defenseItems,"critChanceResist")*s),
+  critDamageResist:Math.max(0,rounded(sum(defenseItems,"critDamageResist")*s)),
+  statusResist:pct(n(base.statusResist)+sum(defenseItems,"statusResist")*s),
+  evade:pct(n(base.evade)+sum(defenseItems,"evade")*s),
+  blockChance:pct(n(base.blockChance)+sum(defenseItems,"blockChance")*s),
+  blockAmount:Math.max(0,rounded(sum(defenseItems,"blockAmount")*s)),
+  attackSpeed:Math.max(1,rounded(100*(1+sum(attackItems,"speedPct")*m/100))),
+  maxResonance:Math.max(0,rounded(sum(resSources,"maxResonance"))),
+  resonanceRecovery:Math.max(0,rounded(sum(resSources,"resonanceRecovery"))),
+  breakdown:Object.freeze({
+   gearMinAttack:rounded(unscaledMin),gearMaxAttack:rounded(unscaledMax),
+   gearDefense:rounded(gearDefense),attackPct:rounded(atkPct),
+   defensePct:rounded(defPct),martialRate:m,survivalRate:s,
+   baseHitChance:n(base.hitChance,70),baseCritChance:n(base.critChance,5),
+   gearHitBonus:rounded(sum(attackItems,"hitBonus")),
+   gearCritBonus:rounded(sum(attackItems,"critBonus")),
+   gearSpeedPct:rounded(sum(attackItems,"speedPct")),
+   gearHpBonus:rounded(hpBonus)
+  })
+ };
+ return Object.freeze(result);
+}
+function resolveStrike({attacker={},defender={},hitRoll,critRoll,blockRoll,damageRoll,
+  cardMultiplier=1,temporaryDefense=0}={}){
+ const hit=clamp(n(attacker.hitChance)-n(defender.evade),0,100);
+ const didHit=n(hitRoll,100)<hit;
+ if(!didHit)return Object.freeze({hit:false,crit:false,blocked:false,damage:0});
+ const critChance=clamp(n(attacker.critChance)-n(defender.critChanceResist),0,100);
+ const crit=n(critRoll,100)<critChance;
+ const criticalExtra=Math.max(0,n(attacker.critDamageBonus)-n(defender.critDamageResist));
+ const blockChance=clamp(n(defender.blockChance),0,100);
+ const blocked=n(blockRoll,100)<blockChance;
+ const min=Math.max(0,n(attacker.minAttack)),max=Math.max(min,n(attacker.maxAttack));
+ const base=min+(max-min)*clamp(n(damageRoll,0),0,1);
+ if(base<=0)return Object.freeze({hit:true,crit,blocked,damage:0});
+ const preDefense=base*Math.max(0,n(cardMultiplier,1))*(crit?1+criticalExtra/100:1);
+ const effectiveDefense=Math.max(0,n(defender.defense)-Math.max(0,n(attacker.penetration)));
+ const damage=Math.max(0,Math.max(1,preDefense-effectiveDefense)-
+  (blocked?Math.max(0,n(defender.blockAmount)):0)-Math.max(0,n(temporaryDefense)));
+ return Object.freeze({hit:true,crit,blocked,damage:Math.round(damage),effectiveDefense});
+}
+// Explicit old-data migration only, not the combat model.
+// Legacy weapon totals already include its eight parts. Subtract once.
+// Do not reuse legacy physical weight/length effects.
+function migrateLegacyPart(mods={},kind="weapon",slot=""){
+ const val=k=>n(mods[k]);
+ const pct=k=>val(k)/100;
+ const attack=kind==="armor"&&slot!=="gloves"?0:val(kind==="armor"?"attack":"power");
+ const [min,max]=[attack*.9,attack*1.1].sort((a,b)=>a-b);
+ const direct={
+  minAttack:min,maxAttack:max,defense:val(kind==="armor"?"defense":"toughness"),
+  attackPct:kind==="armor"&&slot!=="gloves"?0:pct("attackPct"),
+  defensePct:pct("defensePct"),
+  hitBonus:val("hitBonus"),critBonus:val(kind==="armor"?"crit":"precision"),
+  critDamageBonus:val("critDamageBonus"),penetration:val("penetration"),
+  speedPct:val("speedPct")+(kind==="armor"?(slot==="boots"?val("speed"):0):val("handling")),
+  maxHp:val("maxHp"),evade:val("evade"),statusResist:val("resist"),
+  blockChance:val("block"),blockAmount:val("blockAmount"),
+  critChanceResist:val("critChanceResist"),critDamageResist:val("critDamageResist"),
+  maxResonance:kind==="armor"?0:val("maxResonance"),
+  resonanceRecovery:kind==="armor"?0:val("resonanceRecovery")
+ };
+ if(kind==="armor"&&slot!=="gloves"){
+   direct.critBonus=0;direct.critDamageBonus=0;direct.penetration=0;
+ }
+ if(kind==="armor"&&slot!=="boots")direct.speedPct=0;
+ return Object.freeze(direct);
+}
+function migrateLegacyLoadout({weapon={},partCatalog={},equipment={},gearCatalog={}}={}){
+ const parts={},armor={};
+ const total=key=>PART_SLOTS.reduce((v,slot)=>v+n(partCatalog[slot]?.[weapon.parts?.[slot]]?.mods?.[key]),0);
+ for(const slot of PART_SLOTS){
+  const entry=partCatalog[slot]?.[weapon.parts?.[slot]];
+  parts[slot]=migrateLegacyPart(entry?.mods||{},"weapon",slot);
+ }
+ for(const slot of ARMOR_SLOTS){
+  const entry=gearCatalog[equipment[slot]];
+  armor[slot]=migrateLegacyPart(entry?.slot===slot?entry.mods:{}, "armor",slot);
+ }
+ // The old totals include all part modifiers; the difference is the sword
+ // base and permanent progression, not a second copy of equipped parts.
+ const residual=Object.freeze({
+  power:n(weapon.power)-total("power"),
+  precision:n(weapon.precision)-total("precision"),
+  toughness:n(weapon.toughness)-total("toughness"),
+  handling:n(weapon.handling)-total("handling"),
+  penetration:n(weapon.penetration)-total("penetration"),
+  maxResonance:n(weapon.maxResonance)-total("maxResonance"),
+  resonanceRecovery:n(weapon.resonanceRecovery)-total("resonanceRecovery"),
+  attackPct:n(weapon.attackPct),defensePct:n(weapon.defensePct),speedPct:n(weapon.speedPct)
+ });
+ return {weapon:migrateLegacyPart(residual,"weapon"),parts,armor};
+}
+return Object.freeze({PART_SLOTS,ARMOR_SLOTS,BASE,calculate,resolveStrike,migrateLegacyPart,migrateLegacyLoadout});
+})();
+if(typeof module!=="undefined"&&module.exports)module.exports=WC_DIRECT_COMBAT_V2;
 
 (()=>{
 const STORY_PARAMS=new URLSearchParams(location.search);
@@ -999,7 +1162,7 @@ const LIVE_ACTOR=(()=>{
   if(!STORY_MODE)return null;
   try{
     const actor=JSON.parse(STORY_FRAME?.dataset?.unifiedActorV1||'null');
-    const keys=['maxHp','maxResonance','resonanceRecovery','attack','defense','attackSpeed','critChance','penetration'];
+    const keys=['maxHp','maxResonance','resonanceRecovery','minAttack','maxAttack','hitChance','critChance','critDamageBonus','penetration','attackSpeed','defense','evade','blockChance','blockAmount','critChanceResist','critDamageResist'];
     return actor&&keys.every(k=>Number.isFinite(actor[k])&&actor[k]>=0)&&actor.maxHp>=1&&actor.attackSpeed>=1?Object.freeze(actor):null;
   }catch(e){return null;}
 })();
@@ -1201,12 +1364,12 @@ const CARD_DB={
  escapeMemory:{cost:18,name:"죽음 옆을 스친 발",type:"순간기억",timing:"pre",effect:"적 명중 -35%",flavor:"죽을 공격을 반 걸음 차이로 흘렸다.",exhaust:true,moment:true},
  gritMemory:{cost:20,name:"부러지지 않은 밤",type:"순간기억",timing:"pre",effect:"이번 턴 받는 피해 ×0.50",flavor:"큰 일격을 맞고도 검을 놓지 않았다.",exhaust:true,moment:true}
 };
-const BASE_DECK=["aim1","aim2","guard","over","blood","feint","giant","last","reroll","reverse","counter","endure"];
-if(STORY_SKILLS.has('carapace_gap')) BASE_DECK.push('storyGap');
-if(STORY_SKILLS.has('left_behind')) BASE_DECK.push('storyLeft');
-if(STORY_SKILLS.has('silent_prayer')) BASE_DECK.push('storyPrayer');
-if(STORY_SKILLS.has('cyclops_gap')) BASE_DECK.push('mainCyclops');
-if(STORY_SKILLS.has('carry_them')) BASE_DECK.push('mainCarry');
+const BASE_DECK=(()=>{const fallback=["aim1","guard","over","blood","feint","giant","reroll","reverse","counter","endure"];const raw=STORY_FRAME?.dataset?.skillDeck||STORY_PARAMS.get("skillDeck")||"";try{const cards=JSON.parse(raw);if(Array.isArray(cards)&&cards.length===10&&new Set(cards).size===10&&cards.every(id=>typeof id==="string"&&CARD_DB[id]))return cards;}catch(e){}return fallback;})();
+// Earned story cards enter only when equipped in the ten-slot deck.
+// Earned story cards enter only when equipped in the ten-slot deck.
+// Earned story cards enter only when equipped in the ten-slot deck.
+// Earned story cards enter only when equipped in the ten-slot deck.
+// Earned story cards enter only when equipped in the ten-slot deck.
 
 const CARD_TAGS={
   aim1:["정밀"],aim2:["정밀"],guard:["방어"],over:["과출력"],blood:["피"],
@@ -1397,9 +1560,12 @@ function makeEnemy(){
     parryReady:false,retreatTurns:0,absorbReady:false,splitTurns:0,splitStacks:0
   };
   if(LIVE_ACTOR){
-    result.unified=WC_COMBAT_MATH_V1.calculateActorStats(WC_LEGACY_COMBAT_SOURCES_V1.enemyFromLegacy({
-      ...result,speed:s.speed??0,penetration:s.penetration??0
-    }));
+    result.unified=WC_DIRECT_COMBAT_V2.calculate({
+      owner:{martial:100,survival:100,stableSurvival:100,baseHp:result.maxHp},
+      weapon:{minAttack:Math.max(0,result.attack*.9),maxAttack:Math.max(0,result.attack*1.1),
+       defense:result.defense,hitBonus:(s.hitChance??70)-70,critBonus:result.crit-5,
+       penetration:s.penetration??0,speedPct:s.speed??0,evade:result.evasion}
+    });
   }
   return result;
 }
@@ -1475,7 +1641,7 @@ function reasonForHeroAction(action,mood,forced){
   if(action==="defend")
     return `신중성 ${hero.caution} · 손해를 줄이는 판단을 선택했다.`;
   if(action==="dodge")
-    return `생존 ${hero.survival} · 무기의 조작성을 살려 공격 궤적에서 벗어난다.`;
+    return `회피율과 신중성을 활용해 공격 궤적에서 벗어난다.`;
   return `현재 상황을 크게 무리하지 않고 기본 공격으로 풀어간다.`;
 }
 
@@ -1488,12 +1654,12 @@ function chooseHeroPlan(){
     basic:32 + hero.martial*1.3 + hero.aggression*.16,
     heavy:8 + hero.aggression*.46 + hero.boldness*.28,
     defend:10 + hero.caution*.58,
-    dodge:9 + hero.caution*.28 + hero.survival*1.10 + hero.weapon.handling*.55
+    dodge:9 + hero.caution*.28 + hero.survival*1.10 + (LIVE_ACTOR?LIVE_ACTOR.evade:hero.weapon.handling)*.55
   };
 
   if(enemyIntent==="heavy"){
     s.defend+=20+hero.caution*.22;
-    s.dodge+=18+hero.survival*.75+hero.weapon.handling*.55;
+    s.dodge+=18+hero.survival*.75+(LIVE_ACTOR?LIVE_ACTOR.evade:hero.weapon.handling)*.55;
     if(hero.boldness>=65) s.heavy+=8;
   }
   if(enemyIntent==="guard"){
@@ -1612,7 +1778,8 @@ function recordCardUse(id){
 function grantMoment(id,reason){
   if(momentGenerated[id]) return;
   momentGenerated[id]=true;
-  // Record a new memory in the chronicle; this battle never receives replacement cards.
+  // A newly acquired one-shot memory enters the draw pile for a later turn.
+  if(CARD_DB[id] && !hand.includes(id) && !deck.includes(id) && !discard.includes(id) && !exhausted.includes(id)) deck.unshift(id);
   showBanner("MEMORY BORN · "+CARD_DB[id].name);
   log("순간기억 생성 — "+CARD_DB[id].name+" / "+reason,"good");
   addChronicle('memory',CARD_DB[id].name,reason,8);
@@ -1698,6 +1865,19 @@ function hasWeaponBuild(id){return weaponBuilds().some(x=>x.id===id);}
 function buildNames(){const b=weaponBuilds();return b.length?b.map(x=>x.name).join(' + '):'균형형';}
 function calcHeroHit(){
   if(heroPlan==='defend'||heroPlan==='dodge') return 0;
+  if(LIVE_ACTOR){
+    let h=LIVE_ACTOR.hitChance-enemy.unified.evade+heroMissPenaltyNext+memoryMods.hit;
+    if(heroPlan==='heavy')h-=12;
+    if(hero.webbedTurns>0)h-=25;
+    if(enemy.staggered)h+=15;
+    if(preHas('aim1')||preHas('aim2'))h+=isUpgraded(preHas('aim1')?'aim1':'aim2')?35:25;
+    if(preHas('storyGap'))h+=20;
+    if(preHas('mainCyclops'))h+=30;
+    if(preHas('miracle'))h+=20;
+    if(enemy.exposed)h+=weakness().hit+memoryMods.exposeHit;
+    if(hasCombo('legendAim'))h+=10;
+    return clamp(h,0,100);
+  }
   const burden=weaponWeightBurden();
   const reach=(hero.weapon.length-90)*.10;
   let h=34 + hero.martial*3.2 + hero.weapon.precision*2.0 + effectiveHandling()*1.15 + reach - effectiveEnemyEvasion()*2.45 - burden*1.8;
@@ -1718,6 +1898,17 @@ function calcHeroHit(){
 }
 function calcHeroCrit(){
   if(heroPlan==='defend'||heroPlan==='dodge') return 0;
+  if(LIVE_ACTOR){
+    let c=LIVE_ACTOR.critChance-enemy.unified.critChanceResist+
+      (heroPlan==='heavy'?5:0)+(enemy.staggered?4:0)+memoryMods.crit;
+    if(preHas('blood'))c+=isUpgraded('blood')?40:30;
+    if(preHas('giant'))c+=20;
+    if(preHas('mainCyclops'))c+=20;
+    if(preHas('miracle'))c+=20;
+    if(enemy.exposed)c+=weakness().crit+memoryMods.exposeCrit;
+    if(hasCombo('legendAim'))c+=10;
+    return clamp(c,0,100);
+  }
   let c=2 + hero.weapon.precision*.72 + hero.martial*.52 + effectiveHandling()*.18 +(heroPlan==='heavy'?5:0)+(enemy.staggered?4:0)+memoryMods.crit+(hasWeaponBuild('duelist')?4:0);
   if(LIVE_ACTOR)c=LIVE_ACTOR.critChance+(heroPlan==='heavy'?5:0)+(enemy.staggered?4:0)+memoryMods.crit+(hasWeaponBuild('duelist')?4:0);
   if(preHas('blood')) c+=isUpgraded('blood')?40:30;
@@ -1731,15 +1922,32 @@ function calcHeroCrit(){
 function liveDamage(raw,side,critMultiplier=1,temporaryMultiplier=1,ignoreDefense=false){
   const attacker=side==='owner'?LIVE_ACTOR:enemy.unified;
   const defender=side==='owner'?enemy.unified:LIVE_ACTOR;
-  const input={damage:raw,critMultiplier,defense:ignoreDefense?0:defender.defense,penetration:attacker.penetration};
-  // Convert existing guard/absorption reductions to a temporary shield AFTER
-  // permanent defense. Critical/card damage has already been applied before it.
-  const hit=WC_COMBAT_MATH_V1.resolveDamage(input);
-  const temporaryDefense=hit.afterDefense*(1-clamp(temporaryMultiplier,0,1));
-  return Math.max(0,Math.round(WC_COMBAT_MATH_V1.resolveDamage({...input,temporaryDefense}).finalDamage));
+  const criticalBase=side==='owner'?1.75:1.6;
+  const critical=critMultiplier>1?
+    (1+Math.max(0,attacker.critDamageBonus-defender.critDamageResist)/100)*(critMultiplier/criticalBase):1;
+  const preDefense=Math.max(0,raw)*Math.max(0,critical);
+  const effectiveDefense=ignoreDefense?0:Math.max(0,defender.defense-attacker.penetration);
+  const armored=preDefense<=0?0:Math.max(1,preDefense-effectiveDefense);
+  const blocked=roll100()<=defender.blockChance?defender.blockAmount:0;
+  return Math.max(0,Math.round(Math.max(0,armored-blocked)*clamp(temporaryMultiplier,0,1)));
 }
 function calcHeroDmg(critMultiplier=1){
   if(heroPlan==='defend'||heroPlan==='dodge') return [0,0];
+  if(LIVE_ACTOR){
+    let mult=heroPlan==='heavy'?1.6:1;
+    if(preHas('over'))mult*=isUpgraded('over')?2.25:2;
+    if(preHas('giant'))mult*=2;
+    if(preHas('last'))mult*=3;
+    if(preHas('openingShard'))mult*=enemy.exposed?1.6:1.15;
+    if(hasCombo('aimOver'))mult*=1.25;
+    if(enemy.exposed)mult*=weakness().damage;
+    if(hero.hp/hero.maxHp<=.35)mult*=memoryMods.lowHpDamage;
+    let temporaryMultiplier=1;
+    if(stageIndex===0&&enemy.parryReady)temporaryMultiplier*=.55;
+    if(stageIndex===2&&!enemy.exposed)temporaryMultiplier*=enemy.absorbReady?.39:.65;
+    return [LIVE_ACTOR.minAttack,LIVE_ACTOR.maxAttack].map(d=>
+      liveDamage(d*mult,'owner',critMultiplier,temporaryMultiplier,preHas('storyGap')));
+  }
   const mass=Math.max(0,hero.weapon.weight-1.0)*3.5;
   let base=hero.weapon.power + hero.martial*.72 + mass - enemy.defense*.42;
   if(LIVE_ACTOR)base=LIVE_ACTOR.attack+mass;
@@ -1777,6 +1985,16 @@ function calcHeroDmg(critMultiplier=1){
 }
 function calcEnemyHit(){
   if(enemyIntent==='guard'||enemyIntent==='web') return 0;
+  if(LIVE_ACTOR){
+    let h=enemy.unified.hitChance-LIVE_ACTOR.evade+(enemyIntent==='heavy'?-8:0);
+    if(enemyIntent==='combo')h-=6;
+    if(heroPlan==='dodge')h-=18;
+    if(enemy.staggered)h-=15;
+    if(preHas('guard'))h-=isUpgraded('guard')?40:30;
+    if(preHas('storyPrayer'))h-=25;
+    if(preHas('escapeMemory'))h-=35;
+    return clamp(h,0,100);
+  }
   const burden=weaponWeightBurden();
   let avoid=hero.survival*.9 + effectiveHandling()*.65 - burden*.7 + (heroPlan==='dodge'?9:0)+(heroPlan==='defend'?4:0) + (hero.armor?.evasion||0);
   let h=52+(effectiveEnemyAttack()-avoid)*3.15+(enemyIntent==='heavy'?-8:0);
@@ -1792,17 +2010,13 @@ function calcEnemyDmg(critMultiplier=1){
   if(enemyIntent==='guard'||enemyIntent==='web') return [0,0];
   let d=(stage().damage[enemyIntent]||stage().damage.light).slice();
   if(LIVE_ACTOR){
-    d=d.map(raw=>Math.max(0,enemy.unified.attack+raw-stage().attack));
-    let temporaryMultiplier=1;
-    if(heroPlan==='defend'){
-      temporaryMultiplier*=clamp(.68-(hero.weapon.toughness*.014+hero.survival*.012+effectiveHandling()*.005),.38,.62);
-      if(hasWeaponBuild('bulwark'))temporaryMultiplier*=.88;
-    }
-    if(enemy.staggered)d=d.map(raw=>raw*.7);
-    if(stageIndex===2)d=d.map(raw=>raw*(1+puddingRage()*.08+(enemy.splitTurns>0?enemy.splitStacks*.08:0)));
-    if(preHas('gritMemory'))temporaryMultiplier*=.50;
-    if(heroPlan==='defend'&&(hero.armor?.block||0)>0)temporaryMultiplier*=clamp(1-hero.armor.block/100,.55,1);
-    return d.map(raw=>liveDamage(raw,'enemy',critMultiplier,temporaryMultiplier));
+    const baseline=Math.max(0,stage().attack);
+    const scaled=d.map(raw=>Math.max(0,enemy.unified.minAttack+(raw-baseline)));
+    let temporaryMultiplier=heroPlan==='defend'?.5:1;
+    if(enemy.staggered)temporaryMultiplier*=.7;
+    if(stageIndex===2)temporaryMultiplier*=1+puddingRage()*.08+(enemy.splitTurns>0?enemy.splitStacks*.08:0);
+    if(preHas('gritMemory'))temporaryMultiplier*=.5;
+    return scaled.map(raw=>liveDamage(raw,'enemy',critMultiplier,Math.min(1,temporaryMultiplier)));
   }
   if(heroPlan==='defend'){
     const guard=clamp(.68-(hero.weapon.toughness*.014+hero.survival*.012+effectiveHandling()*.005),.38,.62);
@@ -1882,8 +2096,8 @@ function renderWeakness(){
   if(txt){s.textContent=txt;s.className='enemyState show';}
   else{s.textContent='';s.className='enemyState';}
 }
-function renderOverdrive(){ $('overdriveBtn').hidden=true; $('overdriveRisk').textContent=hand.length?'한 턴에 기억카드 1장 사용 또는 버림 · 보충 없음':'손패 소진 · 소유자 자동전투 계속'; }
-function renderCombo(){ const b=$('comboBar'); b.className='comboBar'; b.textContent='MEMORY · 사용/버림 합계 턴당 1장 · 보충 없음'; }
+function renderOverdrive(){ $('overdriveBtn').hidden=true; $('overdriveRisk').textContent='매 턴 시작 시 손패 빈칸 1장 보충 · 사용/버림 합계 턴당 1장'; }
+function renderCombo(){ const b=$('comboBar'); b.className='comboBar'; b.textContent='MEMORY · 사용/버림 턴당 1장 · 덱 소진 시 버린 카드 순환'; }
 function toggleOverdrive(){ return; } // One intervention per turn has no two-card override.
 function exposeEnemy(){ if(enemy.exposed) return; enemy.exposed=true; showBanner(weakness().name+'!'); log(weakness().desc+` — 다음 ${hero.name} 행동에 약점 보너스.`,'warn'); render(); }
 function consumeExposure(){ if(enemy.exposed){enemy.exposed=false;log('약점 노출 종료.','muted');} }
@@ -1911,7 +2125,7 @@ function discardBattleCard36(){
  const id=discardChoice36;
  if(!canDiscardBattleCard36(id))return;
  removeHand(id);discard.push(id);cardUses=1;discardedThisTurn36=true;discardChoice36=null;
- log('기억카드 「'+displayCardName(id)+'」를 버렸다. 이번 턴 개입 종료 · 보충 없음.','warn');
+ log('기억카드 「'+displayCardName(id)+'」를 버렸다. 이번 턴 개입 종료 · 다음 턴 1장 보충.','warn');
  showBanner('기억 정리');render();
 }
 function battleImpact36(label){
@@ -1996,13 +2210,17 @@ function useBattleItem(id){
 }
 function render(){
   $('heroName').textContent=hero.name;
-  hero.pow=hero.martial*1.4+hero.survival*.8+hero.weapon.power*.65+hero.weapon.precision*.35+hero.weapon.handling*.3+hero.weapon.toughness*.25;
-  $('heroPow').textContent=`전투력 ${hero.pow.toFixed(1)}`;
+  hero.pow=LIVE_ACTOR?(LIVE_ACTOR.minAttack+LIVE_ACTOR.maxAttack)/2:stage().pow;
+  if(LIVE_ACTOR){
+    $('heroPow').innerHTML=`<span>공 ${LIVE_ACTOR.minAttack.toFixed(0)}~${LIVE_ACTOR.maxAttack.toFixed(0)} · 방 ${LIVE_ACTOR.defense.toFixed(0)}</span><span>속 ${LIVE_ACTOR.attackSpeed.toFixed(0)} · 치 ${LIVE_ACTOR.critChance.toFixed(0)}% · 관 ${LIVE_ACTOR.penetration.toFixed(1)}</span>`;
+  }else $('heroPow').textContent=`전투력 ${hero.pow.toFixed(1)}`;
   $('heroFill').style.width=(hero.hp/hero.maxHp*100)+'%';
   $('heroHp').textContent=`${hero.hp.toFixed(1)} / ${hero.maxHp.toFixed(1)}`;
 
   $('enemyName').textContent=stage().name;
-  $('enemyPow').textContent=`전투력 ${stage().pow.toFixed(1)}`;
+  if(enemy.unified){
+    $('enemyPow').innerHTML=`<span>공 ${enemy.unified.minAttack.toFixed(0)}~${enemy.unified.maxAttack.toFixed(0)} · 방 ${enemy.unified.defense.toFixed(0)}</span><span>속 ${enemy.unified.attackSpeed.toFixed(0)} · 치 ${enemy.unified.critChance.toFixed(0)}% · 관 ${enemy.unified.penetration.toFixed(1)}</span>`;
+  }else $('enemyPow').textContent=`전투력 ${stage().pow.toFixed(1)}`;
   $('enemyFill').style.width=(enemy.hp/enemy.maxHp*100)+'%';
   $('enemyHp').textContent=`${enemy.hp.toFixed(1)} / ${enemy.maxHp.toFixed(1)}`;
 
@@ -2039,6 +2257,24 @@ function canUseCard(id){
   return false;
 }
 function removeHand(id){ const i=hand.indexOf(id); if(i>=0) hand.splice(i,1); }
+
+/* Four-slot rotating memory hand: one replacement at each new turn.
+ * No bonus-attack or reaction refill; exhausted cards never return.
+ */
+function openingBattleHand(){
+  deck=shuffle(BASE_DECK.slice());
+  hand=deck.splice(0,4);
+}
+function refillBattleHandOnce(){
+  if(hand.length>=4)return false;
+  if(!deck.length && discard.length){
+    deck=shuffle(discard.splice(0));
+    log('버린 기억카드를 다시 섞었다.','muted');
+  }
+  if(!deck.length)return false;
+  hand.push(deck.shift());
+  return true;
+}
 function useCard(id){
   const c=CARD_DB[id];
   if(!canUseCard(id)) return;
@@ -2163,7 +2399,7 @@ async function animateCounter(){
   showBanner(hasCombo('guardCounter')?'CHAIN · 철벽 반격':'반격');
   await sleep(120);
   const usedCounter=usedThisTurn.find(x=>cardBase(x)==='counter');
-  const baseCounter=52 + hero.martial*1.4 + hero.weapon.precision*.75 + effectiveHandling()*.8 + (hasWeaponBuild('duelist')?8:0);
+  const baseCounter=LIVE_ACTOR?LIVE_ACTOR.hitChance:52 + hero.martial*1.4 + hero.weapon.precision*.75 + effectiveHandling()*.8 + (hasWeaponBuild('duelist')?8:0);
   const normal=(usedCounter&&isUpgraded(usedCounter))?Math.max(80,baseCounter+10):baseCounter;
   const cc=hasCombo('guardCounter')?95:clamp(normal+memoryMods.counterChance,35,90);
   const r=roll100();
@@ -2283,6 +2519,7 @@ function startTurn(){
     log('독 피해 — HP -4 ('+hero.poisonTurns+'T 남음).','bad');
     if(hero.hp<=0){render();runEnd();return;}
   }
+  if(turn>1) refillBattleHandOnce();
   enemyIntent=chooseEnemyIntent();
   heroPlan=chooseHeroPlan();
   selectedPre=[];discardChoice36=null;discardedThisTurn36=false;
@@ -2403,7 +2640,7 @@ async function resolveHeroRoll(r, allowReaction){
 async function resolveBanditCombo(){
   phase='enemyResolve';
   showBanner('연속 베기');
-  const hit=calcEnemyHit(),crit=enemy.crit,d=calcEnemyDmg();
+  const hit=calcEnemyHit(),crit=LIVE_ACTOR?Math.max(0,enemy.unified.critChance-LIVE_ACTOR.critChanceResist):enemy.crit,d=calcEnemyDmg();
   let total=0;
 
   for(let i=1;i<=2;i++){
@@ -2450,7 +2687,7 @@ async function resolveEnemyPhase(){
   }
 
   if(stageIndex===1 && enemyIntent==='web'){
-    if(Math.random()*100 < (hero.armor?.resist||0)){showBanner('상태 저항');log('장비와 장신구가 거미줄 구속을 버텨냈다.','good');render();endTurn();return;}
+    if(Math.random()*100 < (LIVE_ACTOR?.statusResist??hero.armor?.resist??0)){showBanner('상태 저항');log('장비와 장신구가 거미줄 구속을 버텨냈다.','good');render();endTurn();return;}
     showBanner('거미줄');
     hero.webbedTurns=1;
     log(`거미줄에 묶였다 — 다음 ${hero.name} 공격 명중 ${hasWeaponBuild('duelist')?'-12%':'-25%'}.`+(hasWeaponBuild('duelist')?' 결투형 조작성이 구속 페널티를 줄였다.':''),'bad');
@@ -2476,7 +2713,7 @@ async function resolveEnemyPhase(){
     return endTurn();
   }
 
-  const hit=calcEnemyHit(),crit=enemy.crit+(enemyIntent==='heavy'?3:0);
+  const hit=calcEnemyHit(),crit=(LIVE_ACTOR?Math.max(0,enemy.unified.critChance-LIVE_ACTOR.critChanceResist):enemy.crit)+(enemyIntent==='heavy'?3:0);
   const r=roll100();
   const dodged=heroPlan==='dodge' && r>hit-18;
 
@@ -2512,7 +2749,7 @@ async function resolveEnemyPhase(){
     log(`${stage().name} ${r<=crit?'치명타':'적중'} — ${dmg} 피해.`,'bad');
 
     if(stageIndex===1 && enemyIntent==='light' && dmg>0){
-      if(Math.random()*100 < (hero.armor?.resist||0)) log('상태 저항 — 독이 퍼지기 전에 버텨냈다.','good');
+      if(Math.random()*100 < (LIVE_ACTOR?.statusResist??hero.armor?.resist??0)) log('상태 저항 — 독이 퍼지기 전에 버텨냈다.','good');
       else {hero.poisonTurns=Math.max(hero.poisonTurns,3);log('독니 적중 — 3턴 동안 독 피해.','bad');}
     }
 
@@ -2582,7 +2819,7 @@ async function resolveSpeedBasic(side){
   let hit,critical,damage;
   const roll=roll100();
   try{
-    enemyIntent='light';hit=calcEnemyHit();critical=roll<=Math.min(hit,enemy.unified.critChance);
+    enemyIntent='light';hit=calcEnemyHit();critical=roll<=Math.min(hit,Math.max(0,enemy.unified.critChance-LIVE_ACTOR.critChanceResist));
     damage=calcEnemyDmg(critical?1.6:1);
   }finally{enemyIntent=oldIntent;}
   await enemyAttackAnim();
@@ -2695,9 +2932,9 @@ function nextStage(){
   stageIndex++;
   enemy=makeEnemy();
   turn=1;
-  // A new encounter receives four cards; no card recycles inside a battle.
-  hand=shuffle(BASE_DECK.slice()).slice(0,4);
-  deck=[];discard=[];exhausted=[];selectedPre=[];usedThisTurn=[];
+  // Each encounter shuffles the complete card pool. Used non-exhaust cards can cycle.
+  discard=[];exhausted=[];selectedPre=[];usedThisTurn=[];
+  openingBattleHand();
   cardUses=0;discardChoice36=null;discardedThisTurn36=false;
   setScene();
   startTurn();
@@ -2798,7 +3035,7 @@ function resetRun(){
   heroDecisionBias=0;
   heroDecisionForced=false;
 
-  hand=shuffle(BASE_DECK.slice()).slice(0,4);
+  openingBattleHand();
   setScene();
   renderChronicleButton();
   log('v2.0 — UI 재배치 + 무기 연대기 기록 시스템 연결.','muted');
