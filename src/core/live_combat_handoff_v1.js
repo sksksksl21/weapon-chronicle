@@ -57,21 +57,10 @@ const WC_LIVE_COMBAT_HANDOFF_V1=(()=>{
 if(typeof module!=="undefined"&&module.exports)module.exports=WC_LIVE_COMBAT_HANDOFF_V1;
 
 if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
-  // Shared exact calculation: the same equipment snapshot drives the HUD and battle.
-  function wcCurrentUnifiedStats(weaponOverride=null,gearOverride=null){
-    return WC_LIVE_COMBAT_HANDOFF_V1.calculate({
-      owner:state.owner,
-      effectiveOwner:effectiveOwnerStats(),
-      rawOwner:rawOwnerStats(),
-      armorSurvival:armorSurvivalValue(),
-      maxHp:state.maxHp,
-      weapon:weaponOverride||state.weapon,
-      partCatalog:PART_CATALOG,
-      ownerEquipment:gearOverride||state.ownerEquipment,
-      gearCatalog:OWNER_GEAR_CATALOG,
-      foodBuff:state.foodBuff
-    },WC_LEGACY_COMBAT_SOURCES_V1,WC_COMBAT_MATH_V1);
-  }
+  // wcCurrentUnifiedStats is owned by direct_combat_runtime_v2.js.
+  // Both HUD rendering and combat handoff consume that V2 projection without
+  // applying owner rates or equipment modifiers again. Keep the legacy module
+  // API above for compatibility checks, outside the active runtime stat path.
   function wcRenderUnifiedStats(){
     const aside=document.querySelector(".wc41-weaponAside");
     if(!aside||!state?.weapon)return;
