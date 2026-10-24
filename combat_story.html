@@ -2864,7 +2864,7 @@ $('useAntidoteBtn').onclick=()=>useBattleItem('antidote');
 $('execBtn').onclick=executeTurn;
 $('battleDiscardBtn36').onclick=discardBattleCard36;
 $('resetBtn').onclick=resetRun;
-$('skipBtn').onclick=async()=>{ $('reactBar').className='reactBar'; if(phase==='heroReaction'){ phase='enemyResolve'; await resolveEnemyPhase(); } else if(phase==='enemyReaction'){ phase='postEnemy'; finishAfterEnemyReaction(); } };
+$('skipBtn').onclick=async()=>{ $('reactBar').className='reactBar'; if(phase==='heroReaction'){ if(pending?.speedBasic==='owner'){ pending=null; await endTurn(); } else { phase='enemyResolve'; await resolveEnemyPhase(); } } else if(phase==='enemyReaction'){ phase='postEnemy'; finishAfterEnemyReaction(); } };
 if(!STORY_MODE) loadChronicle();
 renderChronicleButton();
 resetRun();
