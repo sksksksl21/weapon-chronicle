@@ -187,38 +187,24 @@ function armorBody(){
  }).join("");
  const id=state.ownerEquipment?.[selectedArmor],item=OWNER_GEAR_CATALOG[id],title=ARMOR_SLOTS.find(x=>x[0]===selectedArmor)?.[1];
  const mods=item?.mods||{};
- const actual=WC_DIRECT_COMBAT_V2.migrateLegacyPart(mods,"armor",selectedArmor);
- const values=[
-  ["최소 공격력",actual.minAttack],["최대 공격력",actual.maxAttack],
-  ["방어력",actual.defense],["체력",actual.maxHp],
-  ["명중 %p",actual.hitBonus],["치명타 %p",actual.critBonus],
-  ["치명타 피해 %",actual.critDamageBonus],["관통",actual.penetration],
-  ["회피 %p",actual.evade],["상태 저항 %p",actual.statusResist],
-  ["막기 %p",actual.blockChance],["막기량",actual.blockAmount],
-  ["공격속도 증가 %",actual.speedPct],["방어력 보정",actual.defensePct*100]
- ];
- const effects=values.filter(([,v])=>Math.abs(n(v))>0.00001).map(([label,v])=>
-   label+" "+(v>0?"+":"")+Math.round(v*10)/10);
  return '<section class="wc3-panel"><h3>방어구 장착 상태</h3><div class="wc3-equipGrid">'+buttons+'</div></section>'+
  '<section class="wc3-panel"><h3>'+title+' 상세 정보</h3>'+
  '<div class="wc3-detail"><h4>'+escapeHtml(item?.name||"비어 있음")+'</h4>'+
  '<small>'+escapeHtml(item?.rarity||"미장착")+'</small><p>'+escapeHtml(item?.desc||"이 부위에 방어구를 장착할 수 있습니다.")+'</p>'+
- '<p>'+escapeHtml(effects.join(" · ")||"추가 효과 없음")+'</p>'+
- (item&&typeof WC_EQUIPMENT_POOL_V1!=="undefined"?WC_EQUIPMENT_POOL_V1.formatDetail(item):"")+'</div>'+
+ (item?finalEffects(mods,"armor",selectedArmor):'<p>추가 효과 없음</p>')+
+ (item&&typeof WC_EQUIPMENT_POOL_V1!=="undefined"?WC_EQUIPMENT_POOL_V1.formatDetail(item,true):"")+'</div>'+
  '<button class="wc3-primary" data-wc3-armor-equip="'+selectedArmor+'">장비 선택 / 교체</button></section>'+
  '<p class="wc3-note">투구·갑옷·신발은 보호·기동, 장갑은 공격 보조도 가능합니다. 공격형 옵션은 무예, 방어형 옵션은 생존으로 발휘됩니다.</p>';
 }
-function partEffects(mods){
- const v=WC_DIRECT_COMBAT_V2.migrateLegacyPart(mods||{},"weapon");
- const fields=[["최소 공격력",v.minAttack],["최대 공격력",v.maxAttack],
-  ["방어력",v.defense],["명중 %p",v.hitBonus],["치명타 확률 %p",v.critBonus],
-  ["치명타 추가 피해 %",v.critDamageBonus],["관통",v.penetration],
-  ["속도 증가 %",v.speedPct],["공명 최대",v.maxResonance],
-  ["공명 회복",v.resonanceRecovery],["공격력 보정 %",v.attackPct*100],
-  ["방어력 보정 %",v.defensePct*100]];
- return fields.filter(([,value])=>Math.abs(n(value))>0.00001)
-  .map(([name,value])=>name+" "+(value>0?"+":"")+Math.round(value*10)/10)
-  .join(" · ");
+// Equipment details show the owner-applied final contribution from the shared
+// direct calculator, never the raw legacy power/precision/toughness/handling.
+function finalEffects(mods,kind,slot){
+ const direct=WC_DIRECT_COMBAT_V2.migrateLegacyPart(mods||{},kind,slot);
+ const final=WC_DIRECT_COMBAT_V2.itemEffects(direct,{kind,slot,owner:wcDirectOwnerRates()});
+ const text=WC_DIRECT_COMBAT_V2.describeItemEffects(final).join(" · ");
+ return '<div class="wc3-formula"><b>소유자 발휘 최종값</b>'+
+  '<p>무예 '+final.martial+'% · 생존 '+final.survival+'% 발휘 적용</p>'+
+  '<p>'+escapeHtml(text||"수치 효과 없음")+'</p></div>';
 }
 function weaponBody(){
  const buttons=PART_SLOTS.map((slot,i)=>{
@@ -238,8 +224,8 @@ function weaponBody(){
   '<h4>'+escapeHtml(p?.name||"미장착")+' <span class="'+labelRarity(RARITY_DEF[p?.rarity]?.name||"일반")+'">'+
   escapeHtml(RARITY_DEF[p?.rarity]?.name||"일반")+'</span></h4>'+
   '<p>'+escapeHtml(p?.note||p?.passive||"파츠의 전투 기여도와 재료를 확인합니다.")+'</p>'+
-  '<p>'+escapeHtml(partEffects(p?.mods)||"수치 효과 없음")+'</p>'+
-  (p&&typeof WC_EQUIPMENT_POOL_V1!=="undefined"?WC_EQUIPMENT_POOL_V1.formatDetail(p):"")+
+  (p?finalEffects(p.mods,"weapon",selectedPart):'<p>수치 효과 없음</p>')+
+  (p&&typeof WC_EQUIPMENT_POOL_V1!=="undefined"?WC_EQUIPMENT_POOL_V1.formatDetail(p,true):"")+
   '<small>내구 '+Math.round(n(state.weapon.dur))+' / '+Math.round(n(state.weapon.maxDur))+
   ' · 공명 '+Math.round(n(state.weapon.resonance))+' / '+Math.round(n(state.weapon.maxResonance))+'</small></section>';
 }

@@ -121,7 +121,24 @@ function expand(parts,gear,rarityDef){
  }
  return counts;
 }
-function formatDetail(item){
+function statLabel(key){
+ for(const [k,label] of W_STATS)if(k===key)return label;
+ for(const list of Object.values(A_STATS))for(const [k,label] of list)if(k===key)return label;
+ return key;
+}
+// Smith/shop details: owner-applied final values from the shared direct calculator.
+function ownerFinalDetail(item){
+ if(typeof WC_DIRECT_COMBAT_V2==="undefined"||typeof wcDirectOwnerRates!=="function")return "";
+ try{
+  const armor=A_SLOTS.includes(item.slot),kind=armor?"armor":"weapon",slot=armor?item.slot:"blade";
+  const direct=WC_DIRECT_COMBAT_V2.migrateLegacyPart(item.mods||{},kind,slot);
+  const final=WC_DIRECT_COMBAT_V2.itemEffects(direct,{kind,slot,owner:wcDirectOwnerRates()});
+  const text=WC_DIRECT_COMBAT_V2.describeItemEffects(final).join(" · ")||"수치 효과 없음";
+  return '<p class="wc5-final"><b>현재 소유자 발휘 최종값</b> (무예 '+final.martial+'% · 생존 '+
+   final.survival+'%) '+text+'</p>';
+ }catch(e){console.warn("Owner final detail skipped",e);return "";}
+}
+function formatDetail(item,noFinal){
  if(!item)return "";
  const tier=TIERS.find(t=>t.id===item.rarity);
  const options=(item.options||[]).map(o=>o.name+" +"+o.value);
@@ -133,7 +150,8 @@ function formatDetail(item){
    options.length?'<p>추가 옵션 '+options.map((v,i)=>(i+1)+". "+v).join(" · ")+'</p>':
    '<p>추가 옵션 없음 · 기본 수치에 품질 변동 적용</p>')+
   (unique?'<p class="wc5-unique">고유 효과 · '+unique.name+' — '+unique.description+
-    ' ('+unique.key+' +'+unique.value+')</p>':'')+'</div>';
+    ' ('+statLabel(unique.key)+' +'+unique.value+')</p>':'')+
+  (noFinal?'':ownerFinalDetail(item))+'</div>';
 }
 function rarityClass(item){return "rarity-"+(TIERS.some(t=>t.id===item?.rarity)?item.rarity:(item?.rarity==="beyond"?"chronicle":"common"));}
 function decorateCardHTML(html,item){

@@ -67,6 +67,44 @@ function calculate({owner={},weapon={},parts={},armor={},base=BASE}={}){
  };
  return Object.freeze(result);
 }
+// Per-item owner-applied contribution for equipment detail views. Reuses
+// calculate() so displays never diverge from combat; percentage stats use a
+// neutral offset base so negative rolls are not clamped away.
+const DETAIL_BASE=Object.freeze({hitChance:50,critChance:50,evade:50,statusResist:50,blockChance:50});
+function itemEffects(direct={},{kind="weapon",slot="",owner={}}={}){
+ const holder=kind==="armor"?{armor:{[slot]:direct}}:{parts:{[PART_SLOTS.includes(slot)?slot:"blade"]:direct}};
+ const r=calculate({owner:{...owner,baseHp:0},...holder,base:DETAIL_BASE});
+ const stable=clamp(n(owner.stableSurvival,owner.survival),0,100)/100;
+ return Object.freeze({
+  martial:r.martial,survival:r.survival,stableSurvival:Math.round(stable*100),
+  minAttack:r.minAttack,maxAttack:r.maxAttack,defense:r.defense,
+  maxHp:rounded(n(direct.maxHp)*stable),
+  hitBonus:rounded(r.hitChance-50),critBonus:rounded(r.critChance-50),
+  critDamageBonus:r.critDamageBonus,penetration:r.penetration,
+  evade:rounded(r.evade-50),statusResist:rounded(r.statusResist-50),
+  blockChance:rounded(r.blockChance-50),blockAmount:r.blockAmount,
+  critChanceResist:r.critChanceResist,critDamageResist:r.critDamageResist,
+  speedPct:rounded(r.attackSpeed-100),
+  maxResonance:r.maxResonance,resonanceRecovery:r.resonanceRecovery
+ });
+}
+const EFFECT_LABELS=Object.freeze([
+ ["방어력","defense",""],["체력","maxHp",""],["명중","hitBonus","%p"],
+ ["치명타 확률","critBonus","%p"],["치명타 피해","critDamageBonus","%"],["관통","penetration",""],
+ ["회피","evade","%p"],["상태 저항","statusResist","%p"],["막기 확률","blockChance","%p"],
+ ["막기량","blockAmount",""],["치명타 확률 저항","critChanceResist","%p"],
+ ["치명타 피해 저항","critDamageResist","%p"],["공격속도","speedPct","%"],
+ ["최대 공명","maxResonance",""],["공명 회복","resonanceRecovery",""]
+]);
+function describeItemEffects(e={}){
+ const out=[];
+ if(n(e.maxAttack)>0||n(e.minAttack)>0)out.push("공격력 "+n(e.minAttack)+" ~ "+n(e.maxAttack));
+ for(const [label,key,unit] of EFFECT_LABELS){
+  const v=Math.round(n(e[key])*10)/10;
+  if(Math.abs(v)>0.00001)out.push(label+" "+(v>0?"+":"")+v+unit);
+ }
+ return out;
+}
 function resolveStrike({attacker={},defender={},hitRoll,critRoll,blockRoll,damageRoll,
   cardMultiplier=1,temporaryDefense=0}={}){
  const hit=clamp(n(attacker.hitChance)-n(defender.evade),0,100);
@@ -138,6 +176,7 @@ function migrateLegacyLoadout({weapon={},partCatalog={},equipment={},gearCatalog
  });
  return {weapon:migrateLegacyPart(residual,"weapon"),parts,armor};
 }
-return Object.freeze({PART_SLOTS,ARMOR_SLOTS,BASE,calculate,resolveStrike,migrateLegacyPart,migrateLegacyLoadout});
+return Object.freeze({PART_SLOTS,ARMOR_SLOTS,BASE,calculate,resolveStrike,migrateLegacyPart,migrateLegacyLoadout,
+ itemEffects,describeItemEffects});
 })();
 if(typeof module!=="undefined"&&module.exports)module.exports=WC_DIRECT_COMBAT_V2;
