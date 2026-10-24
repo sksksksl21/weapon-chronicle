@@ -312,7 +312,23 @@ function css(){
  '.wc3-card:disabled{opacity:.45}.wc3-rarity{font-size:10px;padding:2px;border-radius:3px}' +
  '.wc3-rare{color:#3270a8}.wc3-unique{color:#8c4aaf}.wc3-legend{color:#b16c15}' +
  '.wc3-actions{display:flex;gap:7px;margin:9px 0}.wc3-actions button{padding:8px;border-radius:7px;border:1px solid #bfa47c}' +
- '@media(max-width:390px){.wc3-deckGrid{grid-template-columns:repeat(5,minmax(0,1fr))}.wc3-card strong{font-size:9px}}';
+ // Scope status colors to the shared dark modal theme.
+ '.wc3-status{color:var(--wc38-ink,#eee1cf);line-height:1.5;min-width:0}' +
+ '.wc3-status .tabRow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px}.wc3-status .tabBtn{background:#223248;color:#e7d3b0;border-color:#836b48;font-size:12px;min-height:40px;min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.5}.wc3-status .tabBtn.active{background:#8b6a43;color:#fffaf1;border-color:#ecd5a9}' +
+ '.wc3-status .wc3-panel,.wc3-status .wc3-hero{background:linear-gradient(140deg,#233040,#14202d);color:var(--wc38-ink,#eee1cf);border:1px solid #836b48}' +
+ '.wc3-status h3,.wc3-status h4{color:#ecd5a9}.wc3-status .wc3-panel p{font-size:12px}' +
+ '.wc3-status .wc3-panel small,.wc3-status .wc3-sectionTitle small,.wc3-status .wc3-ability>small,.wc3-status .wc3-note,.wc3-status .wc3-migrationNote,.wc3-status .wc3-statRows span,.wc3-status .wc3-equip em{color:var(--wc38-muted,#c3af90);font-size:11px;line-height:1.5}.wc3-status .wc3-note{font-size:11px!important}' +
+ '.wc3-status .wc3-ability,.wc3-status .wc3-directStat,.wc3-status .wc3-statRows div,.wc3-status .wc3-detail,.wc3-status .wc3-formula,.wc3-status .wc3-story{background:#152131;color:var(--wc38-ink,#eee1cf);border-color:#796346}' +
+ '.wc3-status .wc3-directStat strong,.wc3-status .wc3-ability>strong{color:#f3dfb7}.wc3-status .wc3-directDetails{border-color:#796346}.wc3-status .wc3-directDetails summary{color:#ecd5a9}' +
+ '.wc3-status .wc3-avatar{background:#243a4f;color:#f3dfb7}.wc3-status .wc3-sword{background:radial-gradient(ellipse,#27374a,#0b1320)}' +
+ '.wc3-status .wc3-ownerEquip,.wc3-status .wc3-equip,.wc3-status .wc3-part,.wc3-status .wc3-card,.wc3-status .wc3-actions button{background:#223248;color:#f1dfc6!important;border-color:#836b48}' +
+ '.wc3-status .wc3-ownerEquip small{white-space:normal;overflow-wrap:anywhere;line-height:1.5}.wc3-status .wc3-primary{background:#8b6a43!important;color:#fffaf1!important}' +
+ '.wc3-status .wc3-equip.active,.wc3-status .wc3-part.active,.wc3-status .wc3-card.active{outline:2px solid #f3ca78;outline-offset:1px;background:#314152;box-shadow:none}' +
+ '.wc3-status .wc3-rare,.wc3-status .wc5-grade-rare{color:#91bff1}.wc3-status .wc3-unique,.wc3-status .wc5-grade-unique{color:#d0aff3}.wc3-status .wc3-legend,.wc3-status .wc5-grade-legendary{color:#f1ce80}' +
+ '.wc3-status .wc5-quality{background:#101c2b}.wc3-status .wc5-grade-common{color:#c3cbd3}.wc3-status .wc5-grade-chronicle,.wc3-status .wc5-grade-beyond,.wc3-status .wc5-unique{color:#f2a4b4}' +
+ '.wc3-status .wc3-card strong{font-size:12px;line-height:1.4}.wc3-status .wc3-card em,.wc3-status .wc3-part small{font-size:11px}.wc3-status .wc3-part b{font-size:11px;line-height:1.4}' +
+ '.wc3-status .wc3-card:disabled{opacity:1;background:#152131;color:#a8b3bf!important}.wc3-status button:focus-visible{outline:2px solid #f3ca78;outline-offset:2px}' +
+ '@media(max-width:430px){.wc3-status .wc3-deckGrid,.wc3-status .wc3-inventoryGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.wc3-status .wc3-sectionTitle,.wc3-status .wc3-actions{flex-wrap:wrap}}';
  document.head.appendChild(el);
 }
 function draw(tab){
@@ -321,7 +337,7 @@ function draw(tab){
  const nav='<div class="tabRow">'+tabs.map(([id,label])=>'<button class="tabBtn'+(id===tab?' active':'')+
  '" data-wc3-tab="'+id+'">'+label+'</button>').join("")+'</div>';
  const body=tab==="owner"?ownerBody():tab==="gear"?armorBody():tab==="weapon"?weaponBody():skillBody();
- openModal(modalHead("상태 정보",escapeHtml(state.owner.name)+" · 소유자와 검의 기록")+nav+body);
+ openModal(modalHead("상태 정보",escapeHtml(state.owner.name)+" · 소유자와 검의 기록")+'<div class="wc3-status">'+nav+body+'</div>');
  bindClose();
  document.querySelectorAll("[data-wc3-tab]").forEach(e=>e.onclick=()=>draw(e.dataset.wc3Tab));
  document.querySelectorAll("[data-wc3-armor]").forEach(e=>e.onclick=()=>{selectedArmor=e.dataset.wc3Armor;draw("gear");});

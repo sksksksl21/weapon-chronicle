@@ -43,6 +43,7 @@ const ctx={
  loadGame:()=>false,resetOwnerAssetsForSuccessor(){},openStatus(){},launchStoryCombat:()=>true
 };
 vm.createContext(ctx);
+vm.runInContext(fs.readFileSync(path.join(__dirname,"../src/core/direct_combat_stats_v2.js"),"utf8"),ctx);
 vm.runInContext(source,ctx);
 const deck=vm.runInContext("WC_STATUS_SKILLDECK_V1",ctx);
 assert.equal(deck.OWNERS.length,12);

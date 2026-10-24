@@ -49,7 +49,10 @@ body{display:flex;justify-content:center}
 .side{display:flex;flex-direction:column;gap:4px;min-width:0}
 .nrow{display:flex;justify-content:space-between;align-items:flex-end;gap:4px}
 .nm{font-size:11px;font-weight:1000}
-.pow{font-size:10px;color:#7d6f5e;font-weight:800;white-space:nowrap}
+.pow{font-size:9px;color:#7d6f5e;font-weight:800;white-space:normal;line-height:1.3}
+.statusGrid .nrow{display:block;min-width:0}
+.statusGrid .pow{margin-top:3px}
+.statusGrid .pow span{display:block;overflow-wrap:anywhere}
 .bar{height:18px;border:2px solid #bca98a;border-radius:6px;overflow:hidden;background:#c9bfae;position:relative}
 .fill{height:100%}
 .fill.hero{background:#2e9b84}
@@ -601,9 +604,9 @@ body.storyMode .actions #resetBtn{display:none!important}
 <body>
 <div class="app">
   <section class="panel topbar">
-    <div class="title">Weapon Chronicle · 전투 v4.6.1</div>
+    <div class="title">Weapon Chronicle · 전투 DEV</div>
     <div class="meta">
-      <span>스토리 전투 · Core Deck</span>
+      <span>스토리 전투 · 순환 손패</span>
       <button class="topMini" id="chronicleBtn">연대기 0</button>
     </div>
   </section>
@@ -700,7 +703,7 @@ body.storyMode .actions #resetBtn{display:none!important}
     </div>
     <div class="overdriveBar">
       <button class="odBtn" id="overdriveBtn">OVERDRIVE · OFF</button>
-      <div class="odRisk" id="overdriveRisk">사용/버림 합계 턴당 1장 · 보충 없음</div>
+      <div class="odRisk" id="overdriveRisk">매 턴 손패 1장 보충 · 최대 4장 · 턴당 개입 1회</div>
     </div>
     <details class="battleItemsFold361"><summary>전투 소모품 <span>붕대 · 응급약 · 해독약</span></summary>
       <div class="itemBar" id="itemBar">
@@ -869,6 +872,12 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
   const SWORD = Object.freeze(["blade","guard","tang","grip","wrap","pommel","seat","scabbard"]);
   const ARMOR = Object.freeze(["helmet","armor","gloves","boots"]);
   const FLATS = Object.freeze(["attack","defense","speed","crit","penetration","maxResonance","resonanceRecovery"]);
+  // Defensive equipment never grants offensive stats, even when older
+  // catalog entries contain an attack/critical/penetration field. Preserve
+  // original save/catalog data; ignore only those effects in unified combat.
+  const BOOT_MOBILITY = Object.freeze({
+    rope_sandals:4,traveler_boots:6,iron_greaves:-3,climber_boots:8
+  });
   function num(value) {
     if (value === "" || value === null || value === undefined) return 0;
     const n = Number(value);
@@ -889,13 +898,20 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
       attackPct:num(mods.attackPct), defensePct:num(mods.defensePct), speedPct:num(mods.speedPct)
     };
   }
-  function armorValues(mods) {
+  function armorValues(mods,slot,itemId) {
+    const footwear=slot==="boots";
     return {
-      attack:num(mods.attack), defense:num(mods.defense),
-      speed:num(mods.speed), crit:num(mods.crit),
-      penetration:num(mods.penetration), maxHp:num(mods.maxHp),
-      attackPct:num(mods.attackPct), defensePct:num(mods.defensePct), speedPct:num(mods.speedPct)
+      attack:0, crit:0, penetration:0, attackPct:0,
+      defense:num(mods.defense), maxHp:num(mods.maxHp),
+      defensePct:num(mods.defensePct),
+      speed:footwear ? num(mods.speed)+num(BOOT_MOBILITY[itemId]) : 0,
+      speedPct:footwear ? num(mods.speedPct) : 0
     };
+  }
+  function armorContribution(slot,itemId,gearCatalog={}) {
+    if(!ARMOR.includes(slot))throw new RangeError("Unknown armor slot: "+slot);
+    const entry=itemId&&gearCatalog?.[itemId],valid=entry?.slot===slot;
+    return armorValues(valid?(entry.mods||{}):{},slot,valid?itemId:null);
   }
   function fromLegacyLoadout({ownerCombat={},totalMaxHp,weapon={},partCatalog={},
     ownerEquipment={},gearCatalog={},buffs={},legacyVitals}={}) {
@@ -905,10 +921,8 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
     }
     const armor = {};
     for (const slot of ARMOR) {
-      const entry = ownerEquipment?.[slot] && gearCatalog?.[ownerEquipment[slot]];
-      // The saved equipped item must actually belong to the expected slot.
-      const mods = entry?.slot === slot ? (entry.mods||{}) : {};
-      armor[slot] = armorValues(mods);
+      // One role mapping for combat and equipment details.
+      armor[slot] = armorContribution(slot,ownerEquipment?.[slot],gearCatalog);
     }
     // Legacy ownerVitalCaps: clamp(round(65 + rawSurvival*4 +
     // boldness/age modifiers + fixed equipment HP), 58, 170).
@@ -968,6 +982,13 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
     };
     const base = {};
     for (const key of FLATS) {
+      // Legacy recalcWeapon aggregates power/precision/toughness/handling and
+      // resonance, but has NO aggregate penetration field. New part affixes
+      // own penetration directly; do not subtract those from a missing total.
+      if(key==="penetration"&&(weapon.penetration===undefined||weapon.penetration===null)){
+        base[key]=0;
+        continue;
+      }
       base[key] = totals[key] - SWORD.reduce((sum,slot)=>sum+weaponParts[slot][key],0);
     }
     // Explicit baseline permanent bonuses remain separate from part modifiers.
@@ -985,7 +1006,7 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
       }
     };
   }
-  return Object.freeze({SWORD,ARMOR,fromLegacyLoadout,enemyFromLegacy});
+  return Object.freeze({SWORD,ARMOR,armorContribution,fromLegacyLoadout,enemyFromLegacy});
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = WC_LEGACY_COMBAT_SOURCES_V1;
 
@@ -1201,12 +1222,12 @@ const CARD_DB={
  escapeMemory:{cost:18,name:"죽음 옆을 스친 발",type:"순간기억",timing:"pre",effect:"적 명중 -35%",flavor:"죽을 공격을 반 걸음 차이로 흘렸다.",exhaust:true,moment:true},
  gritMemory:{cost:20,name:"부러지지 않은 밤",type:"순간기억",timing:"pre",effect:"이번 턴 받는 피해 ×0.50",flavor:"큰 일격을 맞고도 검을 놓지 않았다.",exhaust:true,moment:true}
 };
-const BASE_DECK=["aim1","aim2","guard","over","blood","feint","giant","last","reroll","reverse","counter","endure"];
-if(STORY_SKILLS.has('carapace_gap')) BASE_DECK.push('storyGap');
-if(STORY_SKILLS.has('left_behind')) BASE_DECK.push('storyLeft');
-if(STORY_SKILLS.has('silent_prayer')) BASE_DECK.push('storyPrayer');
-if(STORY_SKILLS.has('cyclops_gap')) BASE_DECK.push('mainCyclops');
-if(STORY_SKILLS.has('carry_them')) BASE_DECK.push('mainCarry');
+const BASE_DECK=(()=>{const fallback=["aim1","guard","over","blood","feint","giant","reroll","reverse","counter","endure"];const raw=STORY_FRAME?.dataset?.skillDeck||STORY_PARAMS.get("skillDeck")||"";try{const cards=JSON.parse(raw);if(Array.isArray(cards)&&cards.length===10&&new Set(cards).size===10&&cards.every(id=>typeof id==="string"&&CARD_DB[id]))return cards;}catch(e){}return fallback;})();
+// Earned story cards enter only when equipped in the ten-slot deck.
+// Earned story cards enter only when equipped in the ten-slot deck.
+// Earned story cards enter only when equipped in the ten-slot deck.
+// Earned story cards enter only when equipped in the ten-slot deck.
+// Earned story cards enter only when equipped in the ten-slot deck.
 
 const CARD_TAGS={
   aim1:["정밀"],aim2:["정밀"],guard:["방어"],over:["과출력"],blood:["피"],
@@ -1612,7 +1633,8 @@ function recordCardUse(id){
 function grantMoment(id,reason){
   if(momentGenerated[id]) return;
   momentGenerated[id]=true;
-  // Record a new memory in the chronicle; this battle never receives replacement cards.
+  // A newly acquired one-shot memory enters the draw pile for a later turn.
+  if(CARD_DB[id] && !hand.includes(id) && !deck.includes(id) && !discard.includes(id) && !exhausted.includes(id)) deck.unshift(id);
   showBanner("MEMORY BORN · "+CARD_DB[id].name);
   log("순간기억 생성 — "+CARD_DB[id].name+" / "+reason,"good");
   addChronicle('memory',CARD_DB[id].name,reason,8);
@@ -1882,8 +1904,8 @@ function renderWeakness(){
   if(txt){s.textContent=txt;s.className='enemyState show';}
   else{s.textContent='';s.className='enemyState';}
 }
-function renderOverdrive(){ $('overdriveBtn').hidden=true; $('overdriveRisk').textContent=hand.length?'한 턴에 기억카드 1장 사용 또는 버림 · 보충 없음':'손패 소진 · 소유자 자동전투 계속'; }
-function renderCombo(){ const b=$('comboBar'); b.className='comboBar'; b.textContent='MEMORY · 사용/버림 합계 턴당 1장 · 보충 없음'; }
+function renderOverdrive(){ $('overdriveBtn').hidden=true; $('overdriveRisk').textContent='매 턴 시작 시 손패 빈칸 1장 보충 · 사용/버림 합계 턴당 1장'; }
+function renderCombo(){ const b=$('comboBar'); b.className='comboBar'; b.textContent='MEMORY · 사용/버림 턴당 1장 · 덱 소진 시 버린 카드 순환'; }
 function toggleOverdrive(){ return; } // One intervention per turn has no two-card override.
 function exposeEnemy(){ if(enemy.exposed) return; enemy.exposed=true; showBanner(weakness().name+'!'); log(weakness().desc+` — 다음 ${hero.name} 행동에 약점 보너스.`,'warn'); render(); }
 function consumeExposure(){ if(enemy.exposed){enemy.exposed=false;log('약점 노출 종료.','muted');} }
@@ -1911,7 +1933,7 @@ function discardBattleCard36(){
  const id=discardChoice36;
  if(!canDiscardBattleCard36(id))return;
  removeHand(id);discard.push(id);cardUses=1;discardedThisTurn36=true;discardChoice36=null;
- log('기억카드 「'+displayCardName(id)+'」를 버렸다. 이번 턴 개입 종료 · 보충 없음.','warn');
+ log('기억카드 「'+displayCardName(id)+'」를 버렸다. 이번 턴 개입 종료 · 다음 턴 1장 보충.','warn');
  showBanner('기억 정리');render();
 }
 function battleImpact36(label){
@@ -1997,12 +2019,16 @@ function useBattleItem(id){
 function render(){
   $('heroName').textContent=hero.name;
   hero.pow=hero.martial*1.4+hero.survival*.8+hero.weapon.power*.65+hero.weapon.precision*.35+hero.weapon.handling*.3+hero.weapon.toughness*.25;
-  $('heroPow').textContent=`전투력 ${hero.pow.toFixed(1)}`;
+  if(LIVE_ACTOR){
+    $('heroPow').innerHTML=`<span>공 ${LIVE_ACTOR.attack.toFixed(1)} · 방 ${LIVE_ACTOR.defense.toFixed(1)}</span><span>속 ${LIVE_ACTOR.attackSpeed.toFixed(0)} · 치 ${LIVE_ACTOR.critChance.toFixed(0)}% · 관 ${LIVE_ACTOR.penetration.toFixed(1)}</span>`;
+  }else $('heroPow').textContent=`전투력 ${hero.pow.toFixed(1)}`;
   $('heroFill').style.width=(hero.hp/hero.maxHp*100)+'%';
   $('heroHp').textContent=`${hero.hp.toFixed(1)} / ${hero.maxHp.toFixed(1)}`;
 
   $('enemyName').textContent=stage().name;
-  $('enemyPow').textContent=`전투력 ${stage().pow.toFixed(1)}`;
+  if(enemy.unified){
+    $('enemyPow').innerHTML=`<span>공 ${enemy.unified.attack.toFixed(1)} · 방 ${enemy.unified.defense.toFixed(1)}</span><span>속 ${enemy.unified.attackSpeed.toFixed(0)} · 치 ${enemy.unified.critChance.toFixed(0)}% · 관 ${enemy.unified.penetration.toFixed(1)}</span>`;
+  }else $('enemyPow').textContent=`전투력 ${stage().pow.toFixed(1)}`;
   $('enemyFill').style.width=(enemy.hp/enemy.maxHp*100)+'%';
   $('enemyHp').textContent=`${enemy.hp.toFixed(1)} / ${enemy.maxHp.toFixed(1)}`;
 
@@ -2039,6 +2065,24 @@ function canUseCard(id){
   return false;
 }
 function removeHand(id){ const i=hand.indexOf(id); if(i>=0) hand.splice(i,1); }
+
+/* Four-slot rotating memory hand: one replacement at each new turn.
+ * No bonus-attack or reaction refill; exhausted cards never return.
+ */
+function openingBattleHand(){
+  deck=shuffle(BASE_DECK.slice());
+  hand=deck.splice(0,4);
+}
+function refillBattleHandOnce(){
+  if(hand.length>=4)return false;
+  if(!deck.length && discard.length){
+    deck=shuffle(discard.splice(0));
+    log('버린 기억카드를 다시 섞었다.','muted');
+  }
+  if(!deck.length)return false;
+  hand.push(deck.shift());
+  return true;
+}
 function useCard(id){
   const c=CARD_DB[id];
   if(!canUseCard(id)) return;
@@ -2283,6 +2327,7 @@ function startTurn(){
     log('독 피해 — HP -4 ('+hero.poisonTurns+'T 남음).','bad');
     if(hero.hp<=0){render();runEnd();return;}
   }
+  if(turn>1) refillBattleHandOnce();
   enemyIntent=chooseEnemyIntent();
   heroPlan=chooseHeroPlan();
   selectedPre=[];discardChoice36=null;discardedThisTurn36=false;
@@ -2695,9 +2740,9 @@ function nextStage(){
   stageIndex++;
   enemy=makeEnemy();
   turn=1;
-  // A new encounter receives four cards; no card recycles inside a battle.
-  hand=shuffle(BASE_DECK.slice()).slice(0,4);
-  deck=[];discard=[];exhausted=[];selectedPre=[];usedThisTurn=[];
+  // Each encounter shuffles the complete card pool. Used non-exhaust cards can cycle.
+  discard=[];exhausted=[];selectedPre=[];usedThisTurn=[];
+  openingBattleHand();
   cardUses=0;discardChoice36=null;discardedThisTurn36=false;
   setScene();
   startTurn();
@@ -2798,7 +2843,7 @@ function resetRun(){
   heroDecisionBias=0;
   heroDecisionForced=false;
 
-  hand=shuffle(BASE_DECK.slice()).slice(0,4);
+  openingBattleHand();
   setScene();
   renderChronicleButton();
   log('v2.0 — UI 재배치 + 무기 연대기 기록 시스템 연결.','muted');
