@@ -37,3 +37,11 @@ function wcDirectCurrentStats(weaponOverride=null,gearOverride=null){
  return Object.freeze({...result,ownerRates:Object.freeze(rates),
   migration:Object.freeze({version:"legacy-v5.2-preview",audited:false})});
 }
+// The live handoff and status UI share the direct calculator. This compatibility
+// projection must never apply owner rates or equipment modifiers a second time.
+function wcCurrentUnifiedStats(weaponOverride=null,gearOverride=null){
+ const result=wcDirectCurrentStats(weaponOverride,gearOverride);
+ return Object.freeze({...result,
+  attack:(result.minAttack+result.maxAttack)/2
+ });
+}
