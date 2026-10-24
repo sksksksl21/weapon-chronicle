@@ -38,7 +38,7 @@
     {
       "name": "aftermath persisted",
       "passed": true,
-      "detail": "{'winds': {'path': 'a', 'text': '표류의 경위가 기록되어 다음 항구에서도 항해사들의 증언을 들을 수 있게 됐다.', 'year': 1, 'month': 1, 'owner': '이름 없는 선원'}}"
+      "detail": "{'winds': {'path': 'a', 'text': '표류의 경위가 기록되어 다음 항구에서도 항해사들의 증언을 들을 수 있게 됐다.', 'year': 1, 'month': 1, 'owner': '니케'}}"
     },
     {
       "name": "aftermath completed removed from candidates",
