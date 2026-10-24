@@ -22,6 +22,8 @@ function calculate({owner={},weapon={},parts={},armor={},base=BASE}={}){
  const armorPieces=ARMOR_SLOTS.map(k=>armor[k]||{});
  const attackItems=[weapon,...weaponParts,armor.gloves||{}];
  const defenseItems=[weapon,...weaponParts,...armorPieces];
+ // Boots are the only armor speed source (migrateLegacyPart zeroes others).
+ const speedItems=[...attackItems,armor.boots||{}];
  const atkPct=sum(attackItems,"attackPct");
  const defPct=sum(defenseItems,"defensePct");
  const gearMin=sum(attackItems,"minAttack")*(1+atkPct);
@@ -49,7 +51,7 @@ function calculate({owner={},weapon={},parts={},armor={},base=BASE}={}){
   evade:pct(n(base.evade)+sum(defenseItems,"evade")*s),
   blockChance:pct(n(base.blockChance)+sum(defenseItems,"blockChance")*s),
   blockAmount:Math.max(0,rounded(sum(defenseItems,"blockAmount")*s)),
-  attackSpeed:Math.max(1,rounded(100*(1+sum(attackItems,"speedPct")*m/100))),
+  attackSpeed:Math.max(1,rounded(100*(1+sum(speedItems,"speedPct")*m/100))),
   maxResonance:Math.max(0,rounded(sum(resSources,"maxResonance"))),
   resonanceRecovery:Math.max(0,rounded(sum(resSources,"resonanceRecovery"))),
   breakdown:Object.freeze({
@@ -59,7 +61,7 @@ function calculate({owner={},weapon={},parts={},armor={},base=BASE}={}){
    baseHitChance:n(base.hitChance,70),baseCritChance:n(base.critChance,5),
    gearHitBonus:rounded(sum(attackItems,"hitBonus")),
    gearCritBonus:rounded(sum(attackItems,"critBonus")),
-   gearSpeedPct:rounded(sum(attackItems,"speedPct")),
+   gearSpeedPct:rounded(sum(speedItems,"speedPct")),
    gearHpBonus:rounded(hpBonus)
   })
  };
