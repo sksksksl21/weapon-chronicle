@@ -1,10 +1,15 @@
 """Real parent-to-battle personality transfer and decision-weight regression."""
 from pathlib import Path
 import base64
+import sys
 from playwright.sync_api import sync_playwright
 
 ROOT=Path(__file__).resolve().parents[1]
-COMBAT=(ROOT/'src/combat/story_combat.html').read_text(encoding='utf8')
+sys.path.insert(0,str(ROOT/'tools'))
+from build_sources import compose
+EXPECTED_HTML,_,COMBAT_BYTES=compose(ROOT)
+# Instrument the built combat document, not the unexpanded source template.
+COMBAT=COMBAT_BYTES.decode('utf8')
 PROBE="""window.__personalityAudit={
  read:()=>{
   let weights=null;
@@ -25,7 +30,8 @@ MARK="resetRun();\n})();"
 assert COMBAT.count(MARK)==1
 INSTRUMENTED=COMBAT.replace(MARK,PROBE+"\n"+MARK)
 HTML=(ROOT/'index.html').read_text(encoding='utf8')
-ORIGINAL=base64.b64encode(COMBAT.encode('utf8')).decode('ascii')
+assert HTML==EXPECTED_HTML,"Generated index.html is out of date: run npm run build"
+ORIGINAL=base64.b64encode(COMBAT_BYTES).decode('ascii')
 assert HTML.count(ORIGINAL)==1,"Combat HTML is not built from source"
 HTML=HTML.replace(ORIGINAL,base64.b64encode(INSTRUMENTED.encode('utf8')).decode('ascii'))
 APP="""window.__personalityApp={
