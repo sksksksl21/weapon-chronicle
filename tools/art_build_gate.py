@@ -90,10 +90,19 @@ def verify(root, v2_root=None):
     if {p.name for p in managed.iterdir()}!={'assets','manifest.json'}:
         raise ArtBuildBlocked('V2 승인 폴더에 알 수 없는 파일이 포함됐습니다.')
 
-    home=Path(v2_root or os.environ.get('AI_DEV_STUDIO_V2_ROOT','')).expanduser()
-    if not (v2_root or os.environ.get('AI_DEV_STUDIO_V2_ROOT')):
-        raise ArtBuildBlocked('V2 관리 이미지 빌드에는 현재 승인 상태를 읽을 AI_DEV_STUDIO_V2_ROOT가 필요합니다.')
-    home=home.resolve()
+    supplied=v2_root or os.environ.get('AI_DEV_STUDIO_V2_ROOT')
+    if not supplied:
+        # The V2 Windows import is always inside <V2 root>/workspaces/.
+        # Discover only an ancestor that actually owns this checkout.
+        for candidate in root.parents:
+            if (root.is_relative_to(candidate/'workspaces') and
+                    (candidate/'data'/'studio.sqlite3').is_file() and
+                    (candidate/'app'/'art_release.py').is_file()):
+                supplied=candidate
+                break
+    if not supplied:
+        raise ArtBuildBlocked('V2 관리 이미지 빌드에는 등록된 Windows V2 작업 공간 또는 AI_DEV_STUDIO_V2_ROOT가 필요합니다.')
+    home=Path(supplied).expanduser().resolve()
     db=home/'data'/'studio.sqlite3'
     if not db.is_file() or not (home/'app'/'art_release.py').is_file():
         raise ArtBuildBlocked('Windows V2 관리 서버 코드 또는 데이터베이스에 접근할 수 없습니다.')
