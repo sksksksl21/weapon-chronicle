@@ -1,5 +1,12 @@
 # Weapon Chronicle — Codex / GitHub Codespaces baseline (v5.2)
 
+## V2 Art Bible-managed image build gate (2026-11-02, dev only)
+
+The normal `npm run build` now invokes `tools/art_build_gate.py` before touching generated HTML. The existing game and historic sprites build as before when `assets/v2-managed` is absent. If that directory exists, only explicitly approved, SHA-256-verified image files from the currently active AI Dev Studio V2 Art Bible release pass. Invalid/missing V2 proof, stale style version, modified images, extra files or manipulated manifests fail with `ART_GATE_BLOCKED`. The Windows V2 parent is discovered when this repository lives under its `workspaces` directory, or can be set with `AI_DEV_STUDIO_V2_ROOT`. There is no skip switch for managed assets.
+
+The V2 mobile workspace can prepare a verified art bundle and, when this clean `dev` project is connected and explicitly requested, place it at `assets/v2-managed`. This **does not** commit/push it, add images to the old generated HTML, or make the browser-only `play-dev.html` a trusted art release. Art Bible draft images remain unapproved until the user explicitly locks the style. See `docs/ART_APPROVAL_GATE.md`.
+
+
 This repository preserves the **v5.2 playable web baseline** while establishing Git/Codex/Codespaces development. This migration does not rewrite battle, story, or save rules.
 
 ## Mobile DEV live preview (source-built)
