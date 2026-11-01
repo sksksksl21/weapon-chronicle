@@ -39,6 +39,11 @@ def verify(root, v2_root=None):
     """Return legacy/verified state, or stop the build before generating HTML."""
     root=Path(root).resolve()
     managed=root/MANAGED
+    assets_root=root/'assets'
+    if assets_root.is_symlink() or (assets_root.exists() and not _safe_dir(assets_root)):
+        raise ArtBuildBlocked('게임 이미지 상위 경로가 안전하지 않습니다.')
+    if managed.exists() and not managed.resolve().is_relative_to(root):
+        raise ArtBuildBlocked('V2 관리 이미지 경로가 게임 루트 밖을 가리킵니다.')
     if not managed.exists() and not managed.is_symlink():
         return {'state':'legacy_unmodified','managed_assets':0}
     if not _safe_dir(managed):
