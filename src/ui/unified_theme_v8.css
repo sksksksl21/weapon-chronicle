@@ -1,0 +1,254 @@
+/* Weapon Chronicle — unified dark-fantasy visual language.
+ * Reference principles: readable action hierarchy, subdued brass highlights,
+ * tactile surfaces; original artwork and gameplay flow remain untouched.
+ * This single sheet is shared by offline build and both dev previews.
+ */
+:root{
+  --wc-ui-bg:#0a111b;
+  --wc-ui-surface:#142234;
+  --wc-ui-raised:#1b2d40;
+  --wc-ui-raised-hover:#263b50;
+  --wc-ui-border:#7e6b51;
+  --wc-ui-border-strong:#b79560;
+  --wc-ui-gold:#ecc58b;
+  --wc-ui-gold-strong:#ffdfa0;
+  --wc-ui-text:#f1e7d6;
+  --wc-ui-muted:#c1b6a5;
+  --wc-ui-danger:#e28b8c;
+  --wc-ui-radius:12px;
+  --wc-ui-shadow:0 10px 30px rgba(2,6,12,.38);
+  /* Preserve old variable consumers while moving them to one palette. */
+  --ink:var(--wc-ui-text);
+  --muted:var(--wc-ui-muted);
+  --line:var(--wc-ui-border);
+  --paper:var(--wc-ui-surface);
+  --paper2:var(--wc-ui-raised);
+  --card:var(--wc-ui-raised);
+  --accent:#c99b5c;
+  --accent2:var(--wc-ui-gold);
+  --shadow:var(--wc-ui-shadow);
+}
+html,body{background:var(--wc-ui-bg);color:var(--wc-ui-text);-webkit-font-smoothing:antialiased}
+button,[role="button"]{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button:focus-visible,[role="button"]:focus-visible,
+a:focus-visible,select:focus-visible,input:focus-visible,
+[tabindex]:focus-visible{
+  outline:2px solid var(--wc-ui-gold-strong)!important;
+  outline-offset:3px!important;
+}
+button:disabled{cursor:not-allowed}
+.app{color:var(--wc-ui-text)}
+.app .top{
+  background:linear-gradient(180deg,#1b2939,#111b29)!important;
+  border-bottom:1px solid var(--wc-ui-border-strong)!important;
+}
+.app .topline .title{
+  color:var(--wc-ui-gold-strong)!important;
+  letter-spacing:.018em;
+  text-wrap:balance;
+}
+.app .top .res{
+  background:linear-gradient(165deg,#203247,#142234)!important;
+  border-color:#5e6270!important;
+}
+.app .top .res b{font-variant-numeric:tabular-nums}
+.app .quickBtn,.app .detailBtn,.wc38-cinematic button{
+  background:linear-gradient(165deg,#2b4157,#1a2a3b)!important;
+  border:1px solid var(--wc-ui-border-strong)!important;
+  border-radius:10px!important;
+  color:var(--wc-ui-text)!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.055),0 2px 7px #0004;
+}
+.app .quickBtn{min-height:42px}
+.app .panel,.app .ownerFusion,.app .weaponShowcaseV39,
+.app .servicePanelV39,.app .actionHubV39,
+.app .actionHub{
+  background:linear-gradient(155deg,#1d2e40,#111c2b 72%)!important;
+  border:1px solid var(--wc-ui-border)!important;
+  border-radius:var(--wc-ui-radius)!important;
+  box-shadow:var(--wc-ui-shadow)!important;
+}
+.app .sectionTitle b,.app .actionHeader b,
+.app .serviceTitleV39 b,.app .ownerFusion h2,
+.app .weaponName,.app .ownerKicker{
+  color:var(--wc-ui-gold-strong)!important;
+}
+.app .ownerFusion .sub,.app .weaponSpec,
+.app .serviceTitleV39 span{color:var(--wc-ui-muted)!important}
+.app .ownerStat,.app .weaponStat,.app .ownerChapterChip{
+  background:#142338!important;
+  color:var(--wc-ui-text)!important;
+  border-color:#736851!important;
+}
+.app .actionCategory,.app .serviceBtn{
+  border-color:#977a56!important;
+  border-radius:11px!important;
+  box-shadow:inset 0 1px rgba(255,255,255,.08),0 5px 15px #0007;
+}
+.app .actionCategory.active,.app .actionOption.selected{
+  border-color:var(--wc-ui-gold-strong)!important;
+  box-shadow:0 0 0 1px #f1c88755,0 5px 16px #0008!important;
+}
+.app .actionOption{
+  background:linear-gradient(165deg,#263b4d,#172636)!important;
+  border-color:#806d52!important;
+  border-radius:11px!important;
+}
+.app .actionOption b{font-size:max(11px, .8rem)!important}
+.app .actionOption p{font-size:11px!important;line-height:1.45!important}
+.app .exec{
+  background:linear-gradient(180deg,#f4cf91,#c49552)!important;
+  border:1px solid #ffe4ad!important;
+  border-radius:11px!important;
+  color:#1d2026!important;
+  font-size:14px!important;
+  min-height:48px;
+  font-weight:850;
+}
+.app .bottom{
+  background:linear-gradient(180deg,#172636,#0b1420)!important;
+  border-top:1px solid var(--wc-ui-border)!important;
+}
+#overlay.show{background:rgba(3,8,15,.88)}
+#overlay.show:not(.storyFullscreen) .modal{
+  background:linear-gradient(155deg,#1d3042,#111d2b 70%)!important;
+  border:1px solid var(--wc-ui-border-strong)!important;
+  color:var(--wc-ui-text)!important;
+  border-radius:14px!important;
+  box-shadow:0 20px 60px #000a,0 0 0 1px #d0a66e21!important;
+}
+#overlay .modalHead{
+  padding-bottom:10px;
+  margin-bottom:12px;
+  border-bottom:1px solid #88704e7d;
+}
+#overlay .modalHead b{color:var(--wc-ui-gold-strong)!important;font-size:16px!important}
+#overlay .modalDesc{
+  color:var(--wc-ui-muted)!important;
+  font-size:12px!important;
+  line-height:1.65!important;
+}
+#overlay .close{
+  background:#25384b!important;
+  color:var(--wc-ui-text)!important;
+  border:1px solid var(--wc-ui-border-strong)!important;
+  border-radius:9px!important;
+  min-width:42px;
+  min-height:40px;
+  font-size:12px!important;
+}
+#overlay .tabBtn,#overlay .invTab,
+#overlay .invNav32 button{
+  background:#22354a!important;
+  border:1px solid var(--wc-ui-border)!important;
+  color:var(--wc-ui-text)!important;
+  border-radius:9px!important;
+  min-height:44px!important;
+  font-size:12px!important;
+  line-height:1.3!important;
+}
+#overlay .tabBtn.active,#overlay .invTab.active,
+#overlay .invNav32 button.on{
+  background:linear-gradient(165deg,#966d3f,#674b32)!important;
+  color:#fff4de!important;
+  border-color:var(--wc-ui-gold-strong)!important;
+  box-shadow:inset 0 -2px #402b1a!important;
+}
+#overlay .wc3-status .wc3-panel,
+#overlay .wc3-status .wc3-hero,
+#overlay .wc44-titleStrip,
+#overlay .wc44-npcDialogue,
+#overlay .serviceCard40{
+  background:linear-gradient(160deg,#223448,#122033)!important;
+  color:var(--wc-ui-text)!important;
+  border:1px solid var(--wc-ui-border)!important;
+  border-radius:11px!important;
+}
+#overlay .wc3-status .wc3-panel h3,
+#overlay .wc3-status .wc3-sectionTitle h3,
+#overlay .wc44-titleStrip b,
+#overlay .serviceCard40 .dualTitle b{
+  color:var(--wc-ui-gold-strong)!important;
+}
+#overlay .wc3-status .wc3-directStat,
+#overlay .wc3-status .wc3-ability,
+#overlay .wc3-status .wc3-part,
+#overlay .wc3-status .wc3-card,
+#overlay .wc3-status .wc3-equip,
+#overlay .wc44-bag .invTile32,
+#overlay .wc44-state .statusStat{
+  background:#1c2e41!important;
+  color:var(--wc-ui-text)!important;
+  border-color:#77694f!important;
+  border-radius:9px!important;
+}
+#overlay .wc3-status .wc3-directStat strong,
+#overlay .wc3-status .wc3-ability>strong,
+#overlay .wc44-state .statusStat b{
+  color:#ffdfa0!important;
+  font-variant-numeric:tabular-nums;
+}
+#overlay .wc3-status .wc3-panel small,
+#overlay .wc3-status .wc3-ability>small,
+#overlay .wc44-bag .invCapacity34 span,
+#overlay .wc44-npcDialogue p{
+  color:var(--wc-ui-muted)!important;
+}
+#overlay .wc3-status .wc3-card.active,
+#overlay .wc3-status .wc3-part.active,
+#overlay .wc3-status .wc3-equip.active{
+  border-color:var(--wc-ui-gold-strong)!important;
+  box-shadow:0 0 0 1px #d8b78377!important;
+}
+#overlay .wc44-npcCard,#overlay .wc43-shopItem,
+#overlay .wc44-bag .invItem,
+#overlay .wc44-npcChoices button{
+  background:linear-gradient(155deg,#22384c,#162638)!important;
+  border:1px solid var(--wc-ui-border)!important;
+  border-radius:10px!important;
+  color:var(--wc-ui-text)!important;
+}
+#overlay .wc44-npcCard b,#overlay .wc44-npcChoices b{
+  color:var(--wc-ui-gold-strong)!important;
+}
+/* Story remains a full-screen cinematic, rather than becoming a card modal. */
+#overlay.storyFullscreen .modalHead{
+  border-bottom-color:var(--wc-ui-border)!important;
+}
+#overlay.storyFullscreen .storyText{
+  color:var(--wc-ui-text)!important;
+  line-height:1.8!important;
+}
+#overlay.storyFullscreen .storyChoice{
+  border-color:var(--wc-ui-border)!important;
+  border-radius:11px!important;
+}
+.wc38-cinematic-shell{
+  border-color:var(--wc-ui-border-strong)!important;
+  background:linear-gradient(#1a2b3e,#0e1927)!important;
+  border-radius:14px!important;
+}
+.wc38-cinematic-copy h2{color:var(--wc-ui-gold-strong)!important}
+.wc38-cinematic-copy p{color:var(--wc-ui-text)!important}
+.wc38-cinematic-counter,.wc38-cinematic-hint{
+  color:var(--wc-ui-muted)!important;
+}
+@media(hover:hover){
+  .app button:not(:disabled):hover,
+  #overlay button:not(:disabled):hover,
+  .wc38-cinematic button:not(:disabled):hover{
+    filter:brightness(1.12);
+  }
+}
+@media(max-width:390px){
+  #overlay .modalHead b{font-size:15px!important}
+  #overlay .wc3-status .tabRow,
+  #overlay .wc44-state .tabRow,
+  #overlay .wc44-bag .invNav32{gap:5px!important}
+  #overlay .wc3-status .wc3-card strong{font-size:12px!important}
+  .app .actionCategory b{font-size:12px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important}
+  .app .actionOption,.app button,#overlay button{transition:none!important}
+}
