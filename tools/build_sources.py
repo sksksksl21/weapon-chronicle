@@ -36,6 +36,14 @@ def compose(root):
         line = "if(STORY_SKILLS.has('"+tag+"')) BASE_DECK.push('"+card+"');"
         assert combat_text.count(line) == 1, 'Expected one story deck expansion '+tag
         combat_text = combat_text.replace(line, '// Earned story cards enter only when equipped in the ten-slot deck.')
+    # Combat runs inside its own iframe; give it the matching HUD palette
+    # without changing actor placement, mechanics or saved state.
+    combat_theme = (source / 'ui/combat_theme_v8.css').read_text(encoding='utf8')
+    assert combat_text.count('</body>') == 1, 'Expected a single combat body'
+    assert '</style>' not in combat_theme, 'Combat theme must be CSS only'
+    combat_text = combat_text.replace('</body>',
+        '<style id="wc-combat-theme-v8">\n' + combat_theme +
+        '\n</style>\n</body>', 1)
     combat = combat_text.encode('utf8')
     includes = {
         '/* @include:combat-document */': 'const COMBAT_DOC_B64="' + b64encode(combat).decode('ascii') + '";',
