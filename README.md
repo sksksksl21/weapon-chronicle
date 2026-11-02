@@ -1,5 +1,16 @@
 # Weapon Chronicle — Codex / GitHub Codespaces baseline (v5.2)
 
+## DEV unified dark-fantasy UI (2026-11-03)
+
+The existing mobile hub, status/gear/inventory screens, merchant/services, story choices and the independent combat iframe now share a restrained midnight-blue / antique-brass UI palette with brighter readable text and consistent selected-button outlines. This is **CSS presentation only**: no story, character stats, item IDs, save fields or combat rules have been changed, and the original images remain in place. The visual treatment takes general design principles from Darkest Dungeon II and Slay the Spire, without copying assets.
+
+- **Mobile live preview:** [play-dev.html](https://sksksksl21.github.io/weapon-chronicle/play-dev.html), provided GitHub Pages is deployed from `dev`. Hard-refresh to avoid an old cached page.
+- **CSS source:** `src/ui/unified_theme_v8.css` (hub/menu/story), `src/ui/combat_theme_v8.css` (combat).
+- **Consistency:** `tools/build_sources.py`, `play-dev.html` and `dev-play.html` read the same CSS files and embed them after the inherited CSS. Offline `index.html` requires an explicit build; the checked-in generated output has not been updated.
+- **Focused source check:** `python3 -m unittest discover -s tests -p test_ui_theme_v8.py`. This check is present but has **not** been executed on the user's Windows machine. Browser appearance, small-screen wrapping, combat and Android touch targets are still subject to actual play inspection.
+- **Roadmap preserved:** this is the shared visual foundation, **not** the full v8.0 pixel-art and asset-consistency completion gate.
+
+
 ## V2 Art Bible-managed image build gate (2026-11-02, dev only)
 
 The normal `npm run build` now invokes `tools/art_build_gate.py` before touching generated HTML. The existing game and historic sprites build as before when `assets/v2-managed` is absent. If that directory exists, only explicitly approved, SHA-256-verified image files from the currently active AI Dev Studio V2 Art Bible release pass. Invalid/missing V2 proof, stale style version, modified images, extra files or manipulated manifests fail with `ART_GATE_BLOCKED`. The Windows V2 parent is discovered when this repository lives under its `workspaces` directory, or can be set with `AI_DEV_STUDIO_V2_ROOT`. There is no skip switch for managed assets.
