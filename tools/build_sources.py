@@ -52,8 +52,8 @@ def compose(root):
     theme = (source / 'ui/unified_theme_v8.css').read_text(encoding='utf8')
     assert tail.count('</body>') == 1, 'Expected a single closing body tag'
     assert '</style>' not in theme, 'Theme must be CSS only'
-    tail = tail.replace('</body>', '<style id="wc-unified-theme-v8">\\n'
-                        + theme + '\\n</style>\\n</body>', 1)
+    tail = tail.replace('</body>', '<style id="wc-unified-theme-v8">\n'
+                        + theme + '\n</style>\n</body>', 1)
     html = ((source / 'legacy/html_before_script.html').read_text(encoding='utf8')
-            + '<script>\\n' + js + '\\n</script>' + tail)
+            + '<script>\n' + js + '\n</script>' + tail)
     return html, js, combat
