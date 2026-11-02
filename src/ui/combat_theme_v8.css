@@ -1,0 +1,111 @@
+/* Weapon Chronicle v8 — combat HUD companion to unified_theme_v8.css.
+ * Pure presentation: never changes battle state, cards, actor placement or hitboxes.
+ */
+:root{
+  --wc-ui-bg:#0a111b;
+  --wc-ui-surface:#142234;
+  --wc-ui-raised:#1b2d40;
+  --wc-ui-border:#7e6b51;
+  --wc-ui-gold:#ecc58b;
+  --wc-ui-text:#f1e7d6;
+  --wc-ui-muted:#c1b6a5;
+  --bg:var(--wc-ui-bg);
+  --paper:var(--wc-ui-surface);
+  --frame:var(--wc-ui-border);
+  --frame2:#947650;
+  --ink:var(--wc-ui-text);
+  --shadow:0 8px 24px rgba(2,6,12,.38);
+}
+html,body{background:var(--wc-ui-bg);color:var(--wc-ui-text)}
+.app{
+  background:linear-gradient(165deg,#18283b,#0a1422 78%)!important;
+  border-color:#997c54!important;
+}
+.app>.panel{
+  background:linear-gradient(155deg,#1d3042,#111d2b)!important;
+  border:1px solid var(--wc-ui-border)!important;
+  border-radius:12px!important;
+  box-shadow:inset 0 1px #ffffff0b,0 7px 20px #0005!important;
+  color:var(--wc-ui-text)!important;
+}
+.topbar .title,.cardsHead .lh{color:#ffdfa0!important;letter-spacing:.015em}
+.topbar .meta,.cardsHead .rh,.pow,.aiReason span{
+  color:var(--wc-ui-muted)!important;
+}
+.topMini,.itemBtn{
+  background:linear-gradient(160deg,#283c51,#192839)!important;
+  border-color:#8b7456!important;
+  border-radius:9px!important;
+  color:var(--wc-ui-text)!important;
+}
+.statusGrid .nm{color:#f6e7c9!important;font-size:12px}
+.statusGrid .bar{
+  background:#0a1724!important;
+  border-color:#8d785b!important;
+}
+.statusGrid .barTxt{color:#fff9ec}
+.stageOnly .stage,.stageOnly .turnNo{color:#eccc94!important}
+.oddCard{
+  background:#1c2c3f!important;
+  border:1px solid #756c5c!important;
+  border-radius:9px!important;
+}
+.oddMetric{color:var(--wc-ui-muted)!important}
+.oddMetric b,.oddAction .txt{color:var(--wc-ui-text)!important}
+.oddChance.hero{color:#88e0c3!important}
+.oddChance.enemy{color:#ffa4a4!important}
+.aiMind,.traitChip,.moodChip,.aiReason{
+  background:#18283a!important;
+  border-color:#786d57!important;
+  color:var(--wc-ui-text)!important;
+}
+.cardsPanel{border-top:2px solid #c19d63!important}
+.cards{gap:6px}
+.cards .card{
+  background:linear-gradient(155deg,#30465d,#1a2b3d)!important;
+  border:2px solid #a88d65!important;
+  border-radius:9px!important;
+  color:var(--wc-ui-text)!important;
+  box-shadow:inset 0 1px #ffffff15,0 3px 7px #0005!important;
+}
+.cards .card.sel{
+  border-color:#ffe0a0!important;
+  background:linear-gradient(155deg,#425d73,#21384b)!important;
+  outline:2px solid #e6ba70!important;
+  outline-offset:1px!important;
+}
+.cards .card.moment:not(.sel){border-color:#b6a2d2!important}
+.cards .card.engraved:not(.sel){border-color:#e1bd74!important}
+.cards .card .name{color:#ffe5b8!important}
+.cards .card .type,.cards .card .growth{color:#e3c693!important}
+.cards .card .eff{color:#eee5d4!important}
+.cards .card.lock{opacity:.48}
+.itemBtn b{color:#f5dfb5!important}
+.itemBtn span{color:var(--wc-ui-muted)!important}
+.actions .btn,.chronicleFoot button,.chronicleClose{
+  background:linear-gradient(160deg,#2a4054,#1a2b3c)!important;
+  border:1px solid #ae8d5d!important;
+  color:var(--wc-ui-text)!important;
+  border-radius:9px!important;
+}
+.actions .btn.primary{
+  background:linear-gradient(180deg,#e7bd7b,#ae7644)!important;
+  border-color:#ffe1a8!important;
+  color:#1b1d22!important;
+}
+.chronicleOverlay,.overlay{background:rgba(4,9,16,.86)!important}
+.chronicleBook,.overlay .popup{
+  background:linear-gradient(160deg,#213449,#111e2c)!important;
+  border:1px solid #b19060!important;
+  border-radius:13px!important;
+  color:var(--wc-ui-text)!important;
+}
+.chronicleTitle,.rewardTitle{color:#ffe0a0!important}
+.chronicleSub{color:var(--wc-ui-muted)!important}
+button:focus-visible,.card:focus-visible,[tabindex]:focus-visible{
+  outline:2px solid #ffe0a0!important;
+  outline-offset:3px!important;
+}
+@media(prefers-reduced-motion:reduce){
+  .app button,.cards .card{transition:none!important}
+}
