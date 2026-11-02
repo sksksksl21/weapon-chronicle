@@ -29,7 +29,8 @@ const base64=bytes=>new Promise((resolve,reject)=>{
 });
 try{
   const paths=["combat/story_combat.html","story/main_chapters_v47.js",
-    "legacy/html_before_script.html","legacy/html_after_script.html",...SCRIPT_PARTS];
+    "legacy/html_before_script.html","legacy/html_after_script.html",
+    "ui/unified_theme_v8.css",...SCRIPT_PARTS];
   const contents=await Promise.all(paths.map(fetchText));
   const data=Object.fromEntries(paths.map((p,i)=>[p,contents[i]]));
   let combat=data["combat/story_combat.html"];
@@ -57,7 +58,9 @@ try{
     if(scripts.reduce((n,s)=>n+s.split(marker).length-1,0)!==1)throw Error("조립 토큰 오류: "+marker);
     scripts=scripts.map(s=>s.replace(marker,content));
   }
-  const page=data["legacy/html_before_script.html"]+"<script>\n"+scripts.join("\n")+"\n<"+"/script>"+data["legacy/html_after_script.html"];
+  let page=data["legacy/html_before_script.html"]+"<script>\n"+scripts.join("\n")+"\n<"+"/script>"+data["legacy/html_after_script.html"];
+  if(page.split("</body>").length!==2)throw Error("테마 삽입 위치 오류");
+  page=page.replace("</body>",'<style id="wc-unified-theme-v8">\\n'+data["ui/unified_theme_v8.css"]+'\\n</style></body>');
   document.open();document.write(page);document.close();
 }catch(err){
   console.error("DEV play build failed",err);
