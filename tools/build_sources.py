@@ -1,16 +1,51 @@
 """One ordered source manifest and exact-position legacy includes."""
 from base64 import b64encode
+import json
+from pathlib import Path, PurePosixPath
 
-SCRIPT_PARTS = (
-    'legacy/game_runtime.js', 'core/save_ledger_v48.js',
-    'core/action_checkpoint_v482.js', 'core/checkpoint_v483.js',
-    'story/history_branch_v50.js', 'story/world_aftermath_v51.js',
-    'story/act1_history_v52.js',
-    'core/combat_math_v1.js', 'core/legacy_combat_sources_v1.js',
-    'core/direct_combat_stats_v2.js', 'core/direct_combat_runtime_v2.js',
-    'core/live_combat_handoff_v1.js', 'core/equipment_pool_v1.js',
-    'core/merchant_stock_v1.js', 'core/status_skilldeck_v1.js', 'legacy/bootstrap.js',
-)
+
+def load_module_manifest(root):
+    """Validate dependency order; same JSON drives offline and both previews."""
+    data=json.loads((root/'src/module_manifest.json').read_text(encoding='utf8'))
+    if data.get('schema')!=1 or not isinstance(data.get('modules'),list):
+        raise ValueError('Unsupported game module manifest')
+    entries=data['modules']
+    if not entries or entries[0].get('id')!='legacy-runtime' or entries[-1].get('id')!='bootstrap':
+        raise ValueError('Legacy wrapper must be first; bootstrap must be last')
+    seen=set()
+    paths=set()
+    for item in entries:
+        ident=item.get('id')
+        path=item.get('path')
+        depends=item.get('requires')
+        if not isinstance(ident,str) or not ident or ident in seen:
+            raise ValueError('Duplicate or missing game module id')
+        if not isinstance(path,str) or PurePosixPath(path).is_absolute() or (
+                '..' in PurePosixPath(path).parts) or not path.endswith('.js') or path in paths:
+            raise ValueError('Unsafe or duplicate game module path: '+str(path))
+        if not isinstance(depends,list) or len(depends)!=len(set(depends)):
+            raise ValueError('Invalid module dependencies: '+ident)
+        for required in depends:
+            if required not in seen:
+                raise ValueError('Missing or late dependency '+str(required)+' for '+ident)
+        if not (root/'src'/path).is_file():
+            raise ValueError('Missing module source: '+path)
+        paths.add(path)
+        seen.add(ident)
+    # Explicit critical interface map. Keep these contracts visible as files
+    # move instead of silently permitting a different provider implementation.
+    boundaries={'module-services':'core/module_services_v1.js',
+                'equipment':'core/equipment_pool_v1.js',
+                'merchant':'core/merchant_stock_v1.js',
+                'status':'core/status_skilldeck_v1.js'}
+    by_id={entry['id']:entry['path'] for entry in entries}
+    for ident,expected in boundaries.items():
+        if by_id.get(ident)!=expected:
+            raise ValueError('Missing contract module: '+ident)
+    return tuple(item['path'] for item in entries)
+
+
+SCRIPT_PARTS=load_module_manifest(Path(__file__).resolve().parents[1])
 
 
 def compose(root):
