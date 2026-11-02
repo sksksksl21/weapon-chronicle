@@ -16,14 +16,25 @@ small{display:block;color:#a7b3c4;margin-top:8px}button{font:inherit;border-radi
 <script>
 (async function(){
   "use strict";
-  const scriptParts=[
-    "legacy/game_runtime.js","core/save_ledger_v48.js","core/action_checkpoint_v482.js",
-    "core/checkpoint_v483.js","story/history_branch_v50.js","story/world_aftermath_v51.js",
-    "story/act1_history_v52.js","core/combat_math_v1.js",
-    "core/legacy_combat_sources_v1.js",
-    "core/direct_combat_stats_v2.js","core/direct_combat_runtime_v2.js","core/live_combat_handoff_v1.js",
-    "core/equipment_pool_v1.js","core/merchant_stock_v1.js","core/status_skilldeck_v1.js","legacy/bootstrap.js"
-  ];
+  // The same manifest and order are used by the offline Python builder.
+  const manifestResponse=await fetch("./src/module_manifest.json",{cache:"no-store"});
+  if(!manifestResponse.ok)throw Error("모듈 목록 다운로드 실패");
+  const manifest=await manifestResponse.json();
+  if(manifest.schema!==1||!Array.isArray(manifest.modules))
+    throw Error("지원하지 않는 모듈 목록");
+  const loaded=new Set(),scriptParts=[];
+  for(const entry of manifest.modules){
+    if(!entry||typeof entry.id!=="string"||
+       typeof entry.path!=="string"||!Array.isArray(entry.requires)||
+       !/^(legacy|core|story)\/[a-zA-Z0-9_/-]+\.js$/.test(entry.path)||
+       loaded.has(entry.id)||entry.requires.some(id=>!loaded.has(id)))
+      throw Error("모듈 의존성/경로 오류: "+(entry?.id||"?"));
+    loaded.add(entry.id);
+    scriptParts.push(entry.path);
+  }
+  if(manifest.modules[0]?.id!=="legacy-runtime"||
+     manifest.modules.at(-1)?.id!=="bootstrap")
+    throw Error("레거시/시작 모듈 순서 오류");
   const supporting=[
     "legacy/html_before_script.html","legacy/html_after_script.html",
     "combat/story_combat.html","story/main_chapters_v47.js",
