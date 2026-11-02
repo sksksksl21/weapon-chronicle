@@ -90,7 +90,7 @@ def verify(root, v2_root=None):
                 hashlib.sha256(file.read_bytes()).hexdigest()!=digest):
             raise ArtBuildBlocked('미승인 또는 변조된 이미지로 게임 빌드를 중단했습니다.')
         observed.add(filename)
-    if {str(Path('assets')/p.name) for p in directory.iterdir()}!=observed:
+    if {'assets/'+p.name for p in directory.iterdir()}!=observed:
         raise ArtBuildBlocked('승인 목록에 없는 그림이 섞여 있습니다.')
     if {p.name for p in managed.iterdir()}!={'assets','manifest.json'}:
         raise ArtBuildBlocked('V2 승인 폴더에 알 수 없는 파일이 포함됐습니다.')
