@@ -30,7 +30,7 @@ const base64=bytes=>new Promise((resolve,reject)=>{
 try{
   const paths=["combat/story_combat.html","story/main_chapters_v47.js",
     "legacy/html_before_script.html","legacy/html_after_script.html",
-    "ui/unified_theme_v8.css",...SCRIPT_PARTS];
+    "ui/unified_theme_v8.css","ui/combat_theme_v8.css",...SCRIPT_PARTS];
   const contents=await Promise.all(paths.map(fetchText));
   const data=Object.fromEntries(paths.map((p,i)=>[p,contents[i]]));
   let combat=data["combat/story_combat.html"];
@@ -48,6 +48,8 @@ try{
       "// Earned story cards enter only when equipped in the ten-slot deck.");
   }
   status.textContent="최신 게임 조립 중…";
+  if(combat.split("</body>").length!==2)throw Error("전투 테마 삽입 위치 오류");
+  combat=combat.replace("</body>",'<style id="wc-combat-theme-v8">\n'+data["ui/combat_theme_v8.css"]+'\n</style></body>');
   const docB64=await base64(new TextEncoder().encode(combat));
   let scripts=SCRIPT_PARTS.map(p=>data[p]);
   const includes={
