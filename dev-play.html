@@ -60,7 +60,7 @@ try{
   }
   let page=data["legacy/html_before_script.html"]+"<script>\n"+scripts.join("\n")+"\n<"+"/script>"+data["legacy/html_after_script.html"];
   if(page.split("</body>").length!==2)throw Error("테마 삽입 위치 오류");
-  page=page.replace("</body>",'<style id="wc-unified-theme-v8">\\n'+data["ui/unified_theme_v8.css"]+'\\n</style></body>');
+  page=page.replace("</body>",'<style id="wc-unified-theme-v8">\n'+data["ui/unified_theme_v8.css"]+'\n</style></body>');
   document.open();document.write(page);document.close();
 }catch(err){
   console.error("DEV play build failed",err);
