@@ -27,3 +27,13 @@ Do not infer new requirements from legacy accidental UI/code. When old implement
 - The older generated `index.html` is not regenerated/committed by this source change; source-built `play-dev.html` is the intended first viewing path. Do not equate CSS source commits with verified mobile visual output.
 - No changes to progression, combat stats/turn handling, layout structure, persistent save schema, original sprites, approved V2-managed art pipeline or `main`.
 - Focused source-build checks: `python3 -m unittest discover -s tests -p test_ui_theme_v8.py`. **GitHub code written; Python check, browser mobile inspection and full QA not yet run.** This visual skin is not completion of the later comprehensive v8.0 pixel-art audit or Android device matrix.
+
+
+## 2026-11-03 — 모듈 분해 및 유기적인 기능 연결 (dev)
+
+- 기존 게임을 폐기하거나 처음부터 만들지 않는다. 게임 모듈 경계는 파일 분리만이 아니라 소유 데이터·API·연계·저장·검증을 포함한다.
+- \`src/module_manifest.json\`이 실행 순서와 선행 모듈 관계의 유일한 원본이다. Python 오프라인 빌드와 두 개발판은 같은 명세를 읽는다.
+- \`core/module_services_v1.js\`는 API 등록 및 요구만 한다. 게임 상태를 복제하지 않는다. 장비 공급자 1개를 상점·상태창이 공유한다.
+- 레거시 게임 상태, 아이템/장비 ID, 최신 전투 스탯 결정, 스토리와 체크포인트 정책 A, main 브랜치를 유지한다.
+- 다음은 소유자·장비/스탯 → 행동/보상 → 적/전투 → 스토리/NPC → 저장/모바일 순으로 기능 단위마다 점진적으로 분리한다.
+- 이번 구현은 코드와 집중 테스트 정의 반영이며 Windows 빌드/Node 테스트/휴대폰 실제 플레이 PASS로 판정하지 않는다. 자세한 대상은 \`docs/MODULE_MAP.md\` 참조.
