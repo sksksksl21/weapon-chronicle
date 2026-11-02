@@ -6,6 +6,7 @@ const path=require("node:path");
 const root=path.join(__dirname,"..");
 const equipment=fs.readFileSync(path.join(root,"src/core/equipment_pool_v1.js"),"utf8");
 const merchant=fs.readFileSync(path.join(root,"src/core/merchant_stock_v1.js"),"utf8");
+const services=fs.readFileSync(path.join(root,"src/core/module_services_v1.js"),"utf8");
 const parts={},gear={};
 const W=["blade","guard","tang","grip","wrap","pommel","seat","scabbard"];
 const A=["helmet","armor","gloves","boots"];
@@ -37,7 +38,9 @@ const ctx={
  openSmithBuy:()=>{renderSmith++;}
 };
 vm.createContext(ctx);
+vm.runInContext(services,ctx);
 vm.runInContext(equipment,ctx);
+assert.equal(vm.runInContext('WC_GAME_MODULES_V1.require("equipment")===WC_EQUIPMENT_POOL_V1',ctx),true);
 vm.runInContext(merchant,ctx);
 const module=vm.runInContext("WC_MERCHANT_STOCK_V1",ctx);
 const arm=vm.runInContext("randomGearStock()",ctx);
