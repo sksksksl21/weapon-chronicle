@@ -4,11 +4,6 @@
 <style>html,body{margin:0;min-height:100%;background:#101a26;color:#e9d3aa;font-family:system-ui,sans-serif}main{padding:35vh 16px 16px;max-width:480px;margin:auto;text-align:center}small{display:block;margin:16px 0;color:#c5b8a5}button{background:#273d53;color:#fff;border:1px solid #b29a6d;border-radius:10px;padding:12px 20px}</style>
 </head><body><main><h2>Weapon Chronicle · 개발판</h2><small id="wcLoading">최신 dev 소스 읽는 중…</small><button id="wcRetry" hidden onclick="location.reload()">새로고침</button></main>
 <script type="module">
-const SCRIPT_PARTS=[
-"legacy/game_runtime.js","core/save_ledger_v48.js","core/action_checkpoint_v482.js","core/checkpoint_v483.js",
-"story/history_branch_v50.js","story/world_aftermath_v51.js","story/act1_history_v52.js",
-"core/combat_math_v1.js","core/legacy_combat_sources_v1.js",
-    "core/direct_combat_stats_v2.js","core/direct_combat_runtime_v2.js","core/live_combat_handoff_v1.js","core/equipment_pool_v1.js","core/merchant_stock_v1.js","core/status_skilldeck_v1.js","legacy/bootstrap.js"];
 const status=document.getElementById("wcLoading");
 const fetchText=async p=>{
   const url=new URL("src/"+p,location.href);
@@ -28,6 +23,24 @@ const base64=bytes=>new Promise((resolve,reject)=>{
   reader.readAsDataURL(new Blob([bytes],{type:"application/octet-stream"}));
 });
 try{
+  const manifestResponse=await fetch(new URL("src/module_manifest.json",location.href),{cache:"no-store"});
+  if(!manifestResponse.ok)throw Error("모듈 목록 다운로드 실패");
+  const manifest=await manifestResponse.json();
+  if(manifest.schema!==1||!Array.isArray(manifest.modules))
+    throw Error("지원하지 않는 모듈 목록");
+  const seen=new Set(),SCRIPT_PARTS=[];
+  for(const entry of manifest.modules){
+    if(!entry||typeof entry.id!=="string"||typeof entry.path!=="string"||
+       !Array.isArray(entry.requires)||
+       !/^(legacy|core|story)\/[a-zA-Z0-9_/-]+\.js$/.test(entry.path)||
+       seen.has(entry.id)||entry.requires.some(id=>!seen.has(id)))
+      throw Error("모듈 의존성/경로 오류: "+(entry?.id||"?"));
+    seen.add(entry.id);
+    SCRIPT_PARTS.push(entry.path);
+  }
+  if(manifest.modules[0]?.id!=="legacy-runtime"||
+     manifest.modules.at(-1)?.id!=="bootstrap")
+    throw Error("레거시/시작 모듈 순서 오류");
   const paths=["combat/story_combat.html","story/main_chapters_v47.js",
     "legacy/html_before_script.html","legacy/html_after_script.html",
     "ui/unified_theme_v8.css","ui/combat_theme_v8.css",...SCRIPT_PARTS];
