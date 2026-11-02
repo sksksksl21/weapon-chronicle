@@ -302,3 +302,6 @@ if(typeof partDeltaHtml==="function"){
 return Object.freeze({TIERS,W_SLOTS,A_SLOTS,expand,buildItem,formatDetail,result,randomFrom,
  rollCopy,restoreCopy,restoreFromSave,rarityClass,decorateCardHTML,decorateModalCards});
 })();
+// Expose one stable equipment API to dependent modules; no duplicate catalog.
+if(typeof WC_GAME_MODULES_V1!=="undefined")
+  WC_GAME_MODULES_V1.register("equipment",WC_EQUIPMENT_POOL_V1);
