@@ -1,7 +1,7 @@
 """Focused mandatory-art build-gate tests; legacy game stays buildable."""
 import hashlib
 import json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath, PurePosixPath
 import sys
 import tempfile
 import types
@@ -9,10 +9,20 @@ import unittest
 from unittest.mock import patch
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
-from art_build_gate import verify, ArtBuildBlocked
+from art_build_gate import verify, ArtBuildBlocked, _manifest_asset_path
 
 
 class ArtBuildGateTests(unittest.TestCase):
+    def test_cross_platform_asset_names_match_manifest(self):
+        # Regression: Windows Path stringification uses backslashes.
+        # The manifest must always use slash separators.
+        filename=self.aid+'.png'
+        for path in (PureWindowsPath('C:/game/assets',filename),
+                     PurePosixPath('/game/assets',filename)):
+            self.assertEqual(_manifest_asset_path(path),'assets/'+filename)
+        self.assertNotEqual(str(PureWindowsPath('assets',filename)),
+                            'assets/'+filename)
+
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
         self.root=Path(self.temp.name)/'game'
