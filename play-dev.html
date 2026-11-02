@@ -16,6 +16,8 @@ small{display:block;color:#a7b3c4;margin-top:8px}button{font:inherit;border-radi
 <script>
 (async function(){
   "use strict";
+  const detail=document.getElementById("detail");
+  try{
   // The same manifest and order are used by the offline Python builder.
   const manifestResponse=await fetch("./src/module_manifest.json",{cache:"no-store"});
   if(!manifestResponse.ok)throw Error("모듈 목록 다운로드 실패");
@@ -41,8 +43,6 @@ small{display:block;color:#a7b3c4;margin-top:8px}button{font:inherit;border-radi
     "ui/unified_theme_v8.css","ui/combat_theme_v8.css"
   ];
   const paths=[...new Set([...scriptParts,...supporting])];
-  const detail=document.getElementById("detail");
-  try{
     const entries=await Promise.all(paths.map(async path=>{
       const response=await fetch("./src/"+path,{cache:"no-store"});
       if(!response.ok)throw Error(path+" 다운로드 실패 (HTTP "+response.status+")");
