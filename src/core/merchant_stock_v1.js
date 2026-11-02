@@ -3,7 +3,8 @@
  */
 const WC_MERCHANT_STOCK_V1=(()=>{
 "use strict";
-const pool=WC_EQUIPMENT_POOL_V1;
+// The merchant consumes the same equipment service as the rest of the game.
+const pool=WC_GAME_MODULES_V1.require("equipment");
 const RANKS=pool.TIERS;
 const ARMOR=pool.A_SLOTS;
 const SWORD=pool.W_SLOTS;
