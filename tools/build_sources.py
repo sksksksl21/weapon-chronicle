@@ -46,5 +46,14 @@ def compose(root):
         assert sum(s.count(marker) for s in scripts) == 1, f'Expected one {marker}'
         scripts = [s.replace(marker, content) for s in scripts]
     js = '\n'.join(scripts)
-    html = (source / 'legacy/html_before_script.html').read_text(encoding='utf8') + '<script>\n' + js + '\n</script>' + (source / 'legacy/html_after_script.html').read_text(encoding='utf8')
+    # Apply one theme last, after the historical inline styles. This keeps
+    # gameplay markup and original art intact and makes dev/offline builds match.
+    tail = (source / 'legacy/html_after_script.html').read_text(encoding='utf8')
+    theme = (source / 'ui/unified_theme_v8.css').read_text(encoding='utf8')
+    assert tail.count('</body>') == 1, 'Expected a single closing body tag'
+    assert '</style>' not in theme, 'Theme must be CSS only'
+    tail = tail.replace('</body>', '<style id="wc-unified-theme-v8">\\n'
+                        + theme + '\\n</style>\\n</body>', 1)
+    html = ((source / 'legacy/html_before_script.html').read_text(encoding='utf8')
+            + '<script>\\n' + js + '\\n</script>' + tail)
     return html, js, combat
