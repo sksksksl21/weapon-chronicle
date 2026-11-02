@@ -27,7 +27,7 @@ small{display:block;color:#a7b3c4;margin-top:8px}button{font:inherit;border-radi
   const supporting=[
     "legacy/html_before_script.html","legacy/html_after_script.html",
     "combat/story_combat.html","story/main_chapters_v47.js",
-    "ui/unified_theme_v8.css"
+    "ui/unified_theme_v8.css","ui/combat_theme_v8.css"
   ];
   const paths=[...new Set([...scriptParts,...supporting])];
   const detail=document.getElementById("detail");
@@ -60,6 +60,9 @@ small{display:block;color:#a7b3c4;margin-top:8px}button{font:inherit;border-radi
       "// Earned story cards enter only when equipped in the ten-slot deck.");
   }
     // Match tools/build_sources.py without committing a 10 MB generated bundle.
+    if(combat.split("</body>").length!==2)throw Error("전투 테마 삽입 위치 오류");
+    combat=combat.replace("</body>",
+      '<style id="wc-combat-theme-v8">\n'+files["ui/combat_theme_v8.css"]+'\n</style></body>');
     const data=new TextEncoder().encode(combat);
     const chunks=[];
     for(let i=0;i<data.length;i+=16384)
