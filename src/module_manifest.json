@@ -1,0 +1,147 @@
+{
+  "schema": 1,
+  "description": "Ordered browser/offline modules. Preserve legacy IIFE; dependencies are checked before build.",
+  "modules": [
+    {
+      "id": "legacy-runtime",
+      "path": "legacy/game_runtime.js",
+      "requires": [],
+      "domain": "legacy"
+    },
+    {
+      "id": "module-services",
+      "path": "core/module_services_v1.js",
+      "requires": [
+        "legacy-runtime"
+      ],
+      "domain": "core"
+    },
+    {
+      "id": "save-ledger",
+      "path": "core/save_ledger_v48.js",
+      "requires": [
+        "legacy-runtime"
+      ],
+      "domain": "save"
+    },
+    {
+      "id": "action-checkpoint",
+      "path": "core/action_checkpoint_v482.js",
+      "requires": [
+        "save-ledger"
+      ],
+      "domain": "save"
+    },
+    {
+      "id": "checkpoint",
+      "path": "core/checkpoint_v483.js",
+      "requires": [
+        "action-checkpoint"
+      ],
+      "domain": "save"
+    },
+    {
+      "id": "history",
+      "path": "story/history_branch_v50.js",
+      "requires": [
+        "save-ledger"
+      ],
+      "domain": "story"
+    },
+    {
+      "id": "aftermath",
+      "path": "story/world_aftermath_v51.js",
+      "requires": [
+        "history"
+      ],
+      "domain": "story"
+    },
+    {
+      "id": "act1-history",
+      "path": "story/act1_history_v52.js",
+      "requires": [
+        "aftermath"
+      ],
+      "domain": "story"
+    },
+    {
+      "id": "combat-math",
+      "path": "core/combat_math_v1.js",
+      "requires": [
+        "legacy-runtime"
+      ],
+      "domain": "combat"
+    },
+    {
+      "id": "combat-legacy-adapter",
+      "path": "core/legacy_combat_sources_v1.js",
+      "requires": [
+        "combat-math"
+      ],
+      "domain": "combat"
+    },
+    {
+      "id": "combat-direct-stats",
+      "path": "core/direct_combat_stats_v2.js",
+      "requires": [
+        "combat-math"
+      ],
+      "domain": "combat"
+    },
+    {
+      "id": "combat-runtime",
+      "path": "core/direct_combat_runtime_v2.js",
+      "requires": [
+        "combat-direct-stats"
+      ],
+      "domain": "combat"
+    },
+    {
+      "id": "combat-handoff",
+      "path": "core/live_combat_handoff_v1.js",
+      "requires": [
+        "combat-runtime",
+        "combat-legacy-adapter"
+      ],
+      "domain": "combat"
+    },
+    {
+      "id": "equipment",
+      "path": "core/equipment_pool_v1.js",
+      "requires": [
+        "module-services",
+        "legacy-runtime"
+      ],
+      "domain": "equipment"
+    },
+    {
+      "id": "merchant",
+      "path": "core/merchant_stock_v1.js",
+      "requires": [
+        "equipment"
+      ],
+      "domain": "service"
+    },
+    {
+      "id": "status",
+      "path": "core/status_skilldeck_v1.js",
+      "requires": [
+        "equipment",
+        "combat-runtime"
+      ],
+      "domain": "ui"
+    },
+    {
+      "id": "bootstrap",
+      "path": "legacy/bootstrap.js",
+      "requires": [
+        "status",
+        "merchant",
+        "combat-handoff",
+        "checkpoint",
+        "act1-history"
+      ],
+      "domain": "bootstrap"
+    }
+  ]
+}
