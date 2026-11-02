@@ -30,3 +30,10 @@ V2는 `assets/v2-managed`가 없는 깨끗한 `dev` 체크아웃에만 원본 �
 ## 시험
 `python3 -m unittest discover -s tests -p test_art_build_gate.py` — 관리 이미지가 없는 레거시 통과, 승인 묶음 재검증, V2 연결 없음/버전 불일치/원본 변조/추가 파일/위조 메타데이터 거부.
 테스트 작성 및 GitHub `dev` 반영은 확인됐지만 Windows 실제 게임 빌드/모바일 플레이, 실사용 V2 승인 묶음 전송은 **NOT_RUN**이다.
+
+## Windows 집중 검사에서 확인된 경로 버그 수정 (2026-11-02)
+
+- 기존 dev `021eaa4f861f` 사용자의 실제 Windows 집중 테스트: 8개 중 5개 PASS, 2개 FAIL, 1개 ERROR. `test_approved_pack_with_live_v2_evidence_passes`에서 정상 승인 이미지조차 `승인 목록에 없는 그림이 섞여 있습니다.`라고 오인함.
+- 원인: 검사 코드가 `str(Path('assets')/p.name)`으로 Windows에서 역슬래시 구분자를 만든 반면, 저장된 manifest 경로는 항상 `assets/...` 슬래시 형식임.
+- 수정: OS 무관 `_manifest_asset_path(path)`에서 항상 `'assets/'+path.name`을 생성. `test_cross_platform_asset_names_match_manifest`로 `PureWindowsPath`와 `PurePosixPath` 입력의 결과를 직접 검사한다. 미승인 파일 거부·원본 해시/manifest·현재 V2 승인 검증은 그대로 유지한다.
+- 이 수정은 GitHub `dev`에 커밋되어 있으며 Windows에서 **최신화 후 재검증은 NOT_RUN**. 재검증은 V2에서 Weapon Chronicle 프로젝트 최신화 후 `Weapon Chronicle 아트 빌드 검사 1회 실행`으로 한 번만 진행한다. 예상 테스트 수 9개.
