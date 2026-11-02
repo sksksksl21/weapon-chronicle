@@ -50,6 +50,16 @@ const ARMOR_SLOTS=[["helmet","투구","머리 보호 · 체력"],["armor","갑�
 const PART_SLOTS=["blade","guard","tang","grip","wrap","pommel","seat","scabbard"];
 let selectedSkill="",equipMode=false,selectedArmor="helmet",selectedPart="blade";
 const escapeHtml=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function equipmentDetailForStatus(item){
+ if(!item)return "";
+ // Standalone legacy test fixtures may not load the registry; the bundled
+ // game always resolves the same equipment provider used by the merchant.
+ const pool=typeof WC_GAME_MODULES_V1!=="undefined"
+   ?WC_GAME_MODULES_V1.require("equipment")
+   :(typeof WC_EQUIPMENT_POOL_V1!=="undefined"?WC_EQUIPMENT_POOL_V1:null);
+ return pool?pool.formatDetail(item,true):"";
+}
+
 const n=v=>{const x=Number(v);return Number.isFinite(x)?x:0};
 function profileFromRow(r){return {name:r[0],role:r[1],age:r[2],martial:r[3],survival:r[4],social:r[5],
  aggression:r[6],caution:r[7],boldness:r[8],background:r[9],portrait:"odyssey",
@@ -192,7 +202,7 @@ function armorBody(){
  '<div class="wc3-detail"><h4>'+escapeHtml(item?.name||"비어 있음")+'</h4>'+
  '<small>'+escapeHtml(item?.rarity||"미장착")+'</small><p>'+escapeHtml(item?.desc||"이 부위에 방어구를 장착할 수 있습니다.")+'</p>'+
  (item?finalEffects(mods,"armor",selectedArmor):'<p>추가 효과 없음</p>')+
- (item&&typeof WC_EQUIPMENT_POOL_V1!=="undefined"?WC_EQUIPMENT_POOL_V1.formatDetail(item,true):"")+'</div>'+
+ equipmentDetailForStatus(item)+'</div>'+
  '<button class="wc3-primary" data-wc3-armor-equip="'+selectedArmor+'">장비 선택 / 교체</button></section>'+
  '<p class="wc3-note">투구·갑옷·신발은 보호·기동, 장갑은 공격 보조도 가능합니다. 공격형 옵션은 무예, 방어형 옵션은 생존으로 발휘됩니다.</p>';
 }
@@ -225,7 +235,7 @@ function weaponBody(){
   escapeHtml(RARITY_DEF[p?.rarity]?.name||"일반")+'</span></h4>'+
   '<p>'+escapeHtml(p?.note||p?.passive||"파츠의 전투 기여도와 재료를 확인합니다.")+'</p>'+
   (p?finalEffects(p.mods,"weapon",selectedPart):'<p>수치 효과 없음</p>')+
-  (p&&typeof WC_EQUIPMENT_POOL_V1!=="undefined"?WC_EQUIPMENT_POOL_V1.formatDetail(p,true):"")+
+  equipmentDetailForStatus(p)+
   '<small>내구 '+Math.round(n(state.weapon.dur))+' / '+Math.round(n(state.weapon.maxDur))+
   ' · 공명 '+Math.round(n(state.weapon.resonance))+' / '+Math.round(n(state.weapon.maxResonance))+'</small></section>';
 }
