@@ -18,3 +18,12 @@
 | Interrupt recovery | Policy A: restart current action; no duplicate settlement; checkpoint deleted only after durable save |
 
 Do not infer new requirements from legacy accidental UI/code. When old implementation conflicts, identify and report gap before altering rules.
+
+## 2026-11-03 — Unified dark-fantasy UI skin (dev)
+
+- User requested a refined, consistent UI across Weapon Chronicle. Inspiration: Darkest Dungeon II's restrained gothic surfaces and Slay the Spire's readable action hierarchy; do not copy any game's UI artwork, textures, code, layout screenshots, names or protected assets.
+- Preserve current high-resolution pixel-art intent and the existing dark navy/brass direction. Use one shared token-based theme for the main hub, status/equipment, inventories, merchant/service cards, story choices and cinematic view; use a matching combat-only stylesheet in the battle iframe.
+- Primary styles: `src/ui/unified_theme_v8.css` and `src/ui/combat_theme_v8.css`. The offline assembler `tools/build_sources.py`, `play-dev.html` and `dev-play.html` all inject the same source CSS **last**, keeping legacy history and behavioral modules intact.
+- The older generated `index.html` is not regenerated/committed by this source change; source-built `play-dev.html` is the intended first viewing path. Do not equate CSS source commits with verified mobile visual output.
+- No changes to progression, combat stats/turn handling, layout structure, persistent save schema, original sprites, approved V2-managed art pipeline or `main`.
+- Focused source-build checks: `python3 -m unittest discover -s tests -p test_ui_theme_v8.py`. **GitHub code written; Python check, browser mobile inspection and full QA not yet run.** This visual skin is not completion of the later comprehensive v8.0 pixel-art audit or Android device matrix.
