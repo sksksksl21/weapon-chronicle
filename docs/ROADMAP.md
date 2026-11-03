@@ -26,3 +26,11 @@ Priority: a verified and maintainable game over adding unnecessary abstraction o
 - [ ] 저장/복구·개발 도감·모바일 화면 상태 연결
 
 \`docs/MODULE_MAP.md\`에 기존 코드와 나머지 분리 범위를 기록한다. 기존 로드맵/완료 성과/기존 PASS는 유지한다.
+
+## M1 장비·경제 연결 코드 (2026-11-04)
+
+- [x] 상인 서비스와 별도 경제 모듈 등록, 모듈 라이프사이클 및 전투 보상 구독 연결 (`src/core/economy_rewards_v1.js`)
+- [x] 명시적 장비 재고 보상 입력의 검증·중복 방지·기존 판매 이력 보존
+- [ ] 실제 전투 종료에서 아이템 보상이 발생할 때의 생산자 연결 및 사용자 게임 실사용 검증 (현재 `combat-experience` 이벤트 외 아이템 드롭 없음)
+- [ ] Windows/Node 원본 테스트, 전체 빌드, 이전 저장 호환 실제 검사
+- [ ] V2 내부 기존 작업 ID의 원격 통합 증거 및 상태 정합 (GitHub 외부 구현을 완료 판정으로 대체하지 않음)
