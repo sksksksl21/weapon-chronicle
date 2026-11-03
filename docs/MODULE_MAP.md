@@ -11,6 +11,17 @@
 - 전투 iframe은 독립 실행 문서다. 상위 화면과 데이터는 기존 `live_combat_handoff` 경유, 이벤트/메시지는 출처·정해진 유형을 확인하고 한번만 정산한다.
 - 플레이 가능한 `dev`를 유지한다. 새 모듈은 빌드 목록 1곳과 관련 테스트만 수정하고, 매번 모든 검사를 재실행하지 않는다.
 
+## 2026-11-04 / 장비·경제 모듈과 전투 보상 이벤트 연결 — GitHub dev 구현
+
+- 기존 `equipment_pool_v1.js`의 장비 등록 서비스, `merchant_stock_v1.js`의 재고 생성·구매 화면 호환 기능은 보존. 상인을 `merchant` 서비스로 명시 등록하고 신규 `core/economy_rewards_v1.js`를 별도 `economy` 라이프사이클 모듈로 등록.
+- 게임 부트스트랩은 **기존 저장 로드와 첫 화면 준비 후** `WC_GAME_MODULES_V1.initialize()`를 호출한다. 이전에는 모듈 정의만 있었고 초기화가 호출되지 않아 `combat:reward` 구독이 활성화되지 않았음.
+- 경제 모듈은 `combat:reward`를 구독하되 **기존 전투 경험치(`kind=combat-experience`)는 건드리지 않는다.** 아이템이 명시된 `kind=equipment-loot` 이벤트의 `id`, `armor`, `sword`를 상인에게 전달하고, 실제 카탈로그에 존재하는 장비만 기존 `state.marketV24.armor`·`state.smithPartStock`에 중복 없이 추가한다. 기존 `sold` 이력/판매 아이템은 그대로 유지하며 재고 변경 시에만 `saveGame` 1회 호출.
+- **범위 한계:** 현재 전투 모듈이 실제로 발행하는 보상은 `combat-experience` 유형이다. 신규 `equipment-loot` 이벤트는 향후 실제 전투 보상 데이터 생산자가 전달할 때만 재고에 반영한다. 사용자 승인 없이 전투 승리 때 무작위 아이템/금화를 새로 생성하거나 전투 밸런스를 바꾸지 않았다. 따라서 전체 장비 드롭 실사용 완성이라고 판정하지 않음.
+- 새 테스트 `tests/economy_rewards_v1.js`는 이벤트 구독·중복 방지·저장 1회·판매 이력 보존·종료 시 구독 해제 계약을 다룬다. 실제 GitHub 소스 기반 별도 격리 JS 실행 10항목 PASS, **Node 전체 테스트/빌드/Windows 모바일 실사용은 NOT_RUN**.
+- 해당 코드 변경은 V2 내부 `task_f74db38aead278da45e31794` 실행 기록과 별도 GitHub 외부 구현이다. V2의 과거 `ready` 상태를 `completed`로 강제로 변경하거나 완료 6/7로 보고하지 않는다. 원격 dev 변경 내역을 V2 추적과 정합 처리해야 한다.
+
+---
+
 ## 현재 실제 경계 (첫 적용)
 
 `src/module_manifest.json`은 **유일한 실행 파일 목록/선행 의존성 명세**이다. `tools/build_sources.py`, `play-dev.html`, `dev-play.html`이 이 목록을 읽고 기존 순서대로 단일 오프라인 HTML/모바일 개발판을 생성한다. 잘못된 모듈 ID, 경로, 선행 관계는 조립 전에 거부한다. 비즈니스 로직은 변경하지 않았다.
