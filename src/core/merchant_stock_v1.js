@@ -140,16 +140,7 @@ function installStyle(){
 installStyle();
 return Object.freeze({buildStock,upgradeOldStock,tierFor,validRow,applyCombatReward});
 })();
-// Register the merchant as a plain service and the economy as a lifecycle
-// consumer. The registry initializes them after legacy state has been loaded.
-if(typeof WC_GAME_MODULES_V1!=="undefined"){
+// The merchant owns the stock; the separate economy module owns reward events.
+if(typeof WC_GAME_MODULES_V1!=="undefined")
  WC_GAME_MODULES_V1.register("merchant",WC_MERCHANT_STOCK_V1);
- WC_GAME_MODULES_V1.register({
-  id:"economy",dependencies:["equipment","merchant","combat"],
-  init(services){
-   services.events.subscribe("combat:reward",WC_MERCHANT_STOCK_V1.applyCombatReward);
-   return WC_MERCHANT_STOCK_V1;
-  }
- });
-}
 if(typeof module!=="undefined"&&module.exports)module.exports=WC_MERCHANT_STOCK_V1;
