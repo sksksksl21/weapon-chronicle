@@ -82,6 +82,7 @@ v482RecoverPendingAction=function(){
 };
 // Reset must discard the pending rollback before deleting the active save:
 // otherwise restarting from scratch silently resurrects the prior campaign.
+if(typeof restartGame==='function'){
 const _v483RestartGame=restartGame;
 restartGame=function(){
   try{
@@ -95,3 +96,5 @@ restartGame=function(){
   }
   return _v483RestartGame();
 };
+
+}

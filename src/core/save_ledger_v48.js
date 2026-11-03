@@ -3,8 +3,54 @@
  * New ledger is additive and never assigns historical branch outcomes.
  */
 const V48_SAVE_SCHEMA = 48;
-const V48_BACKUP_KEY = SAVE_KEY + '.backup-before-v48';
-const V48_BAD_SAVE_KEY = SAVE_KEY + '.invalid-before-v48';
+const V48_BACKUP_KEY = (typeof SAVE_KEY==='undefined'?'weaponChronicleLifeHubV30':SAVE_KEY) + '.backup-before-v48';
+const V48_BAD_SAVE_KEY = (typeof SAVE_KEY==='undefined'?'weaponChronicleLifeHubV30':SAVE_KEY) + '.invalid-before-v48';
+/* Synchronous, JSON-owned hooks. Missing fields in older saves leave module
+ * defaults intact. Unknown module payloads survive saves for forward compatibility.
+ * Lifecycle modules can register through services.require('save').
+ */
+const v48SaveModules=new Map();
+let v48PendingModuleData;
+function registerSaveModule(id,hooks){
+  if(typeof id!=='string'||!id.trim())throw new TypeError('Invalid save module id');
+  if(!hooks||typeof hooks.serialize!=='function'||typeof hooks.restore!=='function')
+    throw new TypeError('Save modules require serialize and restore hooks');
+  if(v48SaveModules.has(id))throw new Error('Duplicate save module: '+id);
+  const entry={serialize:hooks.serialize.bind(hooks),restore:hooks.restore.bind(hooks)};
+  v48SaveModules.set(id,entry);
+  return ()=>{if(v48SaveModules.get(id)===entry)v48SaveModules.delete(id);};
+}
+function v48CloneSaveData(value){
+  const json=JSON.stringify(value,(k,v)=>v instanceof Set?[...v]:v);
+  if(json===undefined)throw new TypeError('Save module state must be JSON serializable');
+  return JSON.parse(json);
+}
+function serializeSaveModules(existing){
+  const result=Object.create(null);
+  for(const [id,value] of Object.entries(v48SafeRecord(existing)))result[id]=v48CloneSaveData(value);
+  for(const [id,hooks] of v48SaveModules){
+    const value=hooks.serialize();
+    if(value&&typeof value.then==='function')throw new TypeError('Save hooks must be synchronous');
+    result[id]=v48CloneSaveData(value);
+  }
+  return result;
+}
+function restoreSaveModules(saved){
+  const data=v48SafeRecord(saved);
+  for(const [id,hooks] of v48SaveModules){
+    if(!Object.prototype.hasOwnProperty.call(data,id))continue;
+    const result=hooks.restore(v48CloneSaveData(data[id]));
+    if(result&&typeof result.then==='function')throw new TypeError('Save hooks must be synchronous');
+  }
+}
+function v48SerializeState(){
+  const copy=v48CloneSaveData(state);
+  copy.moduleSaveData=serializeSaveModules(state.moduleSaveData);
+  copy.storyCtx=null;copy.activeStory=null;
+  return copy;
+}
+if(typeof WC_GAME_MODULES_V1!=='undefined')WC_GAME_MODULES_V1.register('save',
+  Object.freeze({registerSaveModule,serializeSaveModules,restoreSaveModules}));
 function v48SafeArray(value){return Array.isArray(value)?value:[];}
 function v48SafeRecord(value){return value&&typeof value==='object'&&!Array.isArray(value)?value:{};}
 function v48BackupRaw(raw,invalid=false){
@@ -62,13 +108,14 @@ function v48RecordMainChapter(c,result,path){
 function v48PrepareLoad(raw){
   v48BackupRaw(raw);
   const data=v48ValidateLoadedData(JSON.parse(raw));
+  v48PendingModuleData=data.moduleSaveData;
   // Leave existing values untouched. Additional fields are initialized after the legacy initializer.
   return data;
 }
 function v48SaveGame(){
   try{
     v48EnsureState();
-    const copy=JSON.parse(JSON.stringify(state,(k,v)=>v instanceof Set?[...v]:v));
+    const copy=v48SerializeState();
     copy.resonanceTopics=[...(state.resonanceTopics instanceof Set?state.resonanceTopics:new Set())];
     copy.storyCtx=null;copy.activeStory=null;
     copy.saveMeta.savedAt=new Date().toISOString();

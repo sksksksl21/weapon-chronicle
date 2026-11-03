@@ -1,11 +1,9 @@
 /* v4.8.2 action-boundary checkpoint: the entire pre-action world is preserved separately.
    Intermediate saves never overwrite the rollback point; committed monthly/succession state clears it. */
-const V482_CHECKPOINT_KEY=SAVE_KEY+'.action-checkpoint-v482';
-const V482_RECOVERY_NOTICE_KEY=SAVE_KEY+'.recovered-v482';
+const V482_CHECKPOINT_KEY=(typeof SAVE_KEY==='undefined'?'weaponChronicleLifeHubV30':SAVE_KEY)+'.action-checkpoint-v482';
+const V482_RECOVERY_NOTICE_KEY=(typeof SAVE_KEY==='undefined'?'weaponChronicleLifeHubV30':SAVE_KEY)+'.recovered-v482';
 function v482SerializeState(){
- const snapshot=JSON.parse(JSON.stringify(state,(k,v)=>v instanceof Set?[...v]:v));
- snapshot.storyCtx=null;snapshot.activeStory=null;
- return snapshot;
+ return v48SerializeState();
 }
 function v482BeginAction(){
  try{
@@ -39,6 +37,8 @@ function v482RecoverPendingAction(){
   return false;
  }
 }
+// Hook APIs can also be loaded without the legacy runtime (tools/tests).
+if(typeof startStory==='function'){
 const _v482StartStory=startStory;
 startStory=function(){
  if(!state.policy||!state.subChoice)return;
@@ -68,6 +68,9 @@ completeDeathSuccession=function(...args){const out=_v482Succession(...args);if(
 const _v482SaveGame=saveGame;
 saveGame=function(){const ok=_v482SaveGame();if(ok&&state.gameOver&&state.storyCtx==null)v482CommitAction();return ok;};
 const _v482LoadGame=loadGame;
-loadGame=function(){if(v482RecoverPendingAction()===null)return null;const loaded=_v482LoadGame();if(loaded){
+loadGame=function(){if(v482RecoverPendingAction()===null)return null;v48PendingModuleData=undefined;const loaded=_v482LoadGame();if(loaded){
+  try{restoreSaveModules(v48PendingModuleData);}catch(e){console.error('Module restore failed',e);return false;}
   try{const rec=localStorage.getItem(V482_RECOVERY_NOTICE_KEY);if(rec){const r=JSON.parse(rec);addLog(`${r.year}년차 ${r.month}월 행동 시작 지점으로 복구했다.`);localStorage.removeItem(V482_RECOVERY_NOTICE_KEY);}}catch(_){}
  }return loaded;};
+
+}
