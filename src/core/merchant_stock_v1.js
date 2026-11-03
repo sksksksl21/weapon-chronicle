@@ -86,6 +86,44 @@ if(typeof openSmithBuy==="function"){
   return before.apply(this,args);
  };
 }
+// Equipment and merchant stock remain separate services. A combat reward can
+// offer explicit equipment stock; ordinary experience rewards must never
+// mint items or award money a second time.
+const appliedRewards=new Set();
+function applyCombatReward(reward){
+ if(!reward||reward.kind!=="equipment-loot"||!Number.isSafeInteger(reward.id)||
+    reward.id<1||typeof state==="undefined")return false;
+ const token=String(reward.id)+":"+String(reward.rewardId||"");
+ if(appliedRewards.has(token))return false;
+ const armor=Array.isArray(reward.armor)?reward.armor:[];
+ const sword=Array.isArray(reward.sword)?reward.sword:[];
+ // Reject malformed payloads atomically, rather than partially granting loot.
+ if(armor.length+sword.length>16)return false;
+ const armorRows=armor.map(id=>({id,sold:false}));
+ const swordRows=sword.map(entry=>({
+  id:entry?.id,slot:entry?.slot,price:entry?.price,sold:false
+ }));
+ if(!armorRows.every(row=>validRow("armor",row))||
+    !swordRows.every(row=>validRow("sword",row)))return false;
+ if(!state.marketV24||typeof state.marketV24!=="object")return false;
+ if(!Array.isArray(state.marketV24.armor)||!Array.isArray(state.smithPartStock))
+   return false;
+ appliedRewards.add(token);
+ let changed=false;
+ for(const row of armorRows){
+  if(state.marketV24.armor.some(existing=>existing?.id===row.id))continue;
+  state.marketV24.armor.push(row);changed=true;
+ }
+ for(const row of swordRows){
+  if(state.smithPartStock.some(existing=>existing?.id===row.id))continue;
+  const item=PART_CATALOG[row.slot]?.[row.id];
+  row.price=Number.isFinite(Number(row.price))&&Number(row.price)>0?
+    Math.round(Number(row.price)):Math.max(1,Math.round(Number(item.shopPrice||item.price||1)));
+  state.smithPartStock.push(row);changed=true;
+ }
+ if(changed&&typeof saveGame==="function")saveGame();
+ return changed;
+}
 function installStyle(){
  if(typeof document==="undefined"||document.getElementById("wc6-merchant-style"))return;
  const el=document.createElement("style");
@@ -100,6 +138,18 @@ function installStyle(){
  document.head.appendChild(el);
 }
 installStyle();
-return Object.freeze({buildStock,upgradeOldStock,tierFor,validRow});
+return Object.freeze({buildStock,upgradeOldStock,tierFor,validRow,applyCombatReward});
 })();
+// Register the merchant as a plain service and the economy as a lifecycle
+// consumer. The registry initializes them after legacy state has been loaded.
+if(typeof WC_GAME_MODULES_V1!=="undefined"){
+ WC_GAME_MODULES_V1.register("merchant",WC_MERCHANT_STOCK_V1);
+ WC_GAME_MODULES_V1.register({
+  id:"economy",dependencies:["equipment","merchant","combat"],
+  init(services){
+   services.events.subscribe("combat:reward",WC_MERCHANT_STOCK_V1.applyCombatReward);
+   return WC_MERCHANT_STOCK_V1;
+  }
+ });
+}
 if(typeof module!=="undefined"&&module.exports)module.exports=WC_MERCHANT_STOCK_V1;
