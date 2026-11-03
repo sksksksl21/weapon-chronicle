@@ -37,8 +37,11 @@ function buildStock(kind){
 }
 function validRow(kind,row){
  if(!row||typeof row.id!=="string")return false;
- if(kind==="armor")return !!OWNER_GEAR_CATALOG[row.id];
- return !!(row.slot&&PART_CATALOG[row.slot]?.[row.id]);
+ const own=(obj,key)=>obj&&Object.prototype.hasOwnProperty.call(obj,key);
+ if(kind==="armor")return !!own(OWNER_GEAR_CATALOG,row.id);
+ if(kind!=="sword"||typeof row.slot!=="string"||!own(PART_CATALOG,row.slot))
+   return false;
+ return !!own(PART_CATALOG[row.slot],row.id);
 }
 // For old saves with a shop stock already generated, replace UNSOLD stock only.
 // Never overwrite sold transactions or owner inventory/equipment.
