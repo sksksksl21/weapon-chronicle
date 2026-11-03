@@ -136,6 +136,22 @@ openV47Epilogue=function(){_v52Epilogue();const a=v52EnsureAct1(),modal=$('modal
  const el=document.createElement('div');el.className='wc51Epilogue';el.textContent='제1장부터 이어진 선택\n'+a.entries.map(x=>`· CH.${x.chapter} ${V52_ACT1_PIVOTS[x.chapter]?.title}: ${V52_ACT1_PIVOTS[x.chapter]?.effects[x.choice]||'확정되지 않은 기록'}`).join('\n');
  const body=modal.querySelector('.storyText');if(body)body.insertAdjacentElement('afterend',el);
 };
+// One registry module groups main chapters (v4.7), history (v5.0), aftermath (v5.1) and Act-I history (v5.2).
+// Progress events only route into the existing v47CompleteChapter chain; its stage/result guard keeps commits single.
+function v52StoryChapterCompleted(event){
+ if(!event||typeof event!=='object')return;
+ const c=v47ByNo(event.no);if(!c)return;
+ return v47CompleteChapter(c,typeof event.result==='string'?event.result:'resolved',event.path==='b'?'b':'a');
+}
+if(typeof WC_GAME_MODULES_V1!=='undefined')WC_GAME_MODULES_V1.register({id:'story',dependencies:[],init(services){
+ services.events.subscribe('chapter:completed',v52StoryChapterCompleted);
+ // Late-bound so later wrappers of these legacy globals remain authoritative.
+ return Object.freeze({
+  chapter:no=>v47ByNo(no),completeChapter:v52StoryChapterCompleted,
+  history:()=>v50EnsureHistory(),historicalEnding:()=>v50HistoricalEnding(),support:()=>v50Support(),
+  aftermathAvailable:key=>v51AftermathAvailable(key),act1Pivot:key=>v52Act1Pivot(key)
+ });
+}});
 if(location.search.includes('wc52test'))window.__wc52test={
   get:()=>JSON.parse(JSON.stringify(v52EnsureAct1())),support:()=>v50Support(),news:()=>v51NewsText(),
   events:()=>state.worldHistory.filter(x=>x.type==='act1HistoricalPivot'), stage:()=>ensureV47()?.stage, ctx:()=>state.storyCtx,
