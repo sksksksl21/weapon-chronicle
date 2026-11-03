@@ -42,6 +42,10 @@ def load_module_manifest(root):
     for ident,expected in boundaries.items():
         if by_id.get(ident)!=expected:
             raise ValueError('Missing contract module: '+ident)
+    # The legacy file opens the shared IIFE and must remain first. Install the
+    # registry immediately after it, before any feature can consume services.
+    if len(entries)<2 or entries[1].get('id')!='module-services':
+        raise ValueError('Module registry must precede feature modules after legacy wrapper')
     return tuple(item['path'] for item in entries)
 
 
