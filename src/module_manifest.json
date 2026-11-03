@@ -123,6 +123,15 @@
       "domain": "service"
     },
     {
+      "id": "economy",
+      "path": "core/economy_rewards_v1.js",
+      "requires": [
+        "merchant",
+        "combat-runtime"
+      ],
+      "domain": "economy"
+    },
+    {
       "id": "status",
       "path": "core/status_skilldeck_v1.js",
       "requires": [
@@ -137,6 +146,7 @@
       "requires": [
         "status",
         "merchant",
+        "economy",
         "combat-handoff",
         "checkpoint",
         "act1-history"
