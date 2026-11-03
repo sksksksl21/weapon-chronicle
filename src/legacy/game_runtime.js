@@ -2017,7 +2017,7 @@ function renderEventBoard(){
       banner.className='mainEventBanner show';
       const forced=mainEv.forced?' · 기한 초과':'';
       banner.innerHTML=`<div class="mainText"><small>MAIN STREAM${forced}</small><b>${mainEv.title.replace(/^MAIN · /,'')}</b><span>${mainEv.desc}</span></div><button id="mainEventBtn">${mainEv.forced?'강제 진행':'진행'}</button>`;
-      $('mainEventBtn').onclick=()=>{state.monthEvents.forEach(x=>x.chosen=false);mainEv.chosen=true;state.policy=mainEv.policy;state.subChoice=mainEv.id;activeActionCategory=null;render();};
+      $('mainEventBtn').onclick=()=>{state.monthEvents.forEach(x=>x.chosen=false);mainEv.chosen=true;state.policy=mainEv.policy;state.subChoice=mainEv.id;activeActionCategory=null;emitUiEvent('state-changed',{reason:'main-event-selected'});};
     }else{banner.className='mainEventBanner';banner.innerHTML='';}
   }
   const forcedMain=!!mainEv?.forced;
@@ -6213,4 +6213,36 @@ const _v47Load=loadGame;
 loadGame=function(){const ok=_v47Load();ensureV47();return ok;};
 // Dedicated test harness, unavailable in ordinary play.
 if(location.search.includes('wc47test'))window.__wc47test={getStage:()=>ensureV47()?.stage||0, getMain:()=>v47Current(),setStage:(n)=>{ensureV25MainState();state.mainStory.node='1-09';state.mainStory.act1Complete=true;state.mainStory.prototypeEnd=true;const v=ensureV47();v.stage=n;v.complete=n===41;state.monthCandidateCache={};state.monthEvents=[];genMonth();},getCount:()=>ensureV47()?.results.length||0, getState:()=>({monthEvents:state.monthEvents,policy:state.policy,subChoice:state.subChoice,chapter:mainStoryLabel(),main:state.mainStory.mainV47}),pick:(p,k)=>chooseActionCandidate(p,k),start:()=>startStory(),clickChoice:(i)=>{const b=document.querySelectorAll('#storyChoices button')[i];if(b)b.click();return !!b;},nextMonth:()=>{const b=$('startYear2')||$('nextMonthBtn');if(b)b.click();else genMonth();},markStage:(n)=>{const c=v47Current();if(c&&c.no===n)v47CompleteChapter(c,'resolved','test');},redraw:()=>render()};
+
+// UI module V1 · Game logic announces changes with emitUiEvent(); the "ui" module
+// subscribes and owns the screen refresh. The module registry script loads after
+// this runtime, so subscriptions made earlier are queued and moved onto the
+// registry event bus on first use; until then events are delivered locally.
+const UI_EVENT_PREFIX_V1='ui:';
+const uiPendingSubscriptionsV1=[];
+let uiRegistryV1=null;
+function uiModuleRegistryV1(){
+ if(uiRegistryV1)return uiRegistryV1;
+ let registry=null;
+ try{registry=WC_GAME_MODULES_V1;}catch(error){return null;}
+ if(!registry?.events)return null;
+ uiRegistryV1=registry;
+ for(const s of uiPendingSubscriptionsV1.splice(0))s.detach=registry.events.subscribe(UI_EVENT_PREFIX_V1+s.topic,s.handler);
+ if(!registry.has('ui'))registry.register('ui',UI_MODULE_V1);
+ return registry;
+}
+function subscribeUiEvent(topic,handler){
+ const registry=uiModuleRegistryV1();
+ if(registry)return registry.events.subscribe(UI_EVENT_PREFIX_V1+topic,handler);
+ const entry={topic,handler,detach:null};uiPendingSubscriptionsV1.push(entry);
+ return ()=>{const i=uiPendingSubscriptionsV1.indexOf(entry);if(i>=0)uiPendingSubscriptionsV1.splice(i,1);if(entry.detach)entry.detach();};
+}
+function emitUiEvent(topic,payload){
+ const registry=uiModuleRegistryV1();
+ if(registry)return registry.events.publish(UI_EVENT_PREFIX_V1+topic,payload);
+ for(const s of [...uiPendingSubscriptionsV1])if(s.topic===topic)s.handler(payload);
+}
+// Refreshes only through the renderer; late render() wrappers are resolved at call time.
+const UI_MODULE_V1=Object.freeze({refresh:()=>render()});
+subscribeUiEvent('state-changed',()=>UI_MODULE_V1.refresh());
 
