@@ -14,7 +14,14 @@ const TIERS=[
 ];
 const W_SLOTS=["blade","guard","tang","grip","wrap","pommel","seat","scabbard"];
 const A_SLOTS=["helmet","armor","gloves","boots"];
-const ARMOR_ALLOWED=new Set(["defense","maxHp","survival","evade","resist","block","defensePct","speed","speedPct"]);
+const ARMOR_ALLOWED=new Set(["defense","maxHp","survival","evade","resist","block","defensePct","speed","speedPct",
+ "statusResist","blockChance","blockAmount","critChanceResist","critDamageResist"]);
+// Presence, rather than truthiness: an authored zero is a direct stat too.
+// Shared fields (defense, penetration, speedPct, etc.) alone do not distinguish
+// historical catalog data from native input.
+const DIRECT_FIELDS=["minAttack","maxAttack","hitBonus","critBonus","critDamageBonus",
+ "statusResist","blockChance","blockAmount","critChanceResist","critDamageResist"];
+function isDirect(mods){return DIRECT_FIELDS.some(key=>Object.prototype.hasOwnProperty.call(mods,key));}
 const W_STATS=[
  ["power","공격력"],["precision","치명타 확률"],["toughness","방어력"],
  ["handling","공격속도"],["penetration","관통력"],
@@ -46,10 +53,14 @@ function optionsFor(slot,armor){return armor?A_STATS[slot]:W_STATS;}
 function buildItem(slot,kind,baseId,base,tier,index,rollToken=""){
  const armor=kind==="armor",rand=randomFrom("WC-5|"+kind+"|"+slot+"|"+baseId+"|"+tier.id+(rollToken?"|"+rollToken:""));
  const original=base.mods||{},mods={...original};
+ const native=isDirect(original);
  // Only protective/mobility data are meaningful for armor; legacy attack fields
  // must not leak into the new catalog even before adapter validation.
  if(armor){for(const key of Object.keys(mods))if(!ARMOR_ALLOWED.has(key))delete mods[key];}
- const rollKeys=armor?["defense","maxHp","evade"]:["power","precision","toughness","handling"];
+ // Native values are already authored calculator inputs. No approved native
+ // roll distribution exists yet; keep them intact instead of deriving or
+ // rolling legacy stats. The historical PRNG path below stays byte-equivalent.
+ const rollKeys=native?[]:armor?["defense","maxHp","evade"]:["power","precision","toughness","handling"];
  for(const key of rollKeys){
    const current=Number(mods[key]||0);
    // Quality is independent of base roll: a bad legendary can have drawbacks.
@@ -58,7 +69,7 @@ function buildItem(slot,kind,baseId,base,tier,index,rollToken=""){
  }
  // Item quality changes the amount of possible affixes, never the count.
  const available=optionsFor(slot,armor).slice(),options=[];
- for(let a=0;a<tier.options;a++){
+ for(let a=0;!native&&a<tier.options;a++){
    const chosen=available.splice(Math.floor(rand()*available.length),1)[0];
    const [key,label]=chosen;
    const points=1+Math.floor(tier.options*.7)+whole(rand,0,2);
@@ -67,7 +78,7 @@ function buildItem(slot,kind,baseId,base,tier,index,rollToken=""){
    options.push(Object.freeze({key,name:label,value}));
  }
  let uniqueEffect=null;
- if(tier.id==="unique"||tier.id==="chronicle"){
+ if(!native&&(tier.id==="unique"||tier.id==="chronicle")){
    const rule=armor?UNIQUE_ARMOR[slot]:UNIQUE_WEAPON[index%UNIQUE_WEAPON.length];
    const multiplier=tier.id==="chronicle"?1.5:1;
    const value=Math.round(rule.value*multiplier);
@@ -131,7 +142,8 @@ function ownerFinalDetail(item){
  if(typeof WC_DIRECT_COMBAT_V2==="undefined"||typeof wcDirectOwnerRates!=="function")return "";
  try{
   const armor=A_SLOTS.includes(item.slot),kind=armor?"armor":"weapon",slot=armor?item.slot:"blade";
-  const direct=WC_DIRECT_COMBAT_V2.migrateLegacyPart(item.mods||{},kind,slot);
+  const mods=item.mods||{};
+  const direct=isDirect(mods)?{...mods}:WC_DIRECT_COMBAT_V2.migrateLegacyPart(mods,kind,slot);
   const final=WC_DIRECT_COMBAT_V2.itemEffects(direct,{kind,slot,owner:wcDirectOwnerRates()});
   const text=WC_DIRECT_COMBAT_V2.describeItemEffects(final).join(" · ")||"수치 효과 없음";
   return '<p class="wc5-final"><b>현재 소유자 발휘 최종값</b> (무예 '+final.martial+'% · 생존 '+
