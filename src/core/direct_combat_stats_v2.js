@@ -2,7 +2,8 @@
  * Independent from the legacy battle bridge. No owner attack/defense flat bonus.
  * Percentage conventions: attackPct/defensePct = decimal fractions (0.10=10%).
  * hit/crit/evade/block bonuses = percentage points (10=10%p).
- * speedPct/critDamageBonus = percentages (20=20%).
+ * speedPct/critDamageBonus/critDamageResist = percentages (20=20%); resist is
+ * subtracted directly from the attacker's critDamageBonus in resolveStrike.
  * Legacy migration is explicitly separated below. No weight/length bonuses.
  */
 const WC_DIRECT_COMBAT_V2=(()=>{
@@ -112,7 +113,7 @@ const EFFECT_LABELS=Object.freeze([
  ["치명타 확률","critBonus","%p"],["치명타 피해","critDamageBonus","%"],["관통","penetration",""],
  ["회피","evade","%p"],["상태 저항","statusResist","%p"],["막기 확률","blockChance","%p"],
  ["막기량","blockAmount",""],["치명타 확률 저항","critChanceResist","%p"],
- ["치명타 피해 저항","critDamageResist","%p"],["공격속도","speedPct","%"],
+ ["치명타 피해 저항","critDamageResist","%"],["공격속도","speedPct","%"],
  ["최대 공명","maxResonance",""],["공명 회복","resonanceRecovery",""]
 ]);
 function describeItemEffects(e={}){
