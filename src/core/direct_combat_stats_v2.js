@@ -75,7 +75,9 @@ function calculate({owner={},weapon={},parts={},armor={},base=BASE}={}){
   maxHp:[n(owner.baseHp,1),hpBonus,stable,1],
   hitChance:[n(base.hitChance,70),sum(attackItems,"hitBonus"),m,1],
   critChance:[n(base.critChance,5),sum(attackItems,"critBonus"),m,1],
-  attackSpeed:[100,sum(speedItems,"speedPct"),m,1]
+  attackSpeed:[100,sum(speedItems,"speedPct"),m,1],
+  maxResonance:[0,sum(resSources,"maxResonance"),1,1],
+  resonanceRecovery:[0,sum(resSources,"resonanceRecovery"),1,1]
  };
  for(const key of ["critDamageBonus","penetration","critChanceResist","critDamageResist",
   "statusResist","evade","blockChance","blockAmount"]){
@@ -138,10 +140,16 @@ function resolveStrike({attacker={},defender={},hitRoll,critRoll,blockRoll,damag
  const min=Math.max(0,n(attacker.minAttack)),max=Math.max(min,n(attacker.maxAttack));
  const base=min+(max-min)*clamp(n(damageRoll,0),0,1);
  if(base<=0)return Object.freeze({hit:true,crit,blocked,damage:0});
+ const reduction=(blocked?Math.max(0,n(defender.blockAmount)):0)+Math.max(0,n(temporaryDefense));
+ // Use the common damage arithmetic when loaded by the game; standalone
+ // calculator consumers retain the identical established arithmetic.
+ const common=typeof WC_COMBAT_MATH_V1!=="undefined"?WC_COMBAT_MATH_V1:null;
  const preDefense=base*Math.max(0,n(cardMultiplier,1))*(crit?1+criticalExtra/100:1);
  const effectiveDefense=Math.max(0,n(defender.defense)-Math.max(0,n(attacker.penetration)));
- const damage=Math.max(0,Math.max(1,preDefense-effectiveDefense)-
-  (blocked?Math.max(0,n(defender.blockAmount)):0)-Math.max(0,n(temporaryDefense)));
+ const damage=common?common.resolveDamage({damage:base,cardMultiplier,
+  critMultiplier:crit?1+criticalExtra/100:1,defense:defender.defense,
+  penetration:attacker.penetration,temporaryDefense:reduction}).finalDamage:
+  Math.max(0,Math.max(1,preDefense-effectiveDefense)-reduction);
  return Object.freeze({hit:true,crit,blocked,damage:Math.round(damage),effectiveDefense});
 }
 // Explicit old-data migration only, not the combat model.
@@ -169,6 +177,11 @@ function migrateLegacyPart(mods={},kind="weapon",slot=""){
    direct.critBonus=0;direct.critDamageBonus=0;direct.penetration=0;
  }
  if(kind==="armor"&&slot!=="boots")direct.speedPct=0;
+ // Native fields override compatibility values by presence, including zero.
+ // Never reinterpret an explicitly authored attack range as legacy power.
+ for(const key of Object.keys(direct)){
+  if(Object.prototype.hasOwnProperty.call(mods,key))direct[key]=n(mods[key]);
+ }
  return Object.freeze(direct);
 }
 function migrateLegacyLoadout({weapon={},partCatalog={},equipment={},gearCatalog={}}={}){
@@ -194,9 +207,14 @@ function migrateLegacyLoadout({weapon={},partCatalog={},equipment={},gearCatalog
   resonanceRecovery:n(weapon.resonanceRecovery)-total("resonanceRecovery"),
   attackPct:n(weapon.attackPct),defensePct:n(weapon.defensePct),speedPct:n(weapon.speedPct)
  });
- return {weapon:migrateLegacyPart(residual,"weapon"),parts,armor};
+ const nativeWeapon=Object.prototype.hasOwnProperty.call(weapon,"minAttack")||
+  Object.prototype.hasOwnProperty.call(weapon,"maxAttack");
+ return {weapon:nativeWeapon?migrateLegacyPart(weapon,"weapon"):
+  migrateLegacyPart(residual,"weapon"),parts,armor};
 }
-return Object.freeze({PART_SLOTS,ARMOR_SLOTS,BASE,calculate,resolveStrike,migrateLegacyPart,migrateLegacyLoadout,
+// Compatibility entrypoint: the calculator remains the sole final-stat producer.
+function snapshot(input){return calculate(input);}
+return Object.freeze({PART_SLOTS,ARMOR_SLOTS,BASE,calculate,snapshot,resolveStrike,migrateLegacyPart,migrateLegacyLoadout,
  itemEffects,describeItemEffects});
 })();
 if(typeof module!=="undefined"&&module.exports)module.exports=WC_DIRECT_COMBAT_V2;

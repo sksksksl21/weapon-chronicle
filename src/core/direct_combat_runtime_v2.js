@@ -4,7 +4,7 @@
  * Owner points are percentages on the displayed 0..100 scale; no implicit x10.
  */
 function wcDirectOwnerRates(){
- const raw=rawOwnerStats(), eff=effectiveOwnerStats();
+ const eff=effectiveOwnerStats(), raw=eff.raw||rawOwnerStats();
  const mental=Number.isFinite(Number(eff.mult))?Number(eff.mult):1;
  const armorSurvival=typeof armorSurvivalValue==="function"?Number(armorSurvivalValue()||0):0;
  const weaponMartial=Number(raw.parts?.weapon||0);
@@ -26,14 +26,18 @@ function wcDirectCurrentStats(weaponOverride=null,gearOverride=null){
  const rates=wcDirectOwnerRates();
  // Legacy maxHp already contains armor flat HP; undo that component exactly
  // so the direct layer can scale the equipment HP bonus once.
+ const currentItems=gearOverride?WC_DIRECT_COMBAT_V2.migrateLegacyLoadout({
+  weapon:state.weapon||{},partCatalog:PART_CATALOG,
+  equipment:state.ownerEquipment||{},gearCatalog:OWNER_GEAR_CATALOG
+ }):items;
  const hpFromGear=WC_DIRECT_COMBAT_V2.ARMOR_SLOTS.reduce((total,slot)=>
-  total+Number(items.armor[slot]?.maxHp||0),0);
+  total+Number(currentItems.armor[slot]?.maxHp||0),0);
  // Transitional display only: preserve the CURRENT legacy HP cap exactly.
  // The permanent 0..100 HP migration needs its own save/version audit; never
  // shrink or heal current HP just because the new status window is opened.
  const owner={...rates,baseHp:Math.max(1,Number(state.maxHp||1)-
    hpFromGear*rates.stableSurvival/100)};
- const result=WC_DIRECT_COMBAT_V2.calculate({owner,...items});
+ const result=WC_DIRECT_COMBAT_V2.snapshot({owner,...items});
  return Object.freeze({...result,ownerRates:Object.freeze(rates),
   migration:Object.freeze({version:"legacy-v5.2-preview",audited:false})});
 }
