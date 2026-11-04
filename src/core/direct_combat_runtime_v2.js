@@ -63,25 +63,113 @@ const WC_COMBAT_MODULE_V1=(()=>{
  // Keep the existing resolver (including damage, cards and speed extras) intact.
  function installEnemyIntent(createEnemyIntent){
   const enemyIntentRuntime=createEnemyIntent();
+  // Memory interventions use the frame's real hand, discard/exhaust piles and
+  // resonance rules. This is a view/guard over the existing resolver, not a
+  // second card system or a manual replacement for the owner's chosen plan.
+  let committedTelegraph=null;
+  const ledger=[];
+  const snapshot=()=>Object.freeze({turn,phase,hp:hero.hp,enemyHp:enemy.hp,
+   resonance,hand:Object.freeze(hand.slice()),discard:Object.freeze(discard.slice()),
+   exhausted:Object.freeze(exhausted.slice())});
+  const record=(kind,before,details={})=>{
+   ledger.push(Object.freeze({kind,telegraph:enemyIntentRuntime.telegraph||committedTelegraph,
+    ...details,before,after:snapshot()}));
+  };
+  const originalCanUse=canUseCard;
+  canUseCard=function(id){
+   if(hero.hp<=0||enemy.hp<=0)return false;
+   if(phase==='pre'&&!enemyIntentRuntime.pending)return false;
+   // An enemyHit card cannot react to an unrelated/stale reaction window.
+   if(CARD_DB[id]?.timing==='enemyHit'&&!(pending?.enemyDamage>0))return false;
+   return originalCanUse(id);
+  };
+  const originalSpend=spendResonance;
+  spendResonance=function(id){
+   const before=snapshot(),paid=originalSpend(id);
+   if(paid)record('resonance-cost',before,{card:id,cost:cardCost(id)});
+   return paid;
+  };
+  const originalUse=useCard;
+  useCard=function(id){
+   if(!canUseCard(id))return;
+   const before=snapshot(),result=originalUse(id);
+   record(CARD_DB[id].timing==='pre'?'selection':'reaction',before,{card:id});
+   return result;
+  };
+  const originalCommit=commitPreCard;
+  commitPreCard=function(){
+   const before=snapshot(),cards=selectedPre.slice(),result=originalCommit();
+   record('commit',before,{cards:Object.freeze(cards.filter(id=>usedThisTurn.includes(id)))});
+   return result;
+  };
+  const originalStart=startTurn;
+  startTurn=function(...args){
+   const before=snapshot(),result=originalStart.apply(this,args);
+   record('turn-start',before,{recovery:Math.max(0,resonance-before.resonance)});
+   return result;
+  };
+  const originalDiscard=discardBattleCard36;
+  discardBattleCard36=function(){
+   const before=snapshot(),wasDiscarded=discardedThisTurn36,result=originalDiscard();
+   if(!wasDiscarded&&discardedThisTurn36)record('discard',before);
+   return result;
+  };
+  const originalEndTurn=endTurn;
+  endTurn=async function(...args){
+   const before=snapshot(),result=await originalEndTurn.apply(this,args);
+   record('exchange-result',before);
+   return result;
+  };
+  const originalExecute=executeTurn;
+  executeTurn=function(...args){
+   if(!enemyIntentRuntime.pending||phase!=='pre')return;
+   return originalExecute.apply(this,args);
+  };
+  const options=()=>Object.freeze(hand.filter(id=>canUseCard(id)).map(id=>Object.freeze({
+   id,name:displayCardName(id),timing:CARD_DB[id].timing,
+   benefit:displayCardEffect(id),cost:cardCost(id),
+   destination:CARD_DB[id].exhaust?'exhausted':'discard',
+   tradeoff:'사용/버림 합계 턴당 1장 · 공명 소모 · 반응 카드는 해당 판정 후에만 사용',
+   selected:selectedPre.includes(id),
+   telegraph:enemyIntentRuntime.telegraph||committedTelegraph
+  })));
+  window.WC_MEMORY_INTERVENTION_V1=Object.freeze({
+   get options(){return options();},get state(){return snapshot();},
+   get ledger(){return Object.freeze(ledger.slice());},
+   use(id){if(!canUseCard(id))return false;useCard(id);return true;}
+  });
   let autoTimer=null, cancelled=false;
   const clear=()=>{cancelled=true;enemyIntentRuntime.cancel();clearTimeout(autoTimer);autoTimer=null;};
   const oldChoose=chooseEnemyIntent;
   chooseEnemyIntent=function(){
    cancelled=false;
    enemyIntentRuntime.cancel();
+   committedTelegraph=null;
    return enemyIntentRuntime.decide(oldChoose(),turn).action;
   };
   const oldResolve=resolveEnemyPhase;
   resolveEnemyPhase=async function(...args){
    if(cancelled||hero.hp<=0||enemy.hp<=0||phase==='done'){clear();return;}
+   const publicTelegraph=enemyIntentRuntime.telegraph;
    const planned=enemyIntentRuntime.take(turn);
    if(!planned){clear();return;}
    enemyIntent=planned.action;
-   return oldResolve.apply(this,args);
+   committedTelegraph=publicTelegraph;
+   const before=snapshot(),result=await oldResolve.apply(this,args);
+   record('enemy-result',before);
+   return result;
   };
   const oldRender=render;
   render=function(...args){
    const result=oldRender.apply(this,args);
+   // The normal card buttons are the intervention controls. Keep their exact
+   // eligibility and show the benefit/cost mapping without adding free actions.
+   const cardButtons=$('cards')?.children;
+   if(cardButtons)Array.from(cardButtons).forEach((node,index)=>{
+    const id=hand[index];if(!CARD_DB[id])return;
+    node.title=displayCardEffect(id)+' · 공명 '+cardCost(id)+' · '+
+     (CARD_DB[id].exhaust?'전투 중 소진':'버린 카드로 이동')+' · 턴당 개입 1장';
+   });
    if(hero.hp<=0||enemy.hp<=0||phase==='done')clear();
    if(!enemyIntentRuntime.pending){
     for(const id of ['enemyActionIcon','enemyActionText','enemyHitPct','enemyDmgText']){
@@ -98,13 +186,17 @@ const WC_COMBAT_MODULE_V1=(()=>{
      if(phase!==waiting||hero.hp<=0||enemy.hp<=0)return;
      if(phase==='pre')executeTurn();
      else $('skipBtn').onclick();
-    },1200);
+    },options().length?8000:1200);
    }
    return result;
   };
   for(const name of ['stageVictory','runEnd','resetRun']){
    const previous=name==='stageVictory'?stageVictory:name==='runEnd'?runEnd:resetRun;
-   const wrapped=function(...args){clear();return previous.apply(this,args);};
+   const wrapped=function(...args){
+    clear();
+    if(name==='resetRun'){ledger.length=0;committedTelegraph=null;}
+    return previous.apply(this,args);
+   };
    if(name==='stageVictory')stageVictory=wrapped;
    else if(name==='runEnd')runEnd=wrapped;
    else resetRun=wrapped;
