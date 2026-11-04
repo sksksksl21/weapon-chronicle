@@ -65,6 +65,25 @@ function calculate({owner={},weapon={},parts={},armor={},base=BASE}={}){
    gearHpBonus:rounded(hpBonus)
   })
  };
+ // Audit records mirror the expressions above, including unrounded sources.
+ // Social has no direct-combat target. Base hit/crit/speed/HP are not scaled.
+ const targets={
+  minAttack:[0,sum(attackItems,"minAttack"),m,1+atkPct],
+  maxAttack:[0,sum(attackItems,"maxAttack"),m,1+atkPct],
+  defense:[0,sum(defenseItems,"defense"),s,1+defPct],
+  maxHp:[n(owner.baseHp,1),hpBonus,stable,1],
+  hitChance:[n(base.hitChance,70),sum(attackItems,"hitBonus"),m,1],
+  critChance:[n(base.critChance,5),sum(attackItems,"critBonus"),m,1],
+  attackSpeed:[100,sum(speedItems,"speedPct"),m,1]
+ };
+ for(const key of ["critDamageBonus","penetration","critChanceResist","critDamageResist",
+  "statusResist","evade","blockChance","blockAmount"]){
+  const offensive=["critDamageBonus","penetration"].includes(key);
+  targets[key]=[n(base[key]),sum(offensive?attackItems:defenseItems,key),offensive?m:s,1];
+ }
+ result.calculations=Object.freeze(Object.fromEntries(Object.entries(targets).map(([key,[baseValue,equipment,statRate,modifier]])=>
+  [key,Object.freeze({base:baseValue,equipment,statRate,modifier,
+   beforeClamp:baseValue+equipment*statRate*modifier,final:result[key]})])));
  return Object.freeze(result);
 }
 // Per-item owner-applied contribution for equipment detail views. Reuses

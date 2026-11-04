@@ -1,7 +1,7 @@
 /* Transitional UI-facing direct-stat runtime input, 2026-10-21 contract.
  * This is an explicit compatibility migration bridge; no old source stats are
  * read by WC_DIRECT_COMBAT_V2.calculate itself.
- * TODO: replace legacy 1..10 owner-growth scaling with audited 0..100 migration.
+ * Owner points are percentages on the displayed 0..100 scale; no implicit x10.
  */
 function wcDirectOwnerRates(){
  const raw=rawOwnerStats(), eff=effectiveOwnerStats();
@@ -10,8 +10,8 @@ function wcDirectOwnerRates(){
  const weaponMartial=Number(raw.parts?.weapon||0);
  const currentMartial=Math.max(0,Number(eff.martial||0)-weaponMartial*mental);
  const currentSurvival=Math.max(0,Number(eff.survival||0)-armorSurvival*mental);
- const safe=x=>Math.max(0,Math.min(100,Math.round(x*10)));
- // Explicit migration of v5.2 personal points, not 7 -> 7%.
+ const safe=x=>Math.max(0,Math.min(100,x));
+ // Equipment identity is removed once; mental/injury modifiers remain applied once.
  return {
   martial:safe(currentMartial),survival:safe(currentSurvival),
   social:safe(Number(eff.social||0)),
