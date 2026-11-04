@@ -6135,7 +6135,11 @@ function v47CompleteChapter(c,result,path){
 }
 function v47FinishScene(c,result){
  const path=state.storyCtx?.odysseyPath||'a',v=ensureV47();
- if(v?.stage===c.no)v47CompleteChapter(c,result,path);
+ if(v?.stage===c.no){
+  const registry=uiModuleRegistryV1();
+  if(registry?.has('runtime-integration'))registry.require('runtime-integration').completeChapter({no:c.no,result,path});
+  else v47CompleteChapter(c,result,path);
+ }
  const last=(c.no===40),prefix=result==='defeat'?'대가를 치렀다.':'이 선택은 기록됐다.';
  const conclusion=last?`귀향은 한 사람만의 승리가 아니었다. 이타카의 마지막 밤은 끝났고, 아테나가 멈춘 창끝 앞에서 복수의 고리가 끊어졌다.\n\n검은 바다를 건넌 수많은 소유자를 기억한다. 소유자의 이름이 사라져도 그들의 행동은 남는다. 이것이 Weapon Chronicle의 마지막 MAIN 기록이다.`:c.outro;
  v47Scene(c,last?'최종 장 · 이타카의 평화':(result==='defeat'?'상처를 남긴 귀결':'사건의 귀결'),`${prefix}\n\n${conclusion}\n\n${last?'MAIN STORY COMPLETED · 5장 40챕터 완결':`다음은 제${v47ByNo(c.no+1)?.act||c.act}장 「${v47ByNo(c.no+1)?.title||''}」. 다음 달의 조사에서 새 단서를 확인해야 이어진다.`}`,[{label:last?'검의 연대기에 마지막 장을 남긴다':'이번 장면을 기록한다',next:'END',outcome:last?'오디세이 메인스토리 완결 · 이타카의 평화':`제${c.act}장 CH.${c.local}/8 ${result==='defeat'?'패배의 기록':'완료'} · ${c.title}`}]);

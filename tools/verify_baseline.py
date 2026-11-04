@@ -12,3 +12,45 @@ with tempfile.TemporaryDirectory() as t:
     p=Path(t)/'built.js';p.write_text(js,encoding='utf8')
     subprocess.run(['node','--check',str(p)],check=True)
 print('PASS: deterministic build, JS syntax, output SHA256='+hashlib.sha256(built.encode()).hexdigest())
+
+# Focused integration fixture: execute the actual bootstrap, registry and economy
+# subscription with boundary doubles. Browser regressions remain a separate gate.
+integration = r"""
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+async function check(blocked){
+ const trace=[];
+ const sandbox={console,state:{monthFacts:['existing']},
+  v48EnsureState:()=>trace.push('ensure'),
+  loadGame:()=>{trace.push('load');return blocked?null:true;},
+  genMonth:()=>trace.push('month'),addLog:()=>{}};
+ vm.createContext(sandbox);
+ vm.runInContext(fs.readFileSync('src/core/module_services_v1.js','utf8'),sandbox);
+ const registry=vm.runInContext('WC_GAME_MODULES_V1',sandbox);
+ registry.register('equipment',{});
+ registry.register('merchant',{applyCombatReward:()=>trace.push('reward')});
+ registry.register({id:'combat',init(){trace.push('combat');return {};}});
+ registry.register('save',{});
+ registry.register({id:'story',init(){return {completeChapter:()=>trace.push('story')};}});
+ sandbox.uiModuleRegistryV1=()=>registry.register('ui',{refresh:()=>trace.push('ui')});
+ vm.runInContext(fs.readFileSync('src/core/economy_rewards_v1.js','utf8'),sandbox);
+ const bootstrap=fs.readFileSync('src/legacy/bootstrap.js','utf8');
+ vm.runInContext(bootstrap.replace(/\}\)\(\);\s*$/, ''),sandbox);
+ await vm.runInContext('WC_RUNTIME_READY_V1',sandbox);
+ assert.deepEqual(trace,blocked?['combat','ensure','load']:['combat','ensure','load','ui']);
+ if(!blocked){
+  registry.events.publish('combat:reward',{kind:'equipment'});
+  registry.require('runtime-integration').completeChapter({no:9});
+  registry.events.publish('combat:end',{});
+  assert.deepEqual(trace.slice(-3),['reward','story','ui']);
+  await registry.initialize();
+  const before=trace.length;
+  registry.events.publish('combat:reward',{});
+  assert.equal(trace.length,before+1,'No duplicate reward subscription');
+ }
+ await registry.dispose();
+}
+(async()=>{await check(false);await check(true);
+ console.log('PASS: registry bootstrap, reward/story/UI routing and blocked recovery startup');
+})().catch(error=>{console.error(error);process.exitCode=1;});
+"""
+subprocess.run(['node','-e',integration],cwd=root,check=True)
