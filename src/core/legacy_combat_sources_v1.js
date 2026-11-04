@@ -166,6 +166,41 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
       cancel(){pendingEnemyAction=null;}
     });
   }
-  return Object.freeze({SWORD,ARMOR,armorContribution,fromLegacyLoadout,enemyFromLegacy,createEnemyIntent});
+  // Selection from story_combat.html STAGES / STORY_BOSS, not equipment data:
+  // bandit: lowest attack/HP, existing shield parry; spider: higher evasion,
+  // existing retreat; cyclops: authored chapter-two boss, stage-0 parry rules.
+  // Condition -> action / public cue (priority from top to bottom):
+  // bandit: turn modulo 4 = 1,2,3,0 -> light,heavy,guard,light.
+  // spider: turn modulo 4 = 1,2,3,0 -> guard,light,heavy,web.
+  // cyclops: exposed -> light; parryReady -> heavy;
+  // HP <= half -> heavy,guard,heavy,light; otherwise light,heavy,guard,light.
+  // Guard uses the CURRENT resolver: bandit/cyclops parry, spider retreat.
+  // No stats, damage tables, dodge chances or counter rules are introduced.
+  // Self-contained factory also serialized into the offline combat frame.
+  function createEnemyPatterns(){
+    const cues=Object.freeze({
+      light:"공격 전조 · 무기를 앞으로 세우며 거리를 좁힌다.",
+      heavy:"강공격 전조 · 몸을 낮추고 큰 일격을 준비한다.",
+      guard:"방어·반격 전조 · 몸을 뒤로 빼고 방어 자세를 잡는다.",
+      web:"견제 전조 · 다리를 벌리고 실을 모은다."
+    });
+    const cycles={bandit:['light','heavy','guard','light'],spider:['guard','light','heavy','web']};
+    return Object.freeze({
+      select(id,{turn=1,hp,maxHp,exposed=false,parryReady=false}={}){
+        if(!['bandit','spider','cyclops'].includes(id))return null;
+        const index=((Math.max(1,Math.floor(Number(turn)||1))-1)%4);
+        let action,condition='cycle';
+        if(id==='cyclops'){
+          if(exposed){action='light';condition='exposed';}
+          else if(parryReady){action='heavy';condition='parry-ready';}
+          else if(maxHp>0&&hp/maxHp<=.5){action=['heavy','guard','heavy','light'][index];condition='wounded';}
+          else {action=cycles.bandit[index];condition='steady';}
+        }else action=cycles[id][index];
+        const state=id==='cyclops'?({exposed:'빈틈을 추스르며', 'parry-ready':'막아낸 기세를 이어',wounded:'상처에 격앙되어',steady:'거구의 균형을 잡으며'}[condition]+' · '):'';
+        return Object.freeze({action,condition,cue:state+cues[action]});
+      }
+    });
+  }
+  return Object.freeze({SWORD,ARMOR,armorContribution,fromLegacyLoadout,enemyFromLegacy,createEnemyIntent,createEnemyPatterns});
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = WC_LEGACY_COMBAT_SOURCES_V1;

@@ -2163,12 +2163,37 @@ function applyPrepAfterCombat(enemy,result){
 
 /* @include:combat-document */
 let COMBAT_SRCDOC_CACHE=null;
+// Install before the existing intent decorator: its retained turn decision
+// receives our selected action, and its cancellation still clears the cue.
+function installEnemyPatterns(createEnemyPatterns){
+  const patterns=createEnemyPatterns();
+  let announced=null;
+  const previousChoose=chooseEnemyIntent;
+  chooseEnemyIntent=function(){
+    const id=STORY_MODE?STORY_ENEMY:['bandit','spider','slime'][stageIndex];
+    announced=patterns.select(id,{turn,hp:enemy.hp,maxHp:enemy.maxHp,
+      exposed:enemy.exposed,parryReady:enemy.parryReady});
+    return announced?announced.action:previousChoose();
+  };
+  const previousRender=render;
+  render=function(...args){
+    const result=previousRender.apply(this,args);
+    if(announced&&enemyIntent===announced.action&&hero.hp>0&&enemy.hp>0&&phase!=='done'){
+      $('enemyActionText').textContent='적 · '+enemyIntentName(enemyIntent)+' · '+announced.cue;
+    }
+    return result;
+  };
+}
 function getCombatSrcdoc(){
   if(COMBAT_SRCDOC_CACHE)return COMBAT_SRCDOC_CACHE;
   const bin=atob(COMBAT_DOC_B64);
   const bytes=new Uint8Array(bin.length);
   for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
   COMBAT_SRCDOC_CACHE=new TextDecoder("utf-8").decode(bytes);
+  const marker="$('chronicleBtn').onclick=openChronicle;";
+  if(!COMBAT_SRCDOC_CACHE.includes(marker))throw new Error('Enemy pattern combat bootstrap marker missing');
+  COMBAT_SRCDOC_CACHE=COMBAT_SRCDOC_CACHE.replace(marker,
+    '('+installEnemyPatterns.toString()+')('+WC_LEGACY_COMBAT_SOURCES_V1.createEnemyPatterns.toString()+');\n'+marker);
   return COMBAT_SRCDOC_CACHE;
 }
 
