@@ -5,6 +5,12 @@
  * initialize() validates the entire graph before running hooks, awaits each
  * dependency, and runs each module once. dispose() tears down in reverse order.
  * No game state, save fields or gameplay hooks are owned by this boundary.
+ * Combat service: decorateCombatDocument installs a transient enemy decision
+ * inside the iframe before bootstrap. WC_ENEMY_INTENT_V1.telegraph exposes only
+ * decision id, turn and public kind; cancel clears the pending decision/UI.
+ * AI selection and resolution share the retained legacy action identifier.
+ * Existing heavy damage and guard/counter rules are reused without rebalance;
+ * new multipliers or action types require a separate approved package.
  */
 const WC_GAME_MODULES_V1=(()=>{
  "use strict";

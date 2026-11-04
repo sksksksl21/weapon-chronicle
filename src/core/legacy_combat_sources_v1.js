@@ -143,6 +143,29 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
       }
     };
   }
-  return Object.freeze({SWORD,ARMOR,armorContribution,fromLegacyLoadout,enemyFromLegacy});
+  // Transient turn decision only. Public telegraphs contain no damage rolls,
+  // hidden AI weights or new multipliers. Existing combo/web rules are retained.
+  // Self-contained so the same factory can run inside the offline combat frame.
+  function createEnemyIntent(){
+    const kinds={light:"attack",heavy:"heavy",guard:"guard-counter",combo:"combo",web:"web"};
+    let pendingEnemyAction=null, serial=0;
+    return Object.freeze({
+      decide(action,turn){
+        if(pendingEnemyAction)throw new Error("Enemy action already pending");
+        if(!Object.prototype.hasOwnProperty.call(kinds,action))throw new RangeError("Unknown enemy action: "+action);
+        pendingEnemyAction=Object.freeze({id:++serial,action,turn});
+        return pendingEnemyAction;
+      },
+      get pending(){return pendingEnemyAction;},
+      get telegraph(){return pendingEnemyAction?Object.freeze({id:pendingEnemyAction.id,
+        turn:pendingEnemyAction.turn,kind:kinds[pendingEnemyAction.action]}):null;},
+      take(turn){
+        if(!pendingEnemyAction||pendingEnemyAction.turn!==turn)return null;
+        const action=pendingEnemyAction;pendingEnemyAction=null;return action;
+      },
+      cancel(){pendingEnemyAction=null;}
+    });
+  }
+  return Object.freeze({SWORD,ARMOR,armorContribution,fromLegacyLoadout,enemyFromLegacy,createEnemyIntent});
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = WC_LEGACY_COMBAT_SOURCES_V1;

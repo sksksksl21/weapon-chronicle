@@ -59,10 +59,79 @@ const WC_COMBAT_MODULE_V1=(()=>{
   try{services?.events.publish(topic,Object.freeze(payload));}
   catch(error){if(typeof console!=="undefined")console.warn("Combat observer failed",error);}
  }
+ // Installed in the combat IIFE, before its event bindings and first reset.
+ // Keep the existing resolver (including damage, cards and speed extras) intact.
+ function installEnemyIntent(createEnemyIntent){
+  const enemyIntentRuntime=createEnemyIntent();
+  let autoTimer=null, cancelled=false;
+  const clear=()=>{cancelled=true;enemyIntentRuntime.cancel();clearTimeout(autoTimer);autoTimer=null;};
+  const oldChoose=chooseEnemyIntent;
+  chooseEnemyIntent=function(){
+   cancelled=false;
+   enemyIntentRuntime.cancel();
+   return enemyIntentRuntime.decide(oldChoose(),turn).action;
+  };
+  const oldResolve=resolveEnemyPhase;
+  resolveEnemyPhase=async function(...args){
+   if(cancelled||hero.hp<=0||enemy.hp<=0||phase==='done'){clear();return;}
+   const planned=enemyIntentRuntime.take(turn);
+   if(!planned){clear();return;}
+   enemyIntent=planned.action;
+   return oldResolve.apply(this,args);
+  };
+  const oldRender=render;
+  render=function(...args){
+   const result=oldRender.apply(this,args);
+   if(hero.hp<=0||enemy.hp<=0||phase==='done')clear();
+   if(!enemyIntentRuntime.pending){
+    for(const id of ['enemyActionIcon','enemyActionText','enemyHitPct','enemyDmgText']){
+     const node=$(id);if(node)node.textContent='';
+    }
+   }
+   clearTimeout(autoTimer);autoTimer=null;
+   // Optional card windows expire through the same controls as manual play.
+   // No new combat rolls, rewards or speed-gauge advances are introduced.
+   const waiting=phase;
+   if(!cancelled&&hero.hp>0&&enemy.hp>0&&['pre','heroReaction','enemyReaction'].includes(waiting)){
+    autoTimer=setTimeout(()=>{
+     autoTimer=null;
+     if(phase!==waiting||hero.hp<=0||enemy.hp<=0)return;
+     if(phase==='pre')executeTurn();
+     else $('skipBtn').onclick();
+    },1200);
+   }
+   return result;
+  };
+  for(const name of ['stageVictory','runEnd','resetRun']){
+   const previous=name==='stageVictory'?stageVictory:name==='runEnd'?runEnd:resetRun;
+   const wrapped=function(...args){clear();return previous.apply(this,args);};
+   if(name==='stageVictory')stageVictory=wrapped;
+   else if(name==='runEnd')runEnd=wrapped;
+   else resetRun=wrapped;
+  }
+  window.addEventListener('pagehide',clear);
+  // Read-only public telegraph: AI weights and rolled damage stay private.
+  window.WC_ENEMY_INTENT_V1=Object.freeze({
+   get telegraph(){return enemyIntentRuntime.telegraph;},
+   cancel(){clear();render();}
+  });
+ }
+ function decorateCombatDocument(html){
+  const marker="$('chronicleBtn').onclick=openChronicle;";
+  if(!html.includes(marker))throw new Error('Enemy intent combat bootstrap marker missing');
+  const factory=WC_LEGACY_COMBAT_SOURCES_V1.createEnemyIntent;
+  return html.replace(marker,'('+installEnemyIntent.toString()+')('+factory.toString()+');\n'+marker);
+ }
  function initialize(registry){
   if(cleanup)return api;
   services=registry|| (typeof WC_GAME_MODULES_V1!=="undefined"?WC_GAME_MODULES_V1:null);
   const undo=[];
+  if(typeof getCombatSrcdoc==='function'){
+   const previousDocument=getCombatSrcdoc;
+   const documentWithIntent=function(...args){return decorateCombatDocument(previousDocument.apply(this,args));};
+   getCombatSrcdoc=documentWithIntent;
+   undo.push(()=>{if(getCombatSrcdoc===documentWithIntent)getCombatSrcdoc=previousDocument;});
+  }
   if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
    const previousLaunch=launchStoryCombat;
    const launch=function(...args){
@@ -108,7 +177,7 @@ const WC_COMBAT_MODULE_V1=(()=>{
   return api;
  }
  function dispose(){if(cleanup)cleanup();}
- const api=Object.freeze({initialize,dispose,EVENTS,
+ const api=Object.freeze({initialize,dispose,EVENTS,decorateCombatDocument,
   get math(){return WC_COMBAT_MATH_V1;},
   get stats(){return WC_DIRECT_COMBAT_V2;},
   get legacySources(){return WC_LEGACY_COMBAT_SOURCES_V1;},

@@ -92,7 +92,9 @@
       "id": "combat-runtime",
       "path": "core/direct_combat_runtime_v2.js",
       "requires": [
-        "combat-direct-stats"
+        "combat-direct-stats",
+        "combat-legacy-adapter",
+        "module-services"
       ],
       "domain": "combat"
     },
