@@ -52,6 +52,115 @@ function wcCurrentUnifiedStats(weaponOverride=null,gearOverride=null){
  */
 const WC_COMBAT_MODULE_V1=(()=>{
  "use strict";
+ // Offline QA input: one run per {condition, seed, version, strategy}.
+ // conditions must include enemy/pattern, HP, weapon and available cards. Seeds
+ // identify an externally controlled random stream, not a new combat RNG here.
+ // Feed real exported ledgers from both revisions; never synthesize a baseline.
+ function compareInterventionStrategies({conditions=[],runs=[]}={}){
+  const copy=value=>JSON.parse(JSON.stringify(value));
+  const distribution=values=>{
+   const sorted=values.slice().sort((a,b)=>a-b),n=sorted.length;
+   return {count:n,values:sorted,min:n?sorted[0]:null,max:n?sorted[n-1]:null,
+    mean:n?sorted.reduce((a,b)=>a+b,0)/n:null,
+    median:n?(sorted[Math.floor((n-1)/2)]+sorted[Math.ceil((n-1)/2)])/2:null};
+  };
+  const ids=new Set(),keys=new Set(),missing=[];
+  for(const c of conditions){
+   if(!c.id||ids.has(c.id)||['enemy','pattern','hp','weapon','cards'].some(k=>c[k]===undefined))
+    throw new TypeError('Unique conditions require id, enemy, pattern, hp, weapon and cards');
+   ids.add(c.id);
+  }
+  const samples=runs.map(run=>{
+   if(!ids.has(run.condition)||!['before','after'].includes(run.version)||
+    !run.strategy||run.seed===undefined||!run.revision||!Array.isArray(run.ledger))
+    throw new TypeError('Run requires declared condition, version, strategy, seed, revision and ledger');
+   const key=JSON.stringify([run.condition,run.seed,run.version,run.strategy]);
+   if(keys.has(key))throw new TypeError('Duplicate comparison sample');
+   keys.add(key);
+   const ledger=run.ledger,events=kind=>ledger.filter(e=>e.kind===kind);
+   const damage=events('damage').map(e=>e.amount);
+   if(damage.some(n=>!Number.isFinite(n)||n<0))throw new TypeError('Invalid damage evidence');
+   const costs=events('resonance-cost'),heavy=events('telegraph').filter(e=>e.telegraph?.kind==='heavy');
+   const defensive=new Set(['guard','endure','mainCarry','gritMemory']);
+   const evasive=new Set(['feint','storyPrayer','escapeMemory']);
+   const heavyChoices=heavy.map(e=>{
+    const paid=costs.filter(c=>c.telegraph?.id===e.telegraph.id);
+    return {id:e.telegraph.id,defense:paid.some(c=>defensive.has(c.base)),
+     evasion:paid.some(c=>evasive.has(c.base)),intervened:paid.length>0};
+   });
+   const count=predicate=>heavyChoices.filter(predicate).length;
+   const coverage=events('combat-end').length===1&&events('telemetry-start').length===1;
+   if(!coverage)missing.push('Incomplete telemetry: '+key);
+   return {condition:run.condition,seed:run.seed,version:run.version,strategy:run.strategy,
+    revision:run.revision,complete:coverage,outcome:events('combat-end').at(-1)?.outcome||null,
+    damage:distribution(damage),totalDamage:damage.reduce((a,b)=>a+b,0),
+    turns:new Set(events('telegraph').map(e=>e.telegraph.turn)).size,
+    cardUses:costs.length,cards:costs.map(e=>e.card),
+    resonanceSpent:costs.reduce((n,e)=>n+e.cost,0),
+    resonanceChange:ledger.length?ledger.at(-1).after.resonance-ledger[0].before.resonance:0,
+    heavy:{seen:heavy.length,defense:count(e=>e.defense),evasion:count(e=>e.evasion),
+     defensiveInterventions:count(e=>e.defense||e.evasion),
+     none:count(e=>!e.intervened),aggressive:count(e=>e.intervened&&!e.defense&&!e.evasion),
+     defensiveRate:heavy.length?count(e=>e.defense||e.evasion)/heavy.length:null},
+    outcomes:events('intervention-result').map(e=>({effect:e.effect,text:e.text})),
+    ledger:copy(ledger)};
+  });
+  const pairs=[];
+  for(const s of samples){
+   const other=samples.find(t=>t.condition===s.condition&&t.seed===s.seed&&
+    t.strategy===s.strategy&&t.version!==s.version);
+   if(!other)missing.push('Missing matched revision: '+JSON.stringify([s.condition,s.seed,s.strategy]));
+   else if(s.version==='after')pairs.push({condition:s.condition,seed:s.seed,strategy:s.strategy,
+    damageDelta:s.totalDamage-other.totalDamage,turnDelta:s.turns-other.turns,
+    cardDelta:s.cardUses-other.cardUses,resonanceDelta:s.resonanceChange-other.resonanceChange});
+  }
+  const groups=[];
+  for(const c of conditions)for(const version of ['before','after']){
+   const strategies=[...new Set(samples.filter(s=>s.condition===c.id&&s.version===version).map(s=>s.strategy))];
+   if(!strategies.length)missing.push('No samples: '+c.id+'/'+version);
+   for(const strategy of strategies){
+    const rows=samples.filter(s=>s.condition===c.id&&s.version===version&&s.strategy===strategy);
+    const seen=rows.reduce((n,s)=>n+s.heavy.seen,0);
+    groups.push({condition:c.id,version,strategy,sampleCount:rows.length,
+     damage:distribution(rows.map(s=>s.totalDamage)),turns:distribution(rows.map(s=>s.turns)),
+     cardUses:distribution(rows.map(s=>s.cardUses)),resonanceChange:distribution(rows.map(s=>s.resonanceChange)),
+     heavySeen:seen,defensiveRate:seen?rows.reduce((n,s)=>n+s.heavy.defensiveInterventions,0)/seen:null});
+   }
+  }
+  // Paired multi-objective comparison, not an arbitrary weighted balance score.
+  // A repeat policy dominates only if it is never worse on any tested seed in
+  // victory, incoming damage, turns, card use and resonance spent, and improves
+  // at least one. Missing seeds are an evidence gap, never a win.
+  const strategyComparisons=[];
+  for(const c of conditions){
+   const rows=samples.filter(s=>s.condition===c.id&&s.version==='after');
+   const strategies=[...new Set(rows.map(s=>s.strategy))];
+   if(strategies.length<2)missing.push('Insufficient strategy coverage: '+c.id);
+   for(const strategy of strategies)for(const alternative of strategies.filter(s=>s!==strategy)){
+    const seeds=[...new Set(rows.map(s=>s.seed))];
+    let improves=false,neverWorse=true,matched=0;
+    for(const seed of seeds){
+     const a=rows.find(s=>s.seed===seed&&s.strategy===strategy);
+     const b=rows.find(s=>s.seed===seed&&s.strategy===alternative);
+     if(!a?.complete||!b?.complete){neverWorse=false;continue;}
+     matched++;
+     const vector=s=>[s.outcome==='victory'?0:1,s.totalDamage,s.turns,s.cardUses,s.resonanceSpent];
+     const av=vector(a),bv=vector(b);
+     neverWorse=neverWorse&&av.every((v,i)=>v<=bv[i]);
+     improves=improves||av.some((v,i)=>v<bv[i]);
+    }
+    if(matched!==seeds.length)missing.push('Unmatched strategy seeds: '+c.id+'/'+strategy+'/'+alternative);
+    strategyComparisons.push({condition:c.id,strategy,alternative,matchedSeeds:matched,
+     dominates:matched===seeds.length&&matched>0&&neverWorse&&improves});
+   }
+  }
+  if(!conditions.length)missing.push('No declared conditions');
+  return {conditions:copy(conditions),sampleCount:samples.length,samples,groups,pairs,strategyComparisons,
+   missing:[...new Set(missing)],status:'validation-pending',
+   limitations:['Gross incoming damage includes damage later refunded by reactions.',
+    'Strategy dominance and preservation require separate verified play evidence; metrics alone do not establish balance.'],
+   integration:{code:'implemented',validation:'pending',githubDev:'not-verified'}};
+ }
  let services=null, cleanup=null, encounter=null, sequence=0;
  const EVENTS=Object.freeze({START:"combat:start",END:"combat:end",REWARD:"combat:reward"});
  function publish(topic,payload){
@@ -75,6 +184,18 @@ const WC_COMBAT_MODULE_V1=(()=>{
    ledger.push(Object.freeze({kind,telegraph:enemyIntentRuntime.telegraph||committedTelegraph,
     ...details,before,after:snapshot()}));
   };
+  // Observe the existing damage sink, including extra attacks. Do not sum
+  // nested enemy-result/exchange-result HP deltas (they overlap and include heals).
+  const originalDamage=ownerTookDamage;
+  ownerTookDamage=function(amount,...args){
+   record('damage',snapshot(),{amount});
+   return originalDamage.call(this,amount,...args);
+  };
+  const originalFeedback=showInterventionResult;
+  showInterventionResult=function(effect,text,...args){
+   record('intervention-result',snapshot(),{effect,text});
+   return originalFeedback.call(this,effect,text,...args);
+  };
   const originalCanUse=canUseCard;
   canUseCard=function(id){
    if(hero.hp<=0||enemy.hp<=0)return false;
@@ -86,7 +207,7 @@ const WC_COMBAT_MODULE_V1=(()=>{
   const originalSpend=spendResonance;
   spendResonance=function(id){
    const before=snapshot(),paid=originalSpend(id);
-   if(paid)record('resonance-cost',before,{card:id,cost:cardCost(id)});
+   if(paid)record('resonance-cost',before,{card:id,base:cardBase(id),cost:cardCost(id)});
    return paid;
   };
   const originalUse=useCard;
@@ -145,7 +266,9 @@ const WC_COMBAT_MODULE_V1=(()=>{
    cancelled=false;
    enemyIntentRuntime.cancel();
    committedTelegraph=null;
-   return enemyIntentRuntime.decide(oldChoose(),turn).action;
+   const action=enemyIntentRuntime.decide(oldChoose(),turn).action;
+   record('telegraph',snapshot());
+   return action;
   };
   const oldResolve=resolveEnemyPhase;
   resolveEnemyPhase=async function(...args){
@@ -193,9 +316,12 @@ const WC_COMBAT_MODULE_V1=(()=>{
   for(const name of ['stageVictory','runEnd','resetRun']){
    const previous=name==='stageVictory'?stageVictory:name==='runEnd'?runEnd:resetRun;
    const wrapped=function(...args){
+    if(name!=='resetRun')record('combat-end',snapshot(),{outcome:name==='stageVictory'?'victory':'defeat'});
     clear();
     if(name==='resetRun'){ledger.length=0;committedTelegraph=null;}
-    return previous.apply(this,args);
+    const result=previous.apply(this,args);
+    if(name==='resetRun')ledger.unshift(Object.freeze({kind:'telemetry-start',before:snapshot(),after:snapshot()}));
+    return result;
    };
    if(name==='stageVictory')stageVictory=wrapped;
    else if(name==='runEnd')runEnd=wrapped;
@@ -269,7 +395,7 @@ const WC_COMBAT_MODULE_V1=(()=>{
   return api;
  }
  function dispose(){if(cleanup)cleanup();}
- const api=Object.freeze({initialize,dispose,EVENTS,decorateCombatDocument,
+ const api=Object.freeze({initialize,dispose,EVENTS,decorateCombatDocument,compareInterventionStrategies,
   get math(){return WC_COMBAT_MATH_V1;},
   get stats(){return WC_DIRECT_COMBAT_V2;},
   get legacySources(){return WC_LEGACY_COMBAT_SOURCES_V1;},
@@ -279,6 +405,7 @@ const WC_COMBAT_MODULE_V1=(()=>{
   unifiedStats:wcCurrentUnifiedStats,
   launch(...args){return launchStoryCombat.apply(this,args);}
  });
+ if(typeof window!=="undefined")window.WC_COMBAT_VALIDATION_V1=Object.freeze({compareInterventionStrategies});
  if(typeof WC_GAME_MODULES_V1!=="undefined"){
   WC_GAME_MODULES_V1.register({id:"combat",initialize,dispose});
   if(typeof window!=="undefined")window.WC_GAME_MODULES_V1=WC_GAME_MODULES_V1;
