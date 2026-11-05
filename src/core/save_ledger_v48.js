@@ -45,6 +45,11 @@ function restoreSaveModules(saved){
 }
 function v48SerializeState(){
   const copy=v48CloneSaveData(state);
+  // recalcWeapon owns these fields. Persist parts/upgrades and current resources,
+  // not a second copy of their calculated totals (also used by checkpoints).
+  if(copy.weapon)for(const key of ['power','precision','toughness','handling',
+    'maxResonance','resonanceRecovery','length','weight','carryWeight','firstHandling'])
+    delete copy.weapon[key];
   copy.moduleSaveData=serializeSaveModules(state.moduleSaveData);
   copy.storyCtx=null;copy.activeStory=null;
   return copy;
@@ -108,6 +113,10 @@ function v48RecordMainChapter(c,result,path){
 function v48PrepareLoad(raw){
   v48BackupRaw(raw);
   const data=v48ValidateLoadedData(JSON.parse(raw));
+  // Inner checkpoint recovery can replace the save AFTER the equipment pool's
+  // outer preloader ran. Restore this actual payload before legacy initialization
+  // recalculates the weapon or clamps owner HP against equipped armor.
+  if(typeof WC_EQUIPMENT_POOL_V1!=='undefined')WC_EQUIPMENT_POOL_V1.restoreFromSave(raw);
   v48PendingModuleData=data.moduleSaveData;
   // Leave existing values untouched. Additional fields are initialized after the legacy initializer.
   return data;
