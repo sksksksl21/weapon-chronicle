@@ -164,20 +164,17 @@ function partTagNames(id){const slot=findPartSlot(id);return PART_CATALOG[slot]?
 const PART_STAT_META={power:"위력",precision:"정밀",toughness:"견고",handling:"조작성",maxResonance:"최대공명",resonanceRecovery:"공명회복",firstHandling:"첫턴 조작성",length:"길이",weight:"중량",carryWeight:"휴대중량"};
 function fmtDeltaNum(key,v){if(key==='weight'||key==='carryWeight')return `${v>0?'+':''}${v.toFixed(2)}kg`;if(key==='length')return `${v>0?'+':''}${Math.round(v)}cm`;return `${v>0?'+':''}${Math.round(v*10)/10}`;}
 function previewWeaponSwap(slot,id){
-  const w={...state.weapon},cur=PART_CATALOG[slot]?.[state.weapon.parts[slot]]?.mods||{},m=PART_CATALOG[slot]?.[id]?.mods||{};
-  ["power","precision","toughness","handling","maxResonance","resonanceRecovery","firstHandling","length","weight","carryWeight"].forEach(k=>{w[k]=(state.weapon[k]||0)+(m[k]||0)-(cur[k]||0);});
+  const w={...state.weapon,parts:{...state.weapon.parts,[slot]:id}};
+  recalcWeapon(w);
   return w;
 }
 function partDeltaHtml(slot,id){
-  const cur=PART_CATALOG[slot]?.[state.weapon.parts[slot]]?.mods||{},m=PART_CATALOG[slot]?.[id]?.mods||{};
-  const keys=["power","precision","toughness","handling","maxResonance","resonanceRecovery","firstHandling","length","weight","carryWeight"];
-  const bits=[];
-  for(const k of keys){const d=(m[k]||0)-(cur[k]||0);if(Math.abs(d)<.001)continue;let cls='partNeutral';if(!['length','weight','carryWeight'].includes(k))cls=d>0?'partBuff':'partDebuff';bits.push(`<span class="${cls}">${PART_STAT_META[k]} ${fmtDeltaNum(k,d)}</span>`);}
   const before=new Set(activeBuilds(state.weapon).map(x=>x.id)),after=activeBuilds(previewWeaponSwap(slot,id));
-  const gained=after.filter(x=>!before.has(x.id)),lost=[...before].filter(x=>!after.some(y=>y.id===x)).map(x=>BUILD_RULES.find(y=>y.id===x));
-  if(gained.length)bits.push(...gained.map(x=>`<span class="partBuff">빌드 활성 · ${x.name}</span>`));
-  if(lost.length)bits.push(...lost.filter(Boolean).map(x=>`<span class="partDebuff">빌드 해제 · ${x.name}</span>`));
-  return bits.length?`<div class="partDelta">${bits.join('')}</div>`:`<div class="partDelta"><span class="partNeutral">현재 장착품과 수치 동일</span></div>`;
+  const changes=after.filter(x=>!before.has(x.id)).map(x=>`<span class="partBuff">+ ${x.name}</span>`);
+  for(const id of before)if(!after.some(x=>x.id===id)){
+    const build=BUILD_RULES.find(x=>x.id===id);if(build)changes.push(`<span class="partDebuff">- ${build.name}</span>`);
+  }
+  return equipmentPreviewHtml({kind:"weapon",slot,id})+(changes.length?`<div class="partDelta">${changes.join('')}</div>`:"");
 }
 const BUILD_RULES=[
  {id:"breaker",name:"파쇄형",check:w=>w.power>=18&&w.weight>=1.42,desc:"강공 피해 +18% · 강공 명중 -4%p · 도적 방패 반격 자세를 더 쉽게 무너뜨림"},
@@ -281,8 +278,8 @@ function weaponProfile(){
   if(builds.length)return {name:builds.map(x=>x.name).join(" + "),desc:builds.map(x=>x.desc).join(" / ")};
   return {name:"균형형",desc:"아직 특정 임계치를 넘지 않은 구성. 파츠 교체로 극단을 만들면 빌드 효과가 열린다."};
 }
-function recalcWeapon(){
-  const w=state.weapon,oldMax=w.maxResonance||70;
+function recalcWeapon(weaponInput=null){
+  const w=weaponInput||state.weapon,oldMax=w.maxResonance||70;
   let p=0,pr=0,t=0,h=0,maxR=0,rec=0,weight=0,carry=0,length=14,firstHandling=0;
   Object.entries(w.parts).forEach(([slot,id])=>{
     const m=PART_CATALOG[slot]?.[id]?.mods||{};
@@ -3775,9 +3772,9 @@ function ensureV24State(){
   if(!state.contactTopics)state.contactTopics={mira:[],karon:[]};
   if(!state.weapon.materials)state.weapon.materials={iron:0,shell:0,bronze:0,leather:0,wood:0,steel:0,silverWire:0,wax:0,cloth:0,horn:0};
 }
-function ownerGearBonuses(){
-  ensureV24State();const out={defense:0,evade:0,resist:0,maxHp:0,survival:0};
-  Object.values(state.ownerEquipment).filter(Boolean).forEach(id=>{const m=OWNER_GEAR_CATALOG[id]?.mods||{};for(const k of Object.keys(out))out[k]+=Number(m[k]||0);});
+function ownerGearBonuses(equipment=null){
+  if(!equipment)ensureV24State();const out={defense:0,evade:0,resist:0,maxHp:0,survival:0};
+  Object.values(equipment||state.ownerEquipment).filter(Boolean).forEach(id=>{const m=OWNER_GEAR_CATALOG[id]?.mods||{};for(const k of Object.keys(out))out[k]+=Number(m[k]||0);});
   return out;
 }
 
@@ -3801,7 +3798,7 @@ function gearBoardHtml(){ensureV24State();return `<div class="ownerGearBoard">${
 
 /* retired duplicate gearSummaryHtml */
 
-function ownerGearInventoryHtml(){ensureV24State();const rows=Object.entries(state.ownerGearOwned).filter(([id,n])=>n>0&&OWNER_GEAR_CATALOG[id]).map(([id,n])=>{const it=OWNER_GEAR_CATALOG[id],eq=state.ownerEquipment[it.slot]===id;return `<div class="sideItem rarity-${it.rarity}"><div class="meta"><b>${it.name}</b><span>${OWNER_GEAR_SLOTS[it.slot]} · ${gearEffectText(id)}</span></div><div class="qty"><span>×${n}</span><button class="sellBtnMini" data-equip-gear="${id}">${eq?'장착중':'장착'}</button></div></div>`}).join('')||'<div class="invEmpty">보유한 소유자 장비가 없다.</div>';return rows;}
+function ownerGearInventoryHtml(){ensureV24State();const rows=Object.entries(state.ownerGearOwned).filter(([id,n])=>n>0&&OWNER_GEAR_CATALOG[id]).map(([id,n])=>{const it=OWNER_GEAR_CATALOG[id],eq=state.ownerEquipment[it.slot]===id;return `<div class="sideItem rarity-${it.rarity}"><div class="meta"><b>${it.name}</b><span>${OWNER_GEAR_SLOTS[it.slot]} · ${gearEffectText(id)}</span>${equipmentPreviewHtml({kind:"armor",slot:it.slot,id})}</div><div class="qty"><span>×${n}</span><button class="sellBtnMini" data-equip-gear="${id}">${eq?'장착중':'장착'}</button></div></div>`}).join('')||'<div class="invEmpty">보유한 소유자 장비가 없다.</div>';return rows;}
 function equipOwnerGear(id){ensureV24State();const it=OWNER_GEAR_CATALOG[id];if(!it||(state.ownerGearOwned[id]||0)<1)return;state.ownerEquipment[it.slot]=id;syncOwnerVitalCaps(false);addLog(`${state.owner.name}이 ${it.name}을 장착했다.`);saveGame();render();}
 function unequipOwnerSlot(slot){if(!OWNER_GEAR_SLOTS[slot])return;if(state.ownerEquipment[slot]&&!hasOwnerCapacity(1,'armor')){addLog('가방에 빈칸이 없어 장비를 해제하지 못했다.');return;}state.ownerEquipment[slot]=null;syncOwnerVitalCaps(false);saveGame();render();}
 
@@ -4046,16 +4043,16 @@ function mentalPerformance(){
   return {mult:.35,label:'정신 붕괴',pct:35};
 }
 function combatXpNeed(level){return 55+Math.max(1,level)*35;}
-function levelMartialBonus(){ensureV26Progression();return Math.floor((state.ownerProgress.level-1)*.75);}
+function levelMartialBonus(pure=false){if(!pure)ensureV26Progression();return Math.floor(((Number.isFinite(state.ownerProgress?.level)?state.ownerProgress.level:1)-1)*.75);}
 
 /* retired duplicate weaponMartialBonus */
 
-function lifeExperienceBonus(){ensureV26Progression();const x=state.ownerProgress.lifeXp,steps=[0,6,15,28,45,66,90,120,155];let b=0;for(let i=1;i<steps.length;i++)if(x>=steps[i])b=i;return b;}
+function lifeExperienceBonus(pure=false){if(!pure)ensureV26Progression();const x=state.ownerProgress?.lifeXp||0,steps=[0,6,15,28,45,66,90,120,155];let b=0;for(let i=1;i<steps.length;i++)if(x>=steps[i])b=i;return b;}
 
 /* retired duplicate armorSurvivalValue */
 
 function relationNetworkBonus(){const vals=Object.values(state.contacts||{}).map(n=>Number(n.affinity)||0).sort((a,b)=>b-a).slice(0,3),sum=vals.reduce((a,b)=>a+b,0);return clamp(Math.floor(sum/45),0,4);}
-function reputationBonus(){ensureV26Progression();return clamp(Math.floor(state.ownerProgress.reputation/12),0,5);}
+function reputationBonus(pure=false){if(!pure)ensureV26Progression();return clamp(Math.floor((state.ownerProgress?.reputation||0)/12),0,5);}
 function weaponNarrativeBonus(){const n=(state.weapon.legacyTitles?.length||0)+(state.unlockedSkills?.length||0)+Math.floor((state.mainStory?.act1ChapterResults?.length||0)/2);return clamp(Math.floor(n/3),0,4);}
 /* Percentage contract: only existing stat contributions are scaled. Fixed bases,
  * equipment/world modifiers, clamps and rounding retain their existing order.
@@ -4068,14 +4065,14 @@ function ownerStatRate(value){
  const martial=Math.max(0,Math.min(100,Number.isFinite(parsed)?parsed:0));
  return martial*0.01;
 }
-function rawOwnerStats(){
-  ensureV26Progression();const g=ownerGearBonuses(),martialBase=Number(state.owner.martial)||0,survivalBase=Number(state.owner.survival)||0,socialBase=Number(state.owner.social)||0;
-  const level=levelMartialBonus(),weapon=weaponMartialBonus(),life=lifeExperienceBonus(),armor=armorSurvivalValue(),relations=relationNetworkBonus(),reputation=reputationBonus(),narrative=weaponNarrativeBonus();
+function rawOwnerStats(pure=false,equipment=null){
+  if(!pure)ensureV26Progression();const g=ownerGearBonuses(equipment),martialBase=Number(state.owner.martial)||0,survivalBase=Number(state.owner.survival)||0,socialBase=Number(state.owner.social)||0;
+  const level=levelMartialBonus(pure),weapon=weaponMartialBonus(pure),life=lifeExperienceBonus(pure),armor=armorSurvivalValue(equipment),relations=relationNetworkBonus(),reputation=reputationBonus(pure),narrative=weaponNarrativeBonus();
   return {martial:Math.max(0,martialBase+level+weapon),survival:Math.max(0,survivalBase+life+armor),social:Math.max(0,socialBase+relations+reputation+narrative),parts:{martialBase,level,weapon,survivalBase,life,armor,socialBase,relations,reputation,narrative},gear:g};
 }
-function effectiveOwnerStats(){const r=rawOwnerStats(),m=mentalPerformance();return {martial:Math.max(0,r.martial*m.mult),survival:Math.max(0,r.survival*m.mult-(state.ailmentsV34?.injury?2:0)),social:Math.max(0,r.social*m.mult),raw:r,mult:m.mult,mind:m};}
-function ownerVitalCaps(owner){
-  const o=owner||state.owner,g=(o===state.owner)?ownerGearBonuses():{maxHp:0},raw=(o===state.owner)?rawOwnerStats():{survival:Number(o.survival)||0};
+function effectiveOwnerStats(pure=false,equipment=null){const r=rawOwnerStats(pure,equipment||(pure?(state.ownerEquipment||{}):null)),m=mentalPerformance();return {martial:Math.max(0,r.martial*m.mult),survival:Math.max(0,r.survival*m.mult-(state.ailmentsV34?.injury?2:0)),social:Math.max(0,r.social*m.mult),raw:r,mult:m.mult,mind:m};}
+function ownerVitalCaps(owner,equipment=null,pure=false){
+  const o=owner||state.owner,g=(o===state.owner)?ownerGearBonuses(equipment):{maxHp:0},raw=(o===state.owner)?rawOwnerStats(pure,equipment):{survival:Number(o.survival)||0};
   const boldness=Number(o.boldness)||50,age=Math.max(16,Number(o.age)||24),agePenalty=Math.max(0,age-34);
   const maxHp=clamp(Math.round(65+ownerStatRate(raw.survival)*4+(boldness-50)*.08-agePenalty*.45+(g.maxHp||0)),58,170);
   const maxMind=100;
@@ -4146,18 +4143,18 @@ render=function(){ensureV26Progression();syncOwnerVitalCaps(false);_renderV26Bas
 // Roundtable goal: owner growth, armor, weapon, mental condition and world opportunities
 // must alter actual play rather than live as isolated numbers.
 
-function weaponMartialBonus(){
-  recalcWeapon();
-  const w=state.weapon;
+function weaponMartialBonus(pure=false){
+  const w=pure?{...state.weapon}:state.weapon;
+  recalcWeapon(w);
   // The weapon contributes to "how well this owner can express martial skill", but its raw
   // power/precision are NOT folded wholesale into Martial; those still act directly in combat.
   const fit=(Number(w.handling||0)-9)/3.2+(Number(w.precision||0)-10)/6+(Number(w.firstHandling||0))*0.25+(activeBuilds(w).length?0.5:0);
   return clamp(Math.round(fit),-2,5);
 }
-function armorSurvivalValue(){
+function armorSurvivalValue(equipment=null){
   // Armor contributes its explicit survival identity once. Defense/evade/resist/maxHP remain
   // separate combat outputs so the same armor is not counted twice into Survival.
-  const g=ownerGearBonuses();
+  const g=ownerGearBonuses(equipment);
   return clamp(Math.round(Number(g.survival)||0),0,12);
 }
 function derivedAbilities(){
@@ -5785,7 +5782,7 @@ function renderWeaponVisual39(targetId='weaponVisualWrap'){const el=$(targetId);
 function equipmentVisualHtml(){const w=state.weapon;const slots=Object.keys(PART_LABELS);return `<div class="wc41-smithPreview">${weaponArt41({},'wc41-smithSword')}<div class="wc41-smithPreviewMeta"><b>${partItem('blade').name}</b><span>내구 ${Math.round(w.dur)}/${Math.round(w.maxDur)} · 공명 ${Math.round(w.resonance)}/${Math.round(w.maxResonance)}</span><div class="wc41-smithSlotList">${slots.map(k=>`<div><b>${PART_LABELS[k]}</b><span>${partItem(k).name}</span></div>`).join('')}</div></div></div>`;}
 function wc41WeaponFactHtml(){const w=state.weapon;return `<div class="wc41-weaponFacts"><div>길이 / 중량<b>${Math.round(w.length)}cm / ${w.weight.toFixed(2)}kg</b></div><div>내구도<b>${Math.round(w.dur)} / ${Math.round(w.maxDur)}</b></div><div>공명<b>${Math.round(w.resonance)} / ${Math.round(w.maxResonance)}</b></div><div>위력 / 정밀<b>${Math.round(w.power)} / ${Math.round(w.precision)}</b></div><div>견고 / 조작성<b>${Math.round(w.toughness)} / ${Math.round(w.handling)}</b></div></div>`;}
 function openWeaponDetail(){ensureV24State();recalcWeapon();const slots=Object.keys(PART_LABELS),p=weaponProfile();const list=slots.map(slot=>{const it=partItem(slot),n=Object.entries(state.weapon.spareParts).filter(([id,cnt])=>cnt>0&&findPartSlot(id)===slot).reduce((a,[_id,cnt])=>a+cnt,0);return `<button class="wc41-part" data-weapon-slot="${slot}"><b>${PART_LABELS[slot]}</b><span class="wc41-partName">${it.name}</span><small>교체 가능한 예비 부품 ${n}개</small></button>`;}).join('');const body=`<div class="wc41-weaponModal"><div class="wc41-weaponArtBox">${weaponArt41()}<div><h3>${partItem('blade').name}</h3><div class="wc41-modalNote">${p.name} · ${p.desc}</div>${wc41WeaponFactHtml()}</div></div><div class="wc41-sectionLabel">부품 교체 · 8개 슬롯</div><div class="wc41-modalNote">부품을 선택하면 교체 가능한 부품이 나타난다. 교체 시 검 그림과 능력치가 함께 변경된다.</div><div class="wc41-partGrid">${list}</div><details><summary class="wc41-sectionLabel">검의 계보 보기</summary>${weaponLineageHtml()}</details></div>`;openModal(modalHead('무기 관리','현재 검의 실제 조립 상태 · 부품 교체는 즉시 반영된다.')+body);bindClose();document.querySelectorAll('[data-weapon-slot]').forEach(b=>b.onclick=()=>openWeaponEquipSlot(b.dataset.weaponSlot));}
-function openWeaponEquipSlot(slot){ensureV24State();const cur=state.weapon.parts[slot],ids=Object.entries(state.weapon.spareParts).filter(([id,n])=>n>0&&findPartSlot(id)===slot);const rows=ids.map(([id,n])=>{const it=PART_CATALOG[slot]?.[id];return `<button class="wc41-partOption" data-weapon-equip="${id}"><b>${it.name}</b><span>${it.material} · 보유 ${n}개</span><small>선택하면 즉시 장착 · 기존 부품은 예비품으로 이동</small></button>`;}).join('')||'<div class="wc41-modalNote">이 슬롯의 예비 부품이 없습니다. 대장간에서 구입하거나 제작할 수 있습니다.</div>';const left=ids.length?weaponArt41({[slot]:ids[0][0]},'wc41-compareArt'):weaponArt41({},'wc41-compareArt');const body=`<div class="wc41-weaponModal"><div class="wc41-sectionLabel">${PART_LABELS[slot]} 교체</div><div class="wc41-modalNote">현재 장착: ${PART_CATALOG[slot]?.[cur]?.name||cur}</div>${left}<div class="wc41-sectionLabel">예비 파츠 ${ids.reduce((a,x)=>a+x[1],0)}개</div><div class="wc41-partOptions">${rows}</div><button class="wc41-part" id="wc41GoBack">← 현재 검 보기</button></div>`;openModal(modalHead(PART_LABELS[slot]+' 선택','교체 전후의 실제 검 외형을 확인할 수 있습니다.')+body);bindClose();$('wc41GoBack').onclick=openWeaponDetail;document.querySelectorAll('[data-weapon-equip]').forEach(b=>{b.onmouseenter=()=>{const art=document.querySelector('.wc41-compareArt');if(art)art.outerHTML=weaponArt41({[slot]:b.dataset.weaponEquip},'wc41-compareArt');};b.onclick=()=>{const id=b.dataset.weaponEquip;if(!spareCount(id))return;addSpare(id,-1);addSpare(cur,1);state.weapon.parts[slot]=id;recalcWeapon();addLog(`${PART_LABELS[slot]}을 ${PART_CATALOG[slot][id].name}(으)로 교체했다.`);saveGame();render();openWeaponDetail();};});}
+function openWeaponEquipSlot(slot){ensureV24State();const cur=state.weapon.parts[slot],ids=Object.entries(state.weapon.spareParts).filter(([id,n])=>n>0&&findPartSlot(id)===slot);const rows=ids.map(([id,n])=>{const it=PART_CATALOG[slot]?.[id];return `<button class="wc41-partOption" data-weapon-equip="${id}"><b>${it.name}</b><span>${it.material} · 보유 ${n}개</span>${typeof equipmentPreviewHtml==="function"?equipmentPreviewHtml({kind:"weapon",slot,id}):""}<small>선택하면 즉시 장착 · 기존 부품은 예비품으로 이동</small></button>`;}).join('')||'<div class="wc41-modalNote">이 슬롯의 예비 부품이 없습니다. 대장간에서 구입하거나 제작할 수 있습니다.</div>';const left=ids.length?weaponArt41({[slot]:ids[0][0]},'wc41-compareArt'):weaponArt41({},'wc41-compareArt');const body=`<div class="wc41-weaponModal"><div class="wc41-sectionLabel">${PART_LABELS[slot]} 교체</div><div class="wc41-modalNote">현재 장착: ${PART_CATALOG[slot]?.[cur]?.name||cur}</div>${left}<div class="wc41-sectionLabel">예비 파츠 ${ids.reduce((a,x)=>a+x[1],0)}개</div><div class="wc41-partOptions">${rows}</div><button class="wc41-part" id="wc41GoBack">← 현재 검 보기</button></div>`;openModal(modalHead(PART_LABELS[slot]+' 선택','교체 전후의 실제 검 외형을 확인할 수 있습니다.')+body);bindClose();$('wc41GoBack').onclick=openWeaponDetail;document.querySelectorAll('[data-weapon-equip]').forEach(b=>{b.onmouseenter=()=>{const art=document.querySelector('.wc41-compareArt');if(art)art.outerHTML=weaponArt41({[slot]:b.dataset.weaponEquip},'wc41-compareArt');};b.onclick=()=>{const id=b.dataset.weaponEquip;if(!spareCount(id))return;addSpare(id,-1);addSpare(cur,1);state.weapon.parts[slot]=id;recalcWeapon();addLog(`${PART_LABELS[slot]}을 ${PART_CATALOG[slot][id].name}(으)로 교체했다.`);saveGame();render();openWeaponDetail();};});}
 const _renderWc41=render;
 render=function(){const out=_renderWc41();if(state.owner.portrait==='odyssey'){$('heroImg').src=ODYSSEY_OWNER_ART;$('heroImg').style.display='block';}const used=typeof v35BagUsed==='function'?['consumable','material','armor','part'].reduce((a,t)=>a+v35BagUsed(t),0):0;const cap=typeof v35BagCap==='function'?['consumable','material','armor','part'].reduce((a,t)=>a+v35BagCap(t),0):0;$('inventoryBtn').title=`인벤토리 ${used}/${cap}`;renderWeaponVisual39();return out;};
 

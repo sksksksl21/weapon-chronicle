@@ -3,10 +3,10 @@
  * read by WC_DIRECT_COMBAT_V2.calculate itself.
  * Owner points are percentages on the displayed 0..100 scale; no implicit x10.
  */
-function wcDirectOwnerRates(){
- const eff=effectiveOwnerStats(), raw=eff.raw||rawOwnerStats();
+function wcDirectOwnerRates(equipment=null){
+ const eff=effectiveOwnerStats(true,equipment), raw=eff.raw||rawOwnerStats(true,equipment||state.ownerEquipment||{});
  const mental=Number.isFinite(Number(eff.mult))?Number(eff.mult):1;
- const armorSurvival=typeof armorSurvivalValue==="function"?Number(armorSurvivalValue()||0):0;
+ const armorSurvival=typeof armorSurvivalValue==="function"?Number(armorSurvivalValue(equipment||state.ownerEquipment||{})||0):0;
  const weaponMartial=Number(raw.parts?.weapon||0);
  const currentMartial=Math.max(0,Number(eff.martial||0)-weaponMartial*mental);
  const currentSurvival=Math.max(0,Number(eff.survival||0)-armorSurvival*mental);
@@ -23,7 +23,7 @@ function wcDirectCurrentStats(weaponOverride=null,gearOverride=null){
  const items=WC_DIRECT_COMBAT_V2.migrateLegacyLoadout({
   weapon,partCatalog:PART_CATALOG,equipment:gear,gearCatalog:OWNER_GEAR_CATALOG
  });
- const rates=wcDirectOwnerRates();
+ const rates=wcDirectOwnerRates(gear);
  // Legacy maxHp already contains armor flat HP; undo that component exactly
  // so the direct layer can scale the equipment HP bonus once.
  const currentItems=gearOverride?WC_DIRECT_COMBAT_V2.migrateLegacyLoadout({
@@ -37,6 +37,12 @@ function wcDirectCurrentStats(weaponOverride=null,gearOverride=null){
  // shrink or heal current HP just because the new status window is opened.
  const owner={...rates,baseHp:Math.max(1,Number(state.maxHp||1)-
    hpFromGear*rates.stableSurvival/100)};
+ // A candidate armor loadout must use the very cap that actual equip commits.
+ if(gearOverride&&typeof ownerVitalCaps==="function"){
+  const cap=ownerVitalCaps(state.owner,gear,true).maxHp;
+  const candidateHp=WC_DIRECT_COMBAT_V2.ARMOR_SLOTS.reduce((v,k)=>v+Number(items.armor[k]?.maxHp||0),0);
+  owner.baseHp=Math.max(1,cap-candidateHp*rates.stableSurvival/100);
+ }
  const result=WC_DIRECT_COMBAT_V2.snapshot({owner,...items});
  return Object.freeze({...result,ownerRates:Object.freeze(rates),
   migration:Object.freeze({version:"legacy-v5.2-preview",audited:false})});
@@ -48,6 +54,29 @@ function wcCurrentUnifiedStats(weaponOverride=null,gearOverride=null){
  return Object.freeze({...result,
   attack:(result.minAttack+result.maxAttack)/2
  });
+}
+
+// Pure candidate input adapter; final arithmetic remains in snapshot().
+function previewEquipment({kind,slot,id}={}){
+ const before=wcDirectCurrentStats();
+ let weapon=null,gear=null;
+ if(kind==="weapon"&&WC_DIRECT_COMBAT_V2.PART_SLOTS.includes(slot)&&PART_CATALOG[slot]?.[id]){
+  weapon={...state.weapon,parts:{...state.weapon.parts,[slot]:id}};
+  recalcWeapon(weapon);
+ }else if(kind==="armor"&&WC_DIRECT_COMBAT_V2.ARMOR_SLOTS.includes(slot)&&OWNER_GEAR_CATALOG[id]?.slot===slot){
+  gear={...state.ownerEquipment,[slot]:id};
+ }else throw new TypeError("Invalid equipment candidate");
+ const after=wcDirectCurrentStats(weapon,gear);
+ const delta=Object.freeze(Object.fromEntries(Object.keys(before).filter(k=>typeof before[k]==="number")
+  .map(k=>[k,after[k]-before[k]])));
+ return Object.freeze({before,after,delta});
+}
+function equipmentPreviewHtml(candidate){
+ const {before,after,delta}=previewEquipment(candidate);
+ const labels={minAttack:"\ucd5c\uc18c\uacf5\uaca9",maxAttack:"\ucd5c\ub300\uacf5\uaca9",hitChance:"\uba85\uc911",critChance:"\uce58\uba85\ud0c0\ud655\ub960",critDamageBonus:"\uce58\uba85\ud0c0\ud53c\ud574",penetration:"\uad00\ud1b5\ub825",attackSpeed:"\uacf5\uaca9\uc18d\ub3c4",maxResonance:"\ucd5c\ub300 \uacf5\uba85",defense:"\ubc29\uc5b4\ub825",evade:"\ud68c\ud53c\uc728",blockChance:"\ub9c9\uae30\ud655\ub960",blockAmount:"\ub9c9\uae30\ud53c\ud574\uac10\uc18c",critChanceResist:"\uce58\uba85\uc800\ud56d\uc728",critDamageResist:"\uce58\uba85\ud53c\ud574\uac10\uc18c",maxHp:"\uccb4\ub825",resonanceRecovery:"\uacf5\uba85 \ud68c\ubcf5"};
+ const fmt=v=>Math.round(v*1000)/1000;
+ return '<div class="partDelta">'+Object.entries(labels).map(([key,label])=>
+  `<span class="${delta[key]>0?'partBuff':delta[key]<0?'partDebuff':'partNeutral'}">${label} ${fmt(before[key])} &rarr; ${fmt(after[key])} (${delta[key]>0?'+':''}${fmt(delta[key])})</span>`).join('')+'</div>';
 }
 
 /* Combat boundary. Versioned globals above remain compatibility adapters;
@@ -405,7 +434,7 @@ const WC_COMBAT_MODULE_V1=(()=>{
   get legacySources(){return WC_LEGACY_COMBAT_SOURCES_V1;},
   get handoff(){return WC_LIVE_COMBAT_HANDOFF_V1;},
   get skillDeck(){return WC_STATUS_SKILLDECK_V1;},
-  ownerRates:wcDirectOwnerRates,currentStats:wcDirectCurrentStats,
+  ownerRates:wcDirectOwnerRates,currentStats:wcDirectCurrentStats,previewEquipment,
   unifiedStats:wcCurrentUnifiedStats,
   launch(...args){return launchStoryCombat.apply(this,args);}
  });
