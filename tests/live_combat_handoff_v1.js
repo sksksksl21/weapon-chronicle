@@ -91,6 +91,20 @@ vm.runInNewContext(
   fs.readFileSync(path.join(__dirname,"../src/core/live_combat_handoff_v1.js"),"utf8"),
   context
 );
+const previewCalls=[];
+context.equipmentPreviewHtml=({kind,slot,id})=>{
+  previewCalls.push([kind,slot,id]);
+  return '<div class="partDelta">최종 스탯 적용</div>';
+};
+const beforePreview=JSON.stringify(context.state);
+assert.equal(context.partDeltaHtml("blade","blade_start"),
+  '<div class="partDelta">최종 스탯 적용</div>',
+  "legacy option UI must use final equipment preview, not raw part modifiers");
+assert.equal(context.partDeltaHtml("blade","unknown_part"),"",
+  "invalid candidate cannot call final preview");
+assert.equal(JSON.stringify(previewCalls),JSON.stringify([["weapon","blade","blade_start"]]));
+assert.equal(JSON.stringify(context.state),beforePreview,
+  "delegating equipment preview must not alter live state");
 assert.equal(context.launchStoryCombat("bandit","첫 전투"),"original-battle");
 assert.equal(legacyCalls,1,"new handoff must not invoke legacy battle twice");
 messageListener({data:{type:"wc-story-combat"}});

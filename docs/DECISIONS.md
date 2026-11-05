@@ -1,3 +1,13 @@
+## 2026-11-05 — V3 장비 파츠 옵션의 최종 스탯 미리보기 연결 (dev)
+
+- 이미 존재하는 `equipmentPreviewHtml({kind:"weapon",slot,id})`를 구형 `partDeltaHtml` 및 파츠 선택 UI에 연결한다. 구형 파츠 옵션만 서로 빼던 `wcPartContribution`의 별도 계산 경로는 제거한다.
+- 변경 전후 수치는 이미 구현된 `WC_COMBAT_MODULE_V1.previewEquipment` → `wcDirectCurrentStats` 경로로 계산한다. 새로운 계산 엔진이나 발휘율 계수를 만들지 않는다. 원래 장비 ID·검 8파츠·소유자 입력·저장/계승 데이터·전투 동작을 보존한다.
+- 기존 함수의 진입점은 유지하며 잘못된 아이템은 기존과 같이 빈 결과를 반환한다. 미리보기를 계산할 수 없는 상황에서 구형 스탯을 최종값처럼 표시하지 않고 안내한다.
+- 관련 격리 UI 위임 회귀 단정은 `tests/live_combat_handoff_v1.js`에 추가했다. GitHub 소스 변경만으로 Windows 모바일 실사용 또는 전체 V3 기능 완료를 주장하지 않는다.
+- 기존 V2 자동개발 Goal/Task/Package와 실행/통합 증거는 이 외부 소스 변경으로 자동 승인하지 않는다. 이후 V2의 기존 원격 증거 조정 절차를 그대로 따른다.
+
+---
+
 # Confirmed design decisions (binding)
 
 | Field | Decision |

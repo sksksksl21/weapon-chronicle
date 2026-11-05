@@ -255,23 +255,18 @@ if(typeof window!=="undefined"&&typeof launchStoryCombat==="function"){
     if(title)title.textContent="Weapon Chronicle · DEV";
   }
   function wcPartContribution(slot,id){
-    const entry=PART_CATALOG[slot]?.[id];
-    if(!entry)return "";
-    const previous=WC_DIRECT_COMBAT_V2.migrateLegacyPart(
-      PART_CATALOG[slot]?.[state.weapon?.parts?.[slot]]?.mods||{},"weapon",slot);
-    const next=WC_DIRECT_COMBAT_V2.migrateLegacyPart(entry.mods||{},"weapon",slot);
-    const labels=[["minAttack","최소 공격력"],["maxAttack","최대 공격력"],
-      ["defense","방어력"],["hitBonus","명중 %p"],["critBonus","치명 %p"],
-      ["critDamageBonus","치명 추가 피해 %"],["penetration","관통"],
-      ["speedPct","속도 증가 %"],["maxResonance","공명"],["resonanceRecovery","공명 회복"]];
-    const bits=labels.map(([key,label])=>{
-      const delta=Number(next[key]||0)-Number(previous[key]||0);
-      if(!Number.isFinite(delta)||Math.abs(delta)<.0001)return "";
-      return '<span class="'+(delta>0?"wc2-up":"wc2-down")+'">'+label+
-        ' '+(delta>0?"+":"")+wcFmt(delta)+'</span>';
-    }).filter(Boolean);
-    return '<div class="wc2-delta">'+(bits.join("")||"<span>직접 능력치 변동 없음</span>")+'</div>'+
-      '<div class="wc2-equipment-note">부품 자체의 차이 · 소유자 발휘율은 장착 후 한 번 적용</div>';
+    if(!PART_CATALOG[slot]?.[id])return "";
+    // The original part-option delta ignores current gear, owner rates,
+    // permanent modifiers and caps. Delegate to the already shared final
+    // snapshot preview, without installing another combat calculator.
+    if(typeof equipmentPreviewHtml!=="function")
+      return '<div class="wc2-equipment-note">최종 능력치 비교를 사용할 수 없습니다.</div>';
+    try{
+      return equipmentPreviewHtml({kind:"weapon",slot,id});
+    }catch(error){
+      console.warn("Final equipment preview unavailable:",error);
+      return '<div class="wc2-equipment-note">장비 비교를 계산할 수 없습니다.</div>';
+    }
   }
   function wcPolishModal(){
     wcUIStyle();
