@@ -84,7 +84,50 @@ const WC_COMBAT_MATH_V1 = (() => {
       extraBasicAttack: trigger ? faster : null
     });
   }
+  // Minimal configured duel. The caller dispatches each side's basic attack,
+  // including enemy turns; this session owns turn validation and the outcome.
+  // No balance defaults or legacy save/state dependencies are introduced.
+  function createTurnCombat({player, enemy, firstTurn} = {}) {
+    if (firstTurn !== "player" && firstTurn !== "enemy") {
+      throw new RangeError("firstTurn must be player or enemy");
+    }
+    function participant(config, side) {
+      if (!config || typeof config !== "object" || Array.isArray(config)) {
+        throw new TypeError(side + " must provide hp and attack");
+      }
+      if (!Number.isFinite(config.hp) || config.hp <= 0) {
+        throw new RangeError(side + ".hp must be a finite positive number");
+      }
+      if (!Number.isFinite(config.attack) || config.attack < 0) {
+        throw new RangeError(side + ".attack must be a finite nonnegative number");
+      }
+      return Object.freeze({hp: config.hp, attack: config.attack});
+    }
+    let state = Object.freeze({
+      player: participant(player, "player"),
+      enemy: participant(enemy, "enemy"),
+      turn: firstTurn,
+      winner: null,
+      ended: false
+    });
+    function getState() { return state; }
+    function attack(side) {
+      if (state.ended || side !== state.turn) return state;
+      const target = side === "player" ? "enemy" : "player";
+      const hp = Math.max(0, state[target].hp - state[side].attack);
+      const ended = hp === 0;
+      state = Object.freeze({
+        ...state,
+        [target]: Object.freeze({...state[target], hp}),
+        turn: ended ? null : target,
+        winner: ended ? side : null,
+        ended
+      });
+      return state;
+    }
+    return Object.freeze({getState, attack});
+  }
   return Object.freeze({SWORD_SLOTS, ARMOR_SLOTS, calculateActorStats, resolveDamage,
-    speedRate, advanceSpeedGauge});
+    speedRate, advanceSpeedGauge, createTurnCombat});
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = WC_COMBAT_MATH_V1;
