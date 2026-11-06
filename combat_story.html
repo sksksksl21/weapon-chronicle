@@ -599,6 +599,33 @@ body.storyMode .actions #resetBtn{display:none!important}
  .sceneInner .sprite.enemy[data-kind="cyclops"],.sceneInner .sprite.enemy[data-kind^="v25_cyclops"]{width:43%!important;max-width:43%!important}
 }
 
+/* Enemy omen readout and resolved intervention result: scene overlays only, never hit targets. */
+#enemyOmen{position:absolute;left:50%;bottom:6px;transform:translateX(-50%);z-index:6;display:none;align-items:center;gap:4px;max-width:56%;padding:2px 8px 2px 3px;border:1px solid #7e6b51;border-radius:999px;background:rgba(10,17,27,.86);color:#f1e7d6;font-size:9px;font-weight:900;line-height:1.15;white-space:nowrap;pointer-events:none;box-shadow:0 2px 7px rgba(0,0,0,.28)}
+#enemyOmen.show{display:flex}
+#enemyOmen .omenIcon{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;background:#142234;font-size:10px;line-height:1}
+#enemyOmen .omenText{min-width:0;overflow:hidden;text-overflow:ellipsis}
+#enemyOmen.omenStrike{border-color:#e07a6f;color:#ffd9cf}
+#enemyOmen.omenGuard{border-color:#7fb0d8;border-style:dashed;color:#d9ecff}
+#enemyOmen.omenCharge{border-color:#ecc58b;color:#ffe9b0;box-shadow:0 0 0 1px #ecc58b55,0 0 9px #f2a93a66}
+#enemyOmen.omenNew.omenStrike{animation:wcOmenJab .3s ease-out 1}
+#enemyOmen.omenNew.omenGuard{animation:wcOmenSettle .3s ease-out 1}
+#enemyOmen.omenNew.omenCharge{animation:wcOmenGlow .55s ease-in-out 2}
+@keyframes wcOmenJab{0%{transform:translateX(-50%) translateX(-4px)}60%{transform:translateX(-50%) translateX(2px)}100%{transform:translateX(-50%)}}
+@keyframes wcOmenSettle{0%{opacity:.35}100%{opacity:1}}
+@keyframes wcOmenGlow{0%,100%{box-shadow:0 0 0 1px #ecc58b55,0 0 6px #f2a93a44}50%{box-shadow:0 0 0 1px #ecc58b,0 0 13px #f2a93aaa}}
+#interventionResult{position:absolute;left:50%;bottom:30px;transform:translateX(-50%);z-index:8;max-width:82%;padding:4px 9px;border:1px solid #ecc58b;border-radius:8px;background:rgba(20,34,52,.92);color:#f1e7d6;font-size:10px;font-weight:1000;line-height:1.25;text-align:center;opacity:0;transition:opacity .18s ease;pointer-events:none}
+#interventionResult.show{opacity:1}
+#interventionResult.irReduce{border-color:#7fb0d8;color:#d9ecff}
+#interventionResult.irEvade{border-color:#9fd3c4;color:#dcfff4}
+#interventionResult.irCounter{border-color:#ecc58b;color:#ffe9b0}
+#interventionResult.irHit{border-color:#ecc58b;color:#fff0d0}
+#interventionResult.irSuppress{border-color:#f2a93a;color:#fff2c4;box-shadow:0 0 10px #f2a93a55}
+#interventionResult.irSurvive{border-color:#76dbb8;color:#d8fff0}
+#interventionResult.irFatal{border-color:#e05a5a;color:#ffd0d0;background:rgba(52,14,18,.92)}
+#interventionResult.irFail{border-color:#8a8a8a;color:#d8d2c6}
+@media(max-width:359px){#enemyOmen{bottom:4px;max-width:64%;padding:1px 6px 1px 2px;font-size:8px}#interventionResult{bottom:25px;max-width:90%;font-size:9px;padding:3px 7px}}
+@media(prefers-reduced-motion:reduce){#enemyOmen.omenNew.omenStrike,#enemyOmen.omenNew.omenGuard,#enemyOmen.omenNew.omenCharge{animation:none}#interventionResult.show{transition:none}}
+
 </style>
 </head>
 <body>
@@ -684,6 +711,8 @@ body.storyMode .actions #resetBtn{display:none!important}
       <div class="banner" id="banner">전투 준비</div>
       <div class="weakBadge" id="weakBadge">약점 노출</div>
       <div class="enemyState" id="enemyState"></div>
+      <div id="enemyOmen"></div>
+      <div id="interventionResult" role="status" aria-live="polite"></div>
       <div class="slash hero" id="slashHero"></div>
       <div class="slash enemy" id="slashEnemy"></div>
       <div class="shieldFx hero" id="shieldHero"></div>
@@ -723,7 +752,8 @@ body.storyMode .actions #resetBtn{display:none!important}
 
   <section class="actions">
     <button class="btn" id="resetBtn">처음부터</button>
-    <button class="btn primary" id="execBtn">주사위 굴림 / 턴 실행</button>
+    <span id="battlePhaseText" role="status" aria-live="polite">플레이어 차례 · 행동 준비</span>
+    <button class="btn primary" id="execBtn">공격 / 턴 실행</button>
   </section>
 </div>
 
@@ -856,8 +886,51 @@ const WC_COMBAT_MATH_V1 = (() => {
       extraBasicAttack: trigger ? faster : null
     });
   }
+  // Minimal configured duel. The caller dispatches each side's basic attack,
+  // including enemy turns; this session owns turn validation and the outcome.
+  // No balance defaults or legacy save/state dependencies are introduced.
+  function createTurnCombat({player, enemy, firstTurn} = {}) {
+    if (firstTurn !== "player" && firstTurn !== "enemy") {
+      throw new RangeError("firstTurn must be player or enemy");
+    }
+    function participant(config, side) {
+      if (!config || typeof config !== "object" || Array.isArray(config)) {
+        throw new TypeError(side + " must provide hp and attack");
+      }
+      if (!Number.isFinite(config.hp) || config.hp <= 0) {
+        throw new RangeError(side + ".hp must be a finite positive number");
+      }
+      if (!Number.isFinite(config.attack) || config.attack < 0) {
+        throw new RangeError(side + ".attack must be a finite nonnegative number");
+      }
+      return Object.freeze({hp: config.hp, attack: config.attack});
+    }
+    let state = Object.freeze({
+      player: participant(player, "player"),
+      enemy: participant(enemy, "enemy"),
+      turn: firstTurn,
+      winner: null,
+      ended: false
+    });
+    function getState() { return state; }
+    function attack(side) {
+      if (state.ended || side !== state.turn) return state;
+      const target = side === "player" ? "enemy" : "player";
+      const hp = Math.max(0, state[target].hp - state[side].attack);
+      const ended = hp === 0;
+      state = Object.freeze({
+        ...state,
+        [target]: Object.freeze({...state[target], hp}),
+        turn: ended ? null : target,
+        winner: ended ? side : null,
+        ended
+      });
+      return state;
+    }
+    return Object.freeze({getState, attack});
+  }
   return Object.freeze({SWORD_SLOTS, ARMOR_SLOTS, calculateActorStats, resolveDamage,
-    speedRate, advanceSpeedGauge});
+    speedRate, advanceSpeedGauge, createTurnCombat});
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = WC_COMBAT_MATH_V1;
 
@@ -1006,7 +1079,65 @@ const WC_LEGACY_COMBAT_SOURCES_V1 = (() => {
       }
     };
   }
-  return Object.freeze({SWORD,ARMOR,armorContribution,fromLegacyLoadout,enemyFromLegacy});
+  // Transient turn decision only. Public telegraphs contain no damage rolls,
+  // hidden AI weights or new multipliers. Existing combo/web rules are retained.
+  // Self-contained so the same factory can run inside the offline combat frame.
+  function createEnemyIntent(){
+    const kinds={light:"attack",heavy:"heavy",guard:"guard-counter",combo:"combo",web:"web"};
+    let pendingEnemyAction=null, serial=0;
+    return Object.freeze({
+      decide(action,turn){
+        if(pendingEnemyAction)throw new Error("Enemy action already pending");
+        if(!Object.prototype.hasOwnProperty.call(kinds,action))throw new RangeError("Unknown enemy action: "+action);
+        pendingEnemyAction=Object.freeze({id:++serial,action,turn});
+        return pendingEnemyAction;
+      },
+      get pending(){return pendingEnemyAction;},
+      get telegraph(){return pendingEnemyAction?Object.freeze({id:pendingEnemyAction.id,
+        turn:pendingEnemyAction.turn,kind:kinds[pendingEnemyAction.action]}):null;},
+      take(turn){
+        if(!pendingEnemyAction||pendingEnemyAction.turn!==turn)return null;
+        const action=pendingEnemyAction;pendingEnemyAction=null;return action;
+      },
+      cancel(){pendingEnemyAction=null;}
+    });
+  }
+  // Selection from story_combat.html STAGES / STORY_BOSS, not equipment data:
+  // bandit: lowest attack/HP, existing shield parry; spider: higher evasion,
+  // existing retreat; cyclops: authored chapter-two boss, stage-0 parry rules.
+  // Condition -> action / public cue (priority from top to bottom):
+  // bandit: turn modulo 4 = 1,2,3,0 -> light,heavy,guard,light.
+  // spider: turn modulo 4 = 1,2,3,0 -> guard,light,heavy,web.
+  // cyclops: exposed -> light; parryReady -> heavy;
+  // HP <= half -> heavy,guard,heavy,light; otherwise light,heavy,guard,light.
+  // Guard uses the CURRENT resolver: bandit/cyclops parry, spider retreat.
+  // No stats, damage tables, dodge chances or counter rules are introduced.
+  // Self-contained factory also serialized into the offline combat frame.
+  function createEnemyPatterns(){
+    const cues=Object.freeze({
+      light:"공격 전조 · 무기를 앞으로 세우며 거리를 좁힌다.",
+      heavy:"강공격 전조 · 몸을 낮추고 큰 일격을 준비한다.",
+      guard:"방어·반격 전조 · 몸을 뒤로 빼고 방어 자세를 잡는다.",
+      web:"견제 전조 · 다리를 벌리고 실을 모은다."
+    });
+    const cycles={bandit:['light','heavy','guard','light'],spider:['guard','light','heavy','web']};
+    return Object.freeze({
+      select(id,{turn=1,hp,maxHp,exposed=false,parryReady=false}={}){
+        if(!['bandit','spider','cyclops'].includes(id))return null;
+        const index=((Math.max(1,Math.floor(Number(turn)||1))-1)%4);
+        let action,condition='cycle';
+        if(id==='cyclops'){
+          if(exposed){action='light';condition='exposed';}
+          else if(parryReady){action='heavy';condition='parry-ready';}
+          else if(maxHp>0&&hp/maxHp<=.5){action=['heavy','guard','heavy','light'][index];condition='wounded';}
+          else {action=cycles.bandit[index];condition='steady';}
+        }else action=cycles[id][index];
+        const state=id==='cyclops'?({exposed:'빈틈을 추스르며', 'parry-ready':'막아낸 기세를 이어',wounded:'상처에 격앙되어',steady:'거구의 균형을 잡으며'}[condition]+' · '):'';
+        return Object.freeze({action,condition,cue:state+cues[action]});
+      }
+    });
+  }
+  return Object.freeze({SWORD,ARMOR,armorContribution,fromLegacyLoadout,enemyFromLegacy,createEnemyIntent,createEnemyPatterns});
 })();
 if (typeof module !== "undefined" && module.exports) module.exports = WC_LEGACY_COMBAT_SOURCES_V1;
 
@@ -1941,6 +2072,52 @@ function battleImpact36(label){
  fx.textContent=label;fx.classList.remove('show');speed.classList.remove('show');void fx.offsetWidth;
  fx.classList.add('show');speed.classList.add('show');
 }
+/* Omen readout: three kinds from the chosen intent. Bosses only reveal the kind,
+ * never the move name, so the readout adds nothing beyond the status panel. */
+let omenShownKey=null, interventionTimer=null;
+function isBossEnemy(){ return STORY_MODE&&!!STORY_BOSS[STORY_ENEMY]; }
+function omenKind(intent){ return intent==='heavy'?'omenCharge':intent==='guard'?'omenGuard':'omenStrike'; }
+function omenInfo(){
+  const kind=omenKind(enemyIntent);
+  const icon={omenStrike:'⚔',omenGuard:'🛡',omenCharge:'✷'}[kind];
+  const label=isBossEnemy()
+    ?{omenStrike:'공격 조짐',omenGuard:'자세를 굳힌다',omenCharge:'큰 힘이 모인다'}[kind]
+    :{omenStrike:'공격 조짐',omenGuard:'수비 태세',omenCharge:'강공 축적'}[kind]+' · '+enemyIntentName(enemyIntent);
+  return {kind,icon,label};
+}
+function renderEnemyOmen(){
+  const el=$('enemyOmen'); if(!el) return;
+  if(phase==='done'||!enemy||enemy.hp<=0){ el.className=''; el.textContent=''; return; }
+  const o=omenInfo(), key=stageIndex+':'+turn+':'+enemyIntent;
+  const fresh=key!==omenShownKey; omenShownKey=key;
+  const keep=!fresh&&el.classList.contains('omenNew');
+  el.className='show '+o.kind+(keep?' omenNew':'');
+  el.innerHTML='<span class="omenIcon" aria-hidden="true">'+o.icon+'</span><span class="omenText"></span>';
+  el.lastChild.textContent=o.label;
+  if(fresh){ void el.offsetWidth; el.classList.add('omenNew'); }
+}
+/* Intervention feedback reports only outcomes already resolved by the battle code. */
+const OFFENSIVE_PRE=['aim1','aim2','over','blood','giant','last','storyGap','mainCyclops','miracle','openingShard'];
+const DEFENSIVE_PRE=['guard','feint','storyPrayer','escapeMemory','gritMemory'];
+function preCardIn(list){ return selectedPre.find(id=>list.includes(cardBase(id)))||null; }
+function interventionName(){ const id=usedThisTurn[usedThisTurn.length-1]; return id&&CARD_DB[id]?'「'+displayCardName(id)+'」':''; }
+function showInterventionResult(kind,text){
+  const el=$('interventionResult'); if(!el) return;
+  clearTimeout(interventionTimer);
+  el.textContent=text;
+  el.className='ir'+kind+' show';
+  log('개입 결과 — '+text,(kind==='Fatal'||kind==='Fail')?'bad':'good');
+  interventionTimer=setTimeout(()=>el.classList.remove('show'),1800);
+}
+function clearInterventionResult(){
+  const el=$('interventionResult'); if(!el) return;
+  clearTimeout(interventionTimer); el.className=''; el.textContent='';
+}
+function reportDamageReduced(saved,label){
+  const hp=Math.round(hero.hp);
+  if(hero.hp>0&&hero.hp/hero.maxHp<=.30) showInterventionResult('Survive',`생존 · ${label} 피해 -${saved} · HP ${hp}`);
+  else showInterventionResult('Reduce',`피해 감소 · ${label} -${saved} · HP ${hp}`);
+}
 function renderBattleDiscard36(){
  const btn=$('battleDiscardBtn36'),info=$('battleDiscardInfo36');
  if(!btn)return;
@@ -2039,11 +2216,19 @@ function render(){
   $('resFill').style.width=(resonance/hero.weapon.maxResonance*100)+'%';
   $('resText').textContent=`${Math.round(resonance)} / ${hero.weapon.maxResonance}`;
   $('execBtn').disabled=phase!=='pre';
-  $('execBtn').textContent=selectedPre.length?'카드 적용 후 실행':'주사위 굴림 / 턴 실행';
+  $('execBtn').textContent=selectedPre.length?'카드 적용 후 실행':'공격 / 턴 실행';
+  $('battlePhaseText').textContent=phase==='done'
+    ? (hero.hp<=0?'전투 종료 · 패배':'전투 종료 · 승리')
+    : phase==='pre'?'플레이어 차례 · 소유자 행동 실행'
+    : phase==='heroReaction'?'플레이어 차례 · 공격 반응 카드 선택'
+    : phase==='enemyReaction'?'적 차례 · 피격 반응 카드 선택'
+    : phase==='enemyResolve'||phase==='postEnemy'?'적 차례 · 행동 처리 중'
+    : phase==='speedResolve'?'추가 공격 처리 중':'소유자 행동 처리 중';
   $('reactBar').className='reactBar'+((phase==='heroReaction'||phase==='enemyReaction')?' show':'');
   renderOverdrive();
   renderCombo();
   renderWeakness();
+  renderEnemyOmen();
   renderCards();
   renderBattleDiscard36();
   renderBattleItems();
@@ -2150,6 +2335,7 @@ function useCard(id){
     enemy.hp=Math.max(0,enemy.hp-reflected);
     addDamage(79,48,String(reflected),'gold');
     log(`남겨진 한 사람 — 받은 피해 ${pending.enemyDamage||0} 중 ${reflected}을 되돌렸다.`,'good');
+    if(enemy.hp>0) showInterventionResult('Counter',`반격 · ${interventionName()} ${reflected} 반사`);
     $('reactBar').className='reactBar';
     phase='postEnemy';
     finishAfterEnemyReaction();
@@ -2161,6 +2347,7 @@ function useCard(id){
     hero.hp=Math.min(hero.maxHp,hero.hp+saved);
     resonance=Math.min(hero.weapon.maxResonance,resonance+6);
     log(`끝까지 데리고 간다 — 피해 55% 경감 (${saved}) · 공명 +6.`,'good');
+    reportDamageReduced(saved,interventionName());
     $('reactBar').className='reactBar';
     phase='postEnemy';
     finishAfterEnemyReaction();
@@ -2173,6 +2360,7 @@ function useCard(id){
     const saved=Math.ceil(pending.enemyDamage*reduce);
     hero.hp=Math.min(hero.maxHp,hero.hp+saved);
     log(`부러지지 않는다 — 피해 ${Math.round(reduce*100)}% 경감 (${saved}).`,'good');
+    reportDamageReduced(saved,interventionName());
     $('reactBar').className='reactBar';
     phase='postEnemy';
     finishAfterEnemyReaction();
@@ -2219,11 +2407,13 @@ async function animateCounter(){
     enemySprite().classList.add('hit');
     addDamage(79,48,String(dmg),'red');
     log(`반격 성공 — ${dmg} 피해.`,'good');
+    if(enemy.hp>0) showInterventionResult('Counter',`반격 성공 · ${dmg} 피해`);
     await sleep(220);
     enemySprite().classList.remove('hit');
   }else{
     addDamage(78,46,'MISS','gray');
     log('반격 실패.','bad');
+    showInterventionResult('Fail','반격 실패 · 피해 없음');
   }
   finishAfterEnemyReaction();
 }
@@ -2329,6 +2519,8 @@ function startTurn(){
   }
   if(turn>1) refillBattleHandOnce();
   enemyIntent=chooseEnemyIntent();
+  clearInterventionResult();
+  log('전조 — '+omenInfo().label,'muted');
   heroPlan=chooseHeroPlan();
   selectedPre=[];discardChoice36=null;discardedThisTurn36=false;
   itemUsedThisTurn=false;
@@ -2344,7 +2536,8 @@ function startTurn(){
 }
 async function executeTurn(){
   if(phase!=='pre') return;
-  commitPreCard(); render(); phase='heroResolve'; heroMissPenaltyNext=0;
+  phase='heroResolve';
+  commitPreCard(); heroMissPenaltyNext=0; render();
   if(heroPlan==='defend'){ showBanner('방어'); heroSprite().classList.add('guard'); await flashShield('hero'); await resolveEnemyPhase(); heroSprite().classList.remove('guard'); return; }
   if(heroPlan==='dodge'){ showBanner('회피'); heroSprite().classList.add('dodge','hero'); await sleep(170); heroSprite().classList.remove('dodge','hero'); await resolveEnemyPhase(); return; }
   const r=roll100(); pending={heroRoll:r}; await resolveHeroRoll(r,true);
@@ -2368,6 +2561,7 @@ async function resolveHeroRoll(r, allowReaction){
     enemySprite().classList.add('hit');
     addDamage(79,46,String(dmg),'gold');
     log(`${hero.name} 치명타 — ${dmg} 피해.`,'good');
+    if(!allowReaction&&enemy.hp>0) showInterventionResult('Hit',`판정 역전 · ${interventionName()} 치명타 ${dmg} 피해`);
     ownerHeroResult('crit');
     if(hit<=50) grantMoment('miracle','명중 '+fmtPct(hit)+'의 공격을 치명타로 뒤집었다.');
     if(enemy.exposed) grantMoment('openingShard','노출된 약점을 정확히 꿰뚫었다.');
@@ -2393,6 +2587,7 @@ async function resolveHeroRoll(r, allowReaction){
     enemySprite().classList.add('hit');
     addDamage(79,46,String(dmg),'red');
     log(`${hero.name} 명중 — ${dmg} 피해.`,'good');
+    if(!allowReaction&&enemy.hp>0) showInterventionResult('Hit',`판정 역전 · ${interventionName()} ${dmg} 피해`);
     ownerHeroResult('hit');
     if(enemy.exposed) grantMoment('openingShard','노출된 약점을 실제 피해로 연결했다.');
     addHeat(hit<50?9:4);
@@ -2431,6 +2626,9 @@ async function resolveHeroRoll(r, allowReaction){
     log(`${isUpgraded('blood')?'선혈 각인':'피의 기억'} 반동 — 다음 명중 ${heroMissPenaltyNext}%.`,'warn');
   }
 
+  if(!allowReaction) showInterventionResult('Fail',`개입 실패 · ${interventionName()} 재판정 ${r} 빗나감`);
+  else if(preCardIn(OFFENSIVE_PRE)) showInterventionResult('Fail',`개입 실패 · ${interventionName()} 공격 빗나감`);
+
   render();
   if(hero.hp<=0){runEnd();return;}
 
@@ -2457,7 +2655,10 @@ async function resolveBanditCombo(){
     if(r<=hit){
       let dmg=LIVE_ACTOR?ri(...calcEnemyDmg(r<=crit?1.5:1)):ri(d[0],d[1]);
       if(!LIVE_ACTOR&&r<=crit) dmg=Math.round(dmg*1.5);
-      if(preHas('feint') && Math.random()<(isUpgraded('feint')?.70:.55)) dmg=0;
+      if(preHas('feint') && Math.random()<(isUpgraded('feint')?.70:.55)){
+        dmg=0;
+        showInterventionResult('Evade',`회피 · ${interventionName()} ${i}타 피해 무효`);
+      }
       hero.hp=Math.max(0,hero.hp-dmg);
       ownerTookDamage(dmg);
       total+=dmg;
@@ -2471,6 +2672,7 @@ async function resolveBanditCombo(){
     }else{
       addDamage(24,44,'MISS','gray');
       log('연속 베기 '+i+'타 빗나감.','good');
+      if(preCardIn(['guard','storyPrayer','escapeMemory'])) showInterventionResult('Evade',`회피 · ${interventionName()} 적용 중 ${i}타 빗나감`);
     }
   }
 
@@ -2530,6 +2732,7 @@ async function resolveEnemyPhase(){
     heroSprite().classList.add('dodge','hero');
     addDamage(24,44,'MISS','gray');
     log(`${hero.name} 회피 성공.`,'good');
+    if(preCardIn(DEFENSIVE_PRE)) showInterventionResult('Evade',`회피 · ${interventionName()} 적용 중 공격을 피했다`);
     ownerHeroResult('dodge');
     await sleep(220);
     heroSprite().classList.remove('dodge','hero');
@@ -2548,6 +2751,10 @@ async function resolveEnemyPhase(){
     if(preHas('feint') && Math.random()<(isUpgraded('feint')?.70:.55)){
       dmg=0;
       log('흘려내기 성공 — 피해 무효.','good');
+      showInterventionResult('Evade',`회피 · ${interventionName()} 피해 무효`);
+    }else if(preHas('gritMemory')&&dmg>0){
+      if(hero.hp-dmg>0&&(hero.hp-dmg)/hero.maxHp<=.30) showInterventionResult('Survive',`생존 · ${interventionName()} 피해 절반 적용 · 받은 피해 ${dmg}`);
+      else if(hero.hp-dmg>0) showInterventionResult('Reduce',`피해 감소 · ${interventionName()} 절반 적용 · 받은 피해 ${dmg}`);
     }
 
     hero.hp=Math.max(0,hero.hp-dmg);
@@ -2583,6 +2790,7 @@ async function resolveEnemyPhase(){
   await enemyAttackAnim();
   addDamage(77,45,'MISS','gray');
   log(`${stage().name} 공격 실패.`,'good');
+  if(preCardIn(['guard','storyPrayer','escapeMemory'])) showInterventionResult('Evade',`회피 · ${interventionName()} 적용 중 공격 빗나감`);
   if(r>=96){
     enemy.staggered=true;
     log('적 대실패 — 경직.','warn');
@@ -2636,7 +2844,7 @@ async function resolveSpeedBasic(side){
     addDamage(24,44,'MISS','gray');log('적 공속 추가공격 회피.','good');return false;
   }
   let amount=ri(...damage);
-  if(preHas('feint')&&Math.random()<(isUpgraded('feint')?.70:.55))amount=0;
+  if(preHas('feint')&&Math.random()<(isUpgraded('feint')?.70:.55)){amount=0;showInterventionResult('Evade',`회피 · ${interventionName()} 추가공격 피해 무효`);}
   hero.hp=Math.max(0,hero.hp-amount);ownerTookDamage(amount);
   addDamage(24,44,String(amount),critical?'gold':'red');log(`적 공속 추가공격 — ${amount} 피해.`,'bad');render();
   if(hero.hp>0&&amount>0&&cardUses<maxCardUses&&hand.some(id=>CARD_DB[id].timing==='enemyHit')){
@@ -2677,8 +2885,11 @@ function pickRewardChoices(){
 function renderRewardChoices(){ const box=$('rewardChoices'); box.innerHTML=''; rewardChoices.forEach(k=>{const m=MEMORY_POOL[k],b=document.createElement('button'); b.className='rewardChoice'; b.innerHTML=`<b>${m.name}</b><span>${m.desc}</span>`; b.onclick=()=>chooseMemory(k); box.appendChild(b);}); }
 function chooseMemory(key){ const m=MEMORY_POOL[key]; if(!m)return; m.apply(); if(!memoriesTaken.includes(key))memoriesTaken.push(key); addChronicle('choice',m.name,'전투 뒤 Core에 남길 기억으로 선택했다. '+m.desc,4); $('rewardBox').className='rewardBox'; log('새 기억 획득 — '+m.name,'good'); nextStage(); }
 function stageVictory(){
+  phase='done';
+  render();
   wcCommitCardMastery();
   showBanner('전투 승리');
+  if(usedThisTurn.length) showInterventionResult('Suppress',`적 제압 · 이번 턴 개입 ${interventionName()}`);
   enemySprite().classList.add('defeat');
 
   if(STORY_MODE){
@@ -2748,8 +2959,11 @@ function nextStage(){
   startTurn();
 }
 function runEnd(){
+  phase='done';
+  render();
   wcCommitCardMastery();
   showBanner('패배');
+  showInterventionResult('Fatal','치명적 피해 · '+hero.name+' 쓰러짐');
 
   if(STORY_MODE){
     phase='done';
@@ -2870,5 +3084,119 @@ renderChronicleButton();
 resetRun();
 })();
 </script>
+<style id="wc-combat-theme-v8">
+/* Weapon Chronicle v8 — combat HUD companion to unified_theme_v8.css.
+ * Pure presentation: never changes battle state, cards, actor placement or hitboxes.
+ */
+:root{
+  --wc-ui-bg:#0a111b;
+  --wc-ui-surface:#142234;
+  --wc-ui-raised:#1b2d40;
+  --wc-ui-border:#7e6b51;
+  --wc-ui-gold:#ecc58b;
+  --wc-ui-text:#f1e7d6;
+  --wc-ui-muted:#c1b6a5;
+  --bg:var(--wc-ui-bg);
+  --paper:var(--wc-ui-surface);
+  --frame:var(--wc-ui-border);
+  --frame2:#947650;
+  --ink:var(--wc-ui-text);
+  --shadow:0 8px 24px rgba(2,6,12,.38);
+}
+html,body{background:var(--wc-ui-bg);color:var(--wc-ui-text)}
+.app{
+  background:linear-gradient(165deg,#18283b,#0a1422 78%)!important;
+  border-color:#997c54!important;
+}
+.app>.panel{
+  background:linear-gradient(155deg,#1d3042,#111d2b)!important;
+  border:1px solid var(--wc-ui-border)!important;
+  border-radius:12px!important;
+  box-shadow:inset 0 1px #ffffff0b,0 7px 20px #0005!important;
+  color:var(--wc-ui-text)!important;
+}
+.topbar .title,.cardsHead .lh{color:#ffdfa0!important;letter-spacing:.015em}
+.topbar .meta,.cardsHead .rh,.pow,.aiReason span{
+  color:var(--wc-ui-muted)!important;
+}
+.topMini,.itemBtn{
+  background:linear-gradient(160deg,#283c51,#192839)!important;
+  border-color:#8b7456!important;
+  border-radius:9px!important;
+  color:var(--wc-ui-text)!important;
+}
+.statusGrid .nm{color:#f6e7c9!important;font-size:12px}
+.statusGrid .bar{
+  background:#0a1724!important;
+  border-color:#8d785b!important;
+}
+.statusGrid .barTxt{color:#fff9ec}
+.stageOnly .stage,.stageOnly .turnNo{color:#eccc94!important}
+.oddCard{
+  background:#1c2c3f!important;
+  border:1px solid #756c5c!important;
+  border-radius:9px!important;
+}
+.oddMetric{color:var(--wc-ui-muted)!important}
+.oddMetric b,.oddAction .txt{color:var(--wc-ui-text)!important}
+.oddChance.hero{color:#88e0c3!important}
+.oddChance.enemy{color:#ffa4a4!important}
+.aiMind,.traitChip,.moodChip,.aiReason{
+  background:#18283a!important;
+  border-color:#786d57!important;
+  color:var(--wc-ui-text)!important;
+}
+.cardsPanel{border-top:2px solid #c19d63!important}
+.cards{gap:6px}
+.cards .card{
+  background:linear-gradient(155deg,#30465d,#1a2b3d)!important;
+  border:2px solid #a88d65!important;
+  border-radius:9px!important;
+  color:var(--wc-ui-text)!important;
+  box-shadow:inset 0 1px #ffffff15,0 3px 7px #0005!important;
+}
+.cards .card.sel{
+  border-color:#ffe0a0!important;
+  background:linear-gradient(155deg,#425d73,#21384b)!important;
+  outline:2px solid #e6ba70!important;
+  outline-offset:1px!important;
+}
+.cards .card.moment:not(.sel){border-color:#b6a2d2!important}
+.cards .card.engraved:not(.sel){border-color:#e1bd74!important}
+.cards .card .name{color:#ffe5b8!important}
+.cards .card .type,.cards .card .growth{color:#e3c693!important}
+.cards .card .eff{color:#eee5d4!important}
+.cards .card.lock{opacity:.48}
+.itemBtn b{color:#f5dfb5!important}
+.itemBtn span{color:var(--wc-ui-muted)!important}
+.actions .btn,.chronicleFoot button,.chronicleClose{
+  background:linear-gradient(160deg,#2a4054,#1a2b3c)!important;
+  border:1px solid #ae8d5d!important;
+  color:var(--wc-ui-text)!important;
+  border-radius:9px!important;
+}
+.actions .btn.primary{
+  background:linear-gradient(180deg,#e7bd7b,#ae7644)!important;
+  border-color:#ffe1a8!important;
+  color:#1b1d22!important;
+}
+.chronicleOverlay,.overlay{background:rgba(4,9,16,.86)!important}
+.chronicleBook,.overlay .popup{
+  background:linear-gradient(160deg,#213449,#111e2c)!important;
+  border:1px solid #b19060!important;
+  border-radius:13px!important;
+  color:var(--wc-ui-text)!important;
+}
+.chronicleTitle,.rewardTitle{color:#ffe0a0!important}
+.chronicleSub{color:var(--wc-ui-muted)!important}
+button:focus-visible,.card:focus-visible,[tabindex]:focus-visible{
+  outline:2px solid #ffe0a0!important;
+  outline-offset:3px!important;
+}
+@media(prefers-reduced-motion:reduce){
+  .app button,.cards .card{transition:none!important}
+}
+
+</style>
 </body>
 </html>

@@ -752,7 +752,8 @@ body.storyMode .actions #resetBtn{display:none!important}
 
   <section class="actions">
     <button class="btn" id="resetBtn">처음부터</button>
-    <button class="btn primary" id="execBtn">주사위 굴림 / 턴 실행</button>
+    <span id="battlePhaseText" role="status" aria-live="polite">플레이어 차례 · 행동 준비</span>
+    <button class="btn primary" id="execBtn">공격 / 턴 실행</button>
   </section>
 </div>
 
@@ -1876,7 +1877,14 @@ function render(){
   $('resFill').style.width=(resonance/hero.weapon.maxResonance*100)+'%';
   $('resText').textContent=`${Math.round(resonance)} / ${hero.weapon.maxResonance}`;
   $('execBtn').disabled=phase!=='pre';
-  $('execBtn').textContent=selectedPre.length?'카드 적용 후 실행':'주사위 굴림 / 턴 실행';
+  $('execBtn').textContent=selectedPre.length?'카드 적용 후 실행':'공격 / 턴 실행';
+  $('battlePhaseText').textContent=phase==='done'
+    ? (hero.hp<=0?'전투 종료 · 패배':'전투 종료 · 승리')
+    : phase==='pre'?'플레이어 차례 · 소유자 행동 실행'
+    : phase==='heroReaction'?'플레이어 차례 · 공격 반응 카드 선택'
+    : phase==='enemyReaction'?'적 차례 · 피격 반응 카드 선택'
+    : phase==='enemyResolve'||phase==='postEnemy'?'적 차례 · 행동 처리 중'
+    : phase==='speedResolve'?'추가 공격 처리 중':'소유자 행동 처리 중';
   $('reactBar').className='reactBar'+((phase==='heroReaction'||phase==='enemyReaction')?' show':'');
   renderOverdrive();
   renderCombo();
@@ -2189,7 +2197,8 @@ function startTurn(){
 }
 async function executeTurn(){
   if(phase!=='pre') return;
-  commitPreCard(); render(); phase='heroResolve'; heroMissPenaltyNext=0;
+  phase='heroResolve';
+  commitPreCard(); heroMissPenaltyNext=0; render();
   if(heroPlan==='defend'){ showBanner('방어'); heroSprite().classList.add('guard'); await flashShield('hero'); await resolveEnemyPhase(); heroSprite().classList.remove('guard'); return; }
   if(heroPlan==='dodge'){ showBanner('회피'); heroSprite().classList.add('dodge','hero'); await sleep(170); heroSprite().classList.remove('dodge','hero'); await resolveEnemyPhase(); return; }
   const r=roll100(); pending={heroRoll:r}; await resolveHeroRoll(r,true);
@@ -2537,6 +2546,8 @@ function pickRewardChoices(){
 function renderRewardChoices(){ const box=$('rewardChoices'); box.innerHTML=''; rewardChoices.forEach(k=>{const m=MEMORY_POOL[k],b=document.createElement('button'); b.className='rewardChoice'; b.innerHTML=`<b>${m.name}</b><span>${m.desc}</span>`; b.onclick=()=>chooseMemory(k); box.appendChild(b);}); }
 function chooseMemory(key){ const m=MEMORY_POOL[key]; if(!m)return; m.apply(); if(!memoriesTaken.includes(key))memoriesTaken.push(key); addChronicle('choice',m.name,'전투 뒤 Core에 남길 기억으로 선택했다. '+m.desc,4); $('rewardBox').className='rewardBox'; log('새 기억 획득 — '+m.name,'good'); nextStage(); }
 function stageVictory(){
+  phase='done';
+  render();
   wcCommitCardMastery();
   showBanner('전투 승리');
   if(usedThisTurn.length) showInterventionResult('Suppress',`적 제압 · 이번 턴 개입 ${interventionName()}`);
@@ -2609,6 +2620,8 @@ function nextStage(){
   startTurn();
 }
 function runEnd(){
+  phase='done';
+  render();
   wcCommitCardMastery();
   showBanner('패배');
   showInterventionResult('Fatal','치명적 피해 · '+hero.name+' 쓰러짐');
