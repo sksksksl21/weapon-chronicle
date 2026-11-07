@@ -94,18 +94,11 @@ def compose(root):
         '/* @include:main-chapters-v47 */': (source / 'story/main_chapters_v47.js').read_text(encoding='utf8').removesuffix('\n'),
     }
     scripts = [(source / p).read_text(encoding='utf8') for p in SCRIPT_PARTS]
-    # Startup belongs to bootstrap. Keep the feature source/API unchanged while
-    # suppressing its inherited eager lifecycle call in the integrated bundle.
-    eager = '''if(typeof WC_COMBAT_MODULE_V1!=="undefined"&&typeof WC_GAME_MODULES_V1!=="undefined"){
- WC_GAME_MODULES_V1.initialize().catch(error=>{
-  console.error("Combat module initialization failed",error);
- });
-}'''
-    status_index = SCRIPT_PARTS.index('core/status_skilldeck_v1.js')
-    if scripts[status_index].count(eager) != 1:
-        raise ValueError('Expected one legacy status lifecycle startup')
-    scripts[status_index] = scripts[status_index].replace(eager,
-        '// Integrated lifecycle startup is owned by bootstrap.')
+    # The status module no longer starts the registry while bootstrap is
+    # still registering modules. Share the exact same source with the offline
+    # build and both browser-based dev previews; bootstrap alone starts it.
+    assert '.initialize()' not in scripts[SCRIPT_PARTS.index('core/status_skilldeck_v1.js')], (
+        'Status may not initialize the game module lifecycle before bootstrap')
     for marker, content in includes.items():
         assert sum(s.count(marker) for s in scripts) == 1, f'Expected one {marker}'
         scripts = [s.replace(marker, content) for s in scripts]
