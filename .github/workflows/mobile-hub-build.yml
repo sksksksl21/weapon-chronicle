@@ -1,4 +1,4 @@
-# One-time dev-only hub build on creation of this workflow file.
+# Dev-only hub build retry: Chromium test uses isolated localStorage like the existing UI smoke suite.
 # Subsequent ordinary dev pushes do not meet the path trigger.
 name: Dev mobile hub first-frame verification
 on:
