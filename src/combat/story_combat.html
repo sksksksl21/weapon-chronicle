@@ -1556,7 +1556,9 @@ function calcHeroDmg(critMultiplier=1){
   if(heroPlan==='defend'||heroPlan==='dodge') return [0,0];
   const mass=Math.max(0,hero.weapon.weight-1.0)*3.5;
   let base=hero.weapon.power + hero.martial*.72 + mass - enemy.defense*.42;
-  if(LIVE_ACTOR)base=LIVE_ACTOR.attack+mass;
+  // The final snapshot already owns permanent attack. Physical weapon weight
+  // belongs only to the legacy fallback, not a second live attack bonus.
+  if(LIVE_ACTOR)base=LIVE_ACTOR.attack;
   if(hasWeaponBuild('duelist'))base*=.94;
   if(!LIVE_ACTOR&&preHas('storyGap')) base+=enemy.defense*.32;
   let mn=Math.max(2,Math.floor(base-2)),mx=Math.ceil(base+3);
