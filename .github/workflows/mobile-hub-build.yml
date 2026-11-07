@@ -1,0 +1,45 @@
+# One-time dev-only hub build on creation of this workflow file.
+# Subsequent ordinary dev pushes do not meet the path trigger.
+name: Dev mobile hub first-frame verification
+on:
+  push:
+    branches: [dev]
+    paths:
+      - .github/workflows/mobile-hub-build.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  verify-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install browser dependencies
+        run: |
+          python3 -m pip install -r requirements-dev.txt
+          python3 -m playwright install --with-deps chromium
+      - name: Build current dev source into the default game page
+        run: |
+          npm run build
+          npm run check
+      - name: Assert first mobile frame and single game startup
+        run: |
+          python3 -m unittest -v tests.test_initial_mobile_hub tests.test_module_manifest_v1 tests.test_ui_theme_v8
+      - name: Preserve source-built first page on dev only
+        run: |
+          if ! git diff --quiet -- index.html combat_story.html; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add index.html combat_story.html
+            git commit -m "build(game): sync verified mobile hub to dev Pages"
+            git push origin HEAD:dev
+          fi
