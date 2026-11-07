@@ -37,13 +37,33 @@ class InitialMobileHubTest(unittest.TestCase):
                         page=browser.new_page(viewport={'width':width,'height':844})
                         errors=[]
                         page.on('pageerror',lambda e:errors.append(str(e)))
+                        # The page is injected into about:blank for the test.
+                        # This opaque origin cannot provide ordinary browser
+                        # localStorage, unlike the real github.io origin.
+                        page.evaluate("""Object.defineProperty(window,'localStorage',{
+                          configurable:true,value:{
+                            getItem:k=>window.__wcStored?.[k]??null,
+                            setItem:(k,v)=>{window.__wcStored=window.__wcStored||{};
+                                            window.__wcStored[k]=String(v);},
+                            removeItem:k=>{if(window.__wcStored)delete window.__wcStored[k];}
+                          }})""")
                         page.set_content(page_html,wait_until='domcontentloaded',
                                          timeout=45000)
-                        page.wait_for_function("""() =>
-                          window.WC_RUNTIME_READY_V1 &&
-                          document.getElementById('ownerName')?.textContent!=='이름 없는 선원' &&
-                          document.querySelectorAll('#weaponVisualWrap img').length>=3
-                        """,timeout=20000)
+                        try:
+                            page.wait_for_function("""() =>
+                              window.WC_RUNTIME_READY_V1 &&
+                              document.getElementById('ownerName')?.textContent!=='이름 없는 선원' &&
+                              document.querySelectorAll('#weaponVisualWrap img').length>=3
+                            """,timeout=7000)
+                        except Exception as exc:
+                            diagnosis=page.evaluate("""() => ({
+                              hasBootstrap:!!window.WC_RUNTIME_READY_V1,
+                              owner:document.getElementById('ownerName')?.textContent,
+                              sword:document.querySelectorAll('#weaponVisualWrap img').length,
+                              gold:document.getElementById('goldText')?.textContent,
+                              ready:document.readyState
+                            })""")
+                            self.fail(f'Mobile startup blocked: {diagnosis}; errors={errors[:3]}; {type(exc).__name__}')
                         observed=page.evaluate("""() => {
                           const byId=id=>document.getElementById(id);
                           const rect=el=>el.getBoundingClientRect();
