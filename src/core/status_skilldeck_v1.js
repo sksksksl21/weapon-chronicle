@@ -383,10 +383,7 @@ if(typeof window!=="undefined"&&typeof openStatus==="function"){
    return _wc3Combat.apply(this,args);
  };
 }
-// All combat components and compatibility hooks now exist; initialize through
-// the shared lifecycle before bootstrap loads the save and renders the game.
-if(typeof WC_COMBAT_MODULE_V1!=="undefined"&&typeof WC_GAME_MODULES_V1!=="undefined"){
- WC_GAME_MODULES_V1.initialize().catch(error=>{
-  console.error("Combat module initialization failed",error);
- });
-}
+// The source-built preview and offline bundle share the same lifecycle.
+// Bootstrap registers runtime-integration and then initializes all modules
+// exactly once. Never initialize here: registry.register() refuses additions
+// while initialize() is running, leaving the initial hub as empty HTML.
