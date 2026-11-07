@@ -260,3 +260,68 @@ button:disabled{cursor:not-allowed}
 .wc3-armorFigure>:nth-child(4){grid-column:3;grid-row:1}
 .wc3-armorFigure>:nth-child(5){grid-column:3;grid-row:2}
 .wc3-status .wc3-equipmentContribution{white-space:normal;overflow-wrap:anywhere}
+
+/* Mobile-first v5.2 hub: the in-game frame is 430px wide even on desktop.
+ * The old 1.52fr/.98fr layout reduced the owner to ~200px and left all
+ * four services in a tall sidebar, hiding the actual monthly gameplay.
+ */
+.app .wc41-dashboard{
+  grid-template-columns:minmax(0,1fr)!important;
+  gap:10px!important;
+  align-items:start!important;
+}
+.app .wc41-left,.app .wc41-owner,.app .wc41-weaponSummary,
+.app .wc41-services{min-width:0!important;width:100%!important}
+.app .wc41-ownerHeader{
+  grid-template-columns:minmax(90px,29%) minmax(0,1fr)!important;
+  gap:12px!important;
+  align-items:center!important;
+}
+.app .wc41-portrait{height:136px!important;max-width:124px!important}
+.app .wc41-portrait img:not([src]){display:none!important}
+.app .wc41-identity{min-width:0!important;overflow:visible!important}
+.app .wc41-identity h2{
+  font-size:clamp(18px,5.2vw,23px)!important;
+  line-height:1.25!important;
+  overflow-wrap:break-word!important;
+  word-break:keep-all;
+  margin:5px 0!important;
+}
+.app .wc41-ownerStats .ownerStat{min-width:0}
+.app .wc41-weaponBody .weaponVisualWrap{
+  flex:0 0 40%;
+  min-height:150px!important;
+}
+.app .wc41-weaponAside{flex:1 1 0;width:auto!important}
+.app .wc41-serviceGrid{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  grid-template-rows:repeat(2,minmax(112px,auto))!important;
+  gap:8px!important;
+  height:auto!important;
+  min-height:0!important;
+}
+.app .wc41-serviceTile{min-height:112px!important}
+.app .wc41-services{padding:11px!important}
+.app .bottom{padding:7px 10px calc(7px + env(safe-area-inset-bottom))!important}
+.app .bottom .exec:disabled{
+  filter:none!important;
+  opacity:1!important;
+  color:#bfc2c7!important;
+  background:#253448!important;
+  border-color:#5f6c7b!important;
+  min-height:43px!important;
+  padding:9px!important;
+  box-shadow:none!important;
+}
+@media(max-width:380px){
+  .app .wc41-ownerHeader{
+    grid-template-columns:minmax(80px,28%) minmax(0,1fr)!important;
+    gap:9px!important;
+  }
+  .app .wc41-portrait{height:120px!important}
+  .app .wc41-navTile{min-height:48px}
+  .app .wc41-navTile b{font-size:12px!important}
+  .app .wc41-serviceTile{min-height:106px!important}
+  .app .wc41-identity h2{font-size:19px!important}
+}
