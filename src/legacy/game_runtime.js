@@ -2034,7 +2034,57 @@ function renderSelection(){
   if($('selectionChangeBtn')){$('selectionChangeBtn').textContent=(e.main?'다른 행동 보기':'후보 바꾸기');$('selectionChangeBtn').onclick=()=>openActionMissionPicker(e.policy||activeActionCategory||state.policy||'contract');}
 }
 
-function openModal(content){$("modal").innerHTML=content;$("overlay").classList.add("show");}
+function openModal(content){$("modal").innerHTML=content;wcStatusSnapshotPanel($("modal"));$("overlay").classList.add("show");}
+// Presentation only: consume the same finalized object as combat, after the
+// existing status renderer has assembled its equipment and skill controls.
+function wcStatusSnapshotPanel(modal){
+ const root=modal.querySelector('.wc3-status');
+ if(!root)return;
+ const nav=root.querySelector('.tabRow');
+ const tabs=[['owner','소유자'],['weapon','무기'],['gear','방어'],['combat','스킬']];
+ let active='owner';
+ for(const [id,label] of tabs){
+  const button=nav?.querySelector('[data-wc3-tab="'+id+'"]');
+  if(button){if(button.classList.contains('active'))active=id;button.textContent=label;nav.appendChild(button);}
+ }
+ const stats=wcDirectCurrentStats();
+ const attack=[['minAttack','최소공격'],['maxAttack','최대공격'],['hitChance','명중','%'],['critChance','치명타확률','%'],['critDamageBonus','치명타피해','%p'],['penetration','관통력'],['attackSpeed','공격속도'],['maxResonance','공명']];
+ const defense=[['defense','방어력'],['evade','회피율','%'],['blockChance','막기확률','%'],['blockAmount','막기피해감소'],['critChanceResist','치명저항율','%p'],['critDamageResist','치명피해감소','%p']];
+ // Replace the old main/detail pair rather than stacking a second stat panel.
+ if(active==='owner')root.querySelector('.wc3-directGrid')?.closest('section')?.remove();
+ const fields=active==='gear'?defense:active==='owner'?attack.concat(defense.slice(0,4)):attack;
+ const panel=document.createElement('section');
+ panel.className='wc3-panel wc3-finalSnapshot';
+ panel.innerHTML='<h3>최종 '+(active==='gear'?'방어':'전투')+' 능력치</h3><div class="wc3-directGrid">'+fields.map(([key,label,unit])=>{
+  const value=Number(stats[key]);
+  return '<div class="wc3-directStat" data-stat="'+key+'"><small>'+label+'</small><strong>'+(Number.isFinite(value)?Math.round(value*10)/10:'—')+(unit||'')+'</strong></div>';
+ }).join('')+'</div>';
+ nav.insertAdjacentElement('afterend',panel);
+ // Reuse equipment's existing owner-applied contribution renderer data.
+ const owner=wcDirectOwnerRates();
+ root.querySelectorAll('[data-wc3-part],[data-wc3-armor]').forEach(button=>{
+  const weapon=button.hasAttribute('data-wc3-part');
+  const slot=weapon?button.dataset.wc3Part:button.dataset.wc3Armor;
+  const id=weapon?state.weapon.parts?.[slot]:state.ownerEquipment?.[slot];
+  const item=weapon?PART_CATALOG[slot]?.[id]:OWNER_GEAR_CATALOG[id];
+  if(!item)return;
+  const kind=weapon?'weapon':'armor';
+  const direct=WC_DIRECT_COMBAT_V2.migrateLegacyPart(item.mods||{},kind,slot);
+  const effects=WC_DIRECT_COMBAT_V2.itemEffects(direct,{kind,slot,owner});
+  const contribution=document.createElement('small');
+  contribution.className='wc3-equipmentContribution';
+  contribution.textContent=WC_DIRECT_COMBAT_V2.describeItemEffects(effects).join(' · ')||'수치 효과 없음';
+  button.appendChild(contribution);
+ });
+ if(active==='gear'){
+  const grid=root.querySelector('.wc3-equipGrid');
+  if(grid){
+   grid.classList.add('wc3-armorFigure');
+   const figure=document.createElement('div');figure.className='wc3-armorOwner';
+   figure.textContent=state.owner.name;grid.insertBefore(figure,grid.children[2]);
+  }
+ }
+}
 function closeModal(){$("overlay").classList.remove("show");}
 function modalHead(title,desc=""){return `<div class="modalHead"><b>${title}</b><button class="close" id="closeModal">닫기</button></div>${desc?`<div class="modalDesc">${desc}</div>`:""}`;}
 function bindClose(){$("closeModal")?.addEventListener("click",closeModal);}
@@ -4105,7 +4155,7 @@ function openStatus(tab='owner'){
   }else if(tab==='gear'){
     body=`<div class="profileBox"><b>${state.owner.name}의 방어구</b><p>방어구는 생존에만 영향을 준다. 무예와 처세에는 어떤 장비도 직접 보정을 주지 않는다.</p></div>${gearBoardHtml()}${gearSummaryHtml()}<div class="sectionMini">보유 장비</div><div class="sideList">${ownerGearInventoryHtml()}</div>`;
   }else if(tab==='weapon'){
-    body=`<div class="profileBox"><b>${prof.name}</b><p>검은 무예와 공격 계열을 만든다. 방어구와 달리 공격력·명중·치명에 직접 개입한다.</p></div><div class="statusGrid"><div class="statusStat">위력<b>${w.power}</b></div><div class="statusStat">정밀<b>${w.precision}</b></div><div class="statusStat">견고<b>${w.toughness}</b></div><div class="statusStat">조작성<b>${w.handling}</b></div><div class="statusStat">최대 공명<b>${w.maxResonance}</b></div><div class="statusStat">회복/T<b>+${w.resonanceRecovery}</b></div></div><div class="sectionMini">현재 8파츠</div>${equipmentVisualHtml()}`;
+    body=`<div class="profileBox"><b>${prof.name}</b><p>검은 무예와 공격 계열을 만든다. 방어구와 달리 공격력·명중·치명에 직접 개입한다.</p></div><div class="sectionMini">현재 8파츠</div>${equipmentVisualHtml()}`;
   }else{
     body=`<div class="profileBox"><b>최종 전투 스펙</b><p>공격은 유효 무예와 검, 방어는 유효 생존과 방어구를 사용한다. 정신이 낮으면 두 축 모두 동시에 약해진다.</p></div><div class="statusGrid"><div class="statusStat">공격력<b>${d.dmgMin}~${d.dmgMax}</b></div><div class="statusStat">명중<b>${fmtPct(d.accuracy)}</b></div><div class="statusStat">치명<b>${fmtPct(d.crit)}</b></div><div class="statusStat">방어<b>${d.guard}</b></div><div class="statusStat">회피<b>${fmtPct(d.evade)}</b></div><div class="statusStat">상태저항<b>${d.resist}</b></div></div><div class="formula">공격·명중·치명 = 유효 무예 + 검의 위력·정밀·조작성<br>방어·회피·저항 = 유효 생존 + 투구·갑옷·장갑·신발<br>정신 = 무예·생존·처세의 최종 발휘율</div>`;
   }
