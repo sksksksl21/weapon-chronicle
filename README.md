@@ -1,3 +1,14 @@
+## 2026-11-08 · 모바일 첫 화면 초기화·레이아웃 수정 (dev)
+
+- 실제 Android Chrome 초기 화면에서 소유자 초상 이미지가 깨지고 소유자 이름·검 상태가 초기값에 머무르며, 거점 서비스가 좁은 우측 열에 4개 세로로 늘어서는 문제를 확인했다. 원래 게임 로직과 저장 키는 유지한다.
+- `src/core/status_skilldeck_v1.js`의 중복 조기 모듈 초기화를 제거했다. 빌더의 임시 치환을 없애고 `src/legacy/bootstrap.js`에서만 전체 모듈을 등록 후 초기화한다. 이는 소스 조립형 `play-dev.html`과 기본 `index.html` 간의 실제 실행 차이를 없앤다.
+- `src/ui/unified_theme_v8.css`: 모바일 화면에서 소유자 → 현재 검 → 거점 서비스를 한 열로 쌓고, 서비스 4개를 2×2로 정렬한다. `src/legacy/html_before_script.html`은 실제 초상 로드 전 깨진 이미지 대신 텍스트 대체 표기를 보이게 한다.
+- 빌드된 `index.html`과 `combat_story.html`을 **검증 뒤 dev에 실제 커밋**했다. 기존 루트 HTML은 이전 모듈 시스템과 통합 테마가 반영되지 않은 오래된 파일이었다.
+- 검증: GitHub Actions [첫 화면 브라우저 검사](https://github.com/sksksksl21/weapon-chronicle/actions/runs/42388823755) **SUCCESS**. 실제 Chromium 320·390·430px에서 새 소유자 이름, 정상 초상 로드, 검 레이어·정보, 거점 2×2, 가로 스크롤 없음, 하단 버튼 화면 내 위치, 페이지 오류 없음 확인. `npm run build` 및 `npm run check` 성공. 게임 dev `1a904a70b524af5128e11afb87efbb693e0e7ba5`에 Pages 배포 [42388871358](https://github.com/sksksksl21/weapon-chronicle/actions/runs/42388871358) **SUCCESS**.
+- 개발판 페이지: https://sksksksl21.github.io/weapon-chronicle/ 또는 https://sksksksl21.github.io/weapon-chronicle/play-dev.html . 이 검증은 초기 화면 기준이며 31개 완료 작업의 모든 실제 플레이 시나리오 재검증을 의미하지 않는다. main은 변경하지 않았다.
+
+---
+
 # Weapon Chronicle — Codex / GitHub Codespaces baseline (v5.2)
 
 ## DEV unified dark-fantasy UI (2026-11-03)
