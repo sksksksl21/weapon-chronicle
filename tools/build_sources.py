@@ -2,6 +2,7 @@
 from base64 import b64encode
 from hashlib import sha256
 import json
+import re
 from pathlib import Path, PurePosixPath
 
 
@@ -83,7 +84,7 @@ def approved_scene_style(root):
     filename = entry.get('filename')
     mime = entry.get('media_type')
     if (not isinstance(filename,str) or
-            not __import__('re').fullmatch(r'assets/asset_[a-f0-9]{24}\.(?:png|jpg|webp)',filename)
+            not re.fullmatch(r'assets/asset_[a-f0-9]{24}\.(?:png|jpg|webp)',filename)
             or mime not in ('image/png','image/jpeg','image/webp')):
         raise ValueError('Invalid approved scene filename')
     image = pack/filename
