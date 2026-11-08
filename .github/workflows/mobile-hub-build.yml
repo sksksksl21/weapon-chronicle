@@ -1,11 +1,16 @@
 # Dev-only hub build retry: Chromium test uses isolated localStorage like the existing UI smoke suite.
-# Subsequent ordinary dev pushes do not meet the path trigger.
+# Dev visual source changes rebuild the deployed index.html, not just play-dev.html.
 name: Dev mobile hub first-frame verification
 on:
   push:
     branches: [dev]
     paths:
       - .github/workflows/mobile-hub-build.yml
+      - src/ui/unified_theme_v8.css
+      - src/ui/combat_theme_v8.css
+      - src/legacy/html_before_script.html
+      - src/legacy/html_after_script.html
+      - tools/build_sources.py
   workflow_dispatch:
 permissions:
   contents: write
