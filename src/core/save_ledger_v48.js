@@ -44,6 +44,7 @@ function restoreSaveModules(saved){
   }
 }
 function v48SerializeState(){
+  if(typeof WC_EQUIPMENT_POOL_V1!=="undefined")WC_EQUIPMENT_POOL_V1.catalog.sync();
   const copy=v48CloneSaveData(state);
   // recalcWeapon owns these fields. Persist parts/upgrades and current resources,
   // not a second copy of their calculated totals (also used by checkpoints).
@@ -138,6 +139,12 @@ function v48PrepareLoad(raw){
   // outer preloader ran. Restore this actual payload before legacy initialization
   // recalculates the weapon or clamps owner HP against equipped armor.
   if(typeof WC_EQUIPMENT_POOL_V1!=='undefined')WC_EQUIPMENT_POOL_V1.restoreFromSave(raw);
+  // Missing records recover only equipment actually present in this payload.
+  data.catalogDiscovery=Array.isArray(data.catalogDiscovery)?data.catalogDiscovery:[];
+  if(typeof WC_EQUIPMENT_POOL_V1!=='undefined'){
+    WC_EQUIPMENT_POOL_V1.catalog.sync(data,false);
+    data.discoveredParts=[...new Set(v48SafeArray(data.discoveredParts).map(id=>WC_EQUIPMENT_POOL_V1.catalog.identity(id)?.id||id))];
+  }
   v48PendingModuleData=data.moduleSaveData;
   // Leave existing values untouched. Additional fields are initialized after the legacy initializer.
   return data;

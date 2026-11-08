@@ -311,8 +311,50 @@ if(typeof partDeltaHtml==="function"){
   return original.call(this,slot,id,...args)+formatDetail(PART_CATALOG[slot]?.[id]);
  };
 }
+// Discovery is durable; ownership is always derived from the live inventories.
+function identity(id){
+ restoreCopy(id);
+ for(const slot of W_SLOTS)if(PART_CATALOG[slot]?.[id])return {kind:"weapon",slot,id:PART_CATALOG[slot][id].templateId||id};
+ const item=OWNER_GEAR_CATALOG[id];
+ return item&&A_SLOTS.includes(item.slot)?{kind:"armor",slot:item.slot,id:item.templateId||id}:null;
+}
+function discoveryKey(id){const x=identity(id);return x?x.kind+":"+x.slot+":"+x.id:null;}
+function ownedInstances(target=state){
+ const rows=[];
+ function add(id,count,location){const x=identity(id);if(x&&Number(count)>0)rows.push({...x,id,catalogId:x.id,key:discoveryKey(id),count:Number(count),location});}
+ for(const id of Object.values(target.weapon?.parts||{}))add(id,1,"equipped");
+ for(const [id,n] of Object.entries(target.weapon?.spareParts||{}))add(id,n,"spare");
+ // Armor inventory already includes equipped copies. Never count them twice.
+ for(const [id,n] of Object.entries(target.ownerGearOwned||{}))add(id,n,"armor");
+ for(const id of Object.values(target.ownerEquipment||{}))if(!(target.ownerGearOwned?.[id]>0))add(id,1,"equipped");
+ return rows;
+}
+let lastDiscoveryState="";
+function syncDiscovery(target=state,notify=true){
+ const keys=new Set((Array.isArray(target.catalogDiscovery)?target.catalogDiscovery:[]).filter(x=>typeof x==="string"));
+ const owned=ownedInstances(target);
+ for(const row of owned)keys.add(row.key);
+ target.catalogDiscovery=[...keys];
+ const snapshot={discovered:[...keys],instances:owned};
+ const signature=JSON.stringify(snapshot);
+ if(target===state&&notify&&signature!==lastDiscoveryState){
+  lastDiscoveryState=signature;
+  if(typeof WC_GAME_MODULES_V1!=="undefined"){
+   try{WC_GAME_MODULES_V1.events.publish("equipment-catalog:changed",snapshot);}
+   catch(error){console.warn("Catalog subscriber failed",error);}
+  }
+ }
+ return snapshot;
+}
+function discoveryStatus(candidate){
+ const entry=catalogEntry(candidate);if(!entry)return null;
+ const key=discoveryKey(entry.id),snapshot=syncDiscovery();
+ const instances=snapshot.instances.filter(row=>row.key===key);
+ const discovered=snapshot.discovered.includes(key);
+ return {key,discovered,owned:instances.length>0,status:instances.length?"owned":discovered?"discovered":"undiscovered",instances};
+}
 // Read-through catalog: definitions stay in the original ID-keyed catalogs.
-// No discovery state, inventory, save fields or random draws are owned here.
+// Definitions remain shared; discovery never mints equipment or changes rolls.
 function catalogRarity(rarity){return rarity==="beyond"?"chronicle":TIERS.some(t=>t.id===rarity)?rarity:"common";}
 function catalogEntry({kind,slot,id}={}){
  if(kind==="armor"){
@@ -362,6 +404,7 @@ function catalogDetail(candidate={},context={}){
    performance.preview=WC_COMBAT_MODULE_V1.previewEquipment({kind,slot,id});
  }
  return {id,kind,slot,name:item.name,rarity:catalogRarity(item.rarity),originalRarity:item.rarity,
+  discovery:typeof state!=="undefined"?discoveryStatus(candidate):null,
   description:item.desc||item.note||"",familyId,templateId,
   generationRule:item.generated?"equipment_pool_v1:buildItem":null,
   definition:base,baseStats:clone(base.mods||{}),
@@ -382,6 +425,7 @@ function queryCatalog({kind,slot,rarity,search=""}={}){
    (!term||[row.id,row.name,row.description,row.familyId].some(v=>String(v).toLocaleLowerCase().includes(term))));
 }
 const catalog=Object.freeze({query:queryCatalog,detail:catalogDetail,rarity:catalogRarity,
+ identity,discoveryKey,status:discoveryStatus,sync:syncDiscovery,ownedInstances,
  weaponSlots:Object.freeze([...W_SLOTS]),armorSlots:Object.freeze([...A_SLOTS]),
  tiers:Object.freeze(TIERS.map(t=>Object.freeze({id:t.id,name:t.name})))});
 return Object.freeze({TIERS,W_SLOTS,A_SLOTS,expand,buildItem,formatDetail,result,randomFrom,catalog,
