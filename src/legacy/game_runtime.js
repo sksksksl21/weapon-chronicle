@@ -27,7 +27,7 @@ const state={
   year:1,month:1,
   hp:74,maxHp:93,mind:52,maxMind:100,gold:68,
   generation:1,
-  owner:{name:"이름 없는 선원",role:"이타카의 수병",age:24,martial:7,survival:6,social:4,aggression:68,caution:38,boldness:62,portrait:"odyssey",deeds:{martial:[],survival:[],social:[]}},
+  owner:{name:"이름 없는 선원",role:"이타카의 수병",age:24,martial:70,survival:60,social:40,statScale:100,aggression:68,caution:38,boldness:62,portrait:"odyssey",deeds:{martial:[],survival:[],social:[]}},
   weapon:{
     dur:68,maxDur:100,resonance:52,
     power:13,precision:11,toughness:10,handling:9,maxResonance:70,resonanceRecovery:9,length:92,weight:1.30,carryWeight:1.66,firstHandling:0,
@@ -3894,12 +3894,12 @@ function applyFoodToCombat(g){const f=state.foodBuff;if(!f)return {...g,combatHp
 
 function shouldOwnerDie(p){return roll100()<=deathChanceForCombat(p);}
 const SUCCESSOR_POOL=[
- {name:'테온',role:'항만 수습 호위',age:19,martial:4,survival:7,social:6,aggression:45,caution:62,boldness:48},
- {name:'에이라',role:'전장 수습꾼',age:22,martial:5,survival:8,social:3,aggression:52,caution:70,boldness:42},
- {name:'도리스',role:'어부의 딸',age:20,martial:3,survival:8,social:6,aggression:38,caution:66,boldness:56},
- {name:'멜라스',role:'떠돌이 짐꾼',age:27,martial:6,survival:6,social:5,aggression:57,caution:48,boldness:61},
- {name:'니케',role:'몰락한 병사의 동생',age:18,martial:5,survival:5,social:7,aggression:63,caution:44,boldness:69},
- {name:'파온',role:'항구 밀수꾼',age:25,martial:5,survival:6,social:8,aggression:46,caution:58,boldness:55}
+ {name:'테온',role:'항만 수습 호위',age:19,martial:40,survival:70,social:60,statScale:100,aggression:45,caution:62,boldness:48},
+ {name:'에이라',role:'전장 수습꾼',age:22,martial:50,survival:80,social:30,statScale:100,aggression:52,caution:70,boldness:42},
+ {name:'도리스',role:'어부의 딸',age:20,martial:30,survival:80,social:60,statScale:100,aggression:38,caution:66,boldness:56},
+ {name:'멜라스',role:'떠돌이 짐꾼',age:27,martial:60,survival:60,social:50,statScale:100,aggression:57,caution:48,boldness:61},
+ {name:'니케',role:'몰락한 병사의 동생',age:18,martial:50,survival:50,social:70,statScale:100,aggression:63,caution:44,boldness:69},
+ {name:'파온',role:'항구 밀수꾼',age:25,martial:50,survival:60,social:80,statScale:100,aggression:46,caution:58,boldness:55}
 ];
 function chooseDeathScenario(p){const facts=new Set((state.worldFacts||[]).map(x=>x.id||x));if(p?.enemy==='cyclops'||/바다|항해|절벽/.test(p?.label||''))return {id:'sea',title:'바다가 남긴 한 자루',successor:'fisher'};if(state.contacts?.mira?.flags?.length||facts.has('farewell_mira'))return {id:'legacy',title:'끝내지 못한 일을 받은 사람',successor:'heir'};if(p?.enemy==='ismaros'||state.policy==='contract')return choice([{id:'battlefield',title:'시체를 거두는 손',successor:'salvager'},{id:'enemy_spoil',title:'전리품이 된 검',successor:'wanderer'}]);return choice([{id:'road',title:'길가에 남은 검',successor:'wanderer'},{id:'legacy',title:'유지를 이어받은 사람',successor:'heir'},{id:'battlefield',title:'시체를 거두는 손',successor:'salvager'}]);}
 function deathStoryText(sc,old,p){
@@ -3920,7 +3920,7 @@ function archiveCurrentOwner(endReason,legacyTitle){ensureV24State();state.pastO
 /* retired duplicate completeDeathSuccession */
 
 function beginOwnerDeathTransition(p){const old=state.owner.name,sc=chooseDeathScenario(p),text=deathStoryText(sc,old,p);openModal(`<div class="modalHead"><div><div class="deathKicker">OWNER LOST · 제${state.generation}대</div><b>${sc.title}</b></div></div><div class="deathStory">${text}</div><div class="modalDesc">${old}의 GOLD·방어구·소모품·재료·가방·현재 인간관계는 여기서 끝난다. 검과 파츠, 각인, 도감, 세계의 사건과 과거 인물 기록은 남는다.</div><button class="primary" id="continueSuccession">검의 다음 장을 연다</button>`);$('continueSuccession').onclick=()=>completeDeathSuccession(sc,old,p);}
-function doSuccession(choiceId){const old=state.owner.name,profile={name:'테온',role:'항만 수습 호위',age:19,martial:4,survival:7,social:6,aggression:45,caution:62,boldness:48};state.successionDone=true;resetOwnerAssetsForSuccessor(profile,'자발적 계승',`${old}이 건넨 검`);state.mind=Math.round(state.maxMind*(choiceId==='explain'?.76:.58));addWorldFact(`${old}이 현역에서 물러나며 Legend Core가 ${profile.name}에게 넘어갔다.`,'succession_1_2');addLog(`제${state.generation}대 소유자 ${profile.name}이 Legend Core를 이어받았다.`);}
+function doSuccession(choiceId){const old=state.owner.name,profile={name:'테온',role:'항만 수습 호위',age:19,martial:40,survival:70,social:60,statScale:100,aggression:45,caution:62,boldness:48};state.successionDone=true;resetOwnerAssetsForSuccessor(profile,'자발적 계승',`${old}이 건넨 검`);state.mind=Math.round(state.maxMind*(choiceId==='explain'?.76:.58));addWorldFact(`${old}이 현역에서 물러나며 Legend Core가 ${profile.name}에게 넘어갔다.`,'succession_1_2');addLog(`제${state.generation}대 소유자 ${profile.name}이 Legend Core를 이어받았다.`);}
 
 /* retired duplicate openContacts */
 
@@ -4107,8 +4107,8 @@ function weaponNarrativeBonus(){const n=(state.weapon.legacyTitles?.length||0)+(
 /* Percentage contract: only existing stat contributions are scaled. Fixed bases,
  * equipment/world modifiers, clamps and rounding retain their existing order.
  * Threshold unlocks remain point comparisons, not probability multipliers.
- * No save conversion: old personal points now mean that same displayed percent.
- * Unresolved: no authored 100-point progression rebalance is specified.
+ * Authored personal points use 0..100; legacy saves are normalized once by
+ * v48PrepareLoad. Existing additive growth bonuses retain their point values.
  */
 function ownerStatRate(value){
  const parsed=Number(value);
@@ -4712,21 +4712,21 @@ doSuccession=function(){addLog('소유권은 자발적으로 이전할 수 없�
 
 const SUCCESSOR_CONTEXT_V30={
   fisher:[
-    {name:'도리스',role:'어부의 딸',age:20,martial:3,survival:8,social:6,aggression:38,caution:66,boldness:56,origin:'coast'},
-    {name:'이아손',role:'연안 어선의 갑판원',age:23,martial:4,survival:8,social:5,aggression:44,caution:64,boldness:58,origin:'coast'}
+    {name:'도리스',role:'어부의 딸',age:20,martial:30,survival:80,social:60,statScale:100,aggression:38,caution:66,boldness:56,origin:'coast'},
+    {name:'이아손',role:'연안 어선의 갑판원',age:23,martial:40,survival:80,social:50,statScale:100,aggression:44,caution:64,boldness:58,origin:'coast'}
   ],
   salvager:[
-    {name:'에이라',role:'전장 수습꾼',age:22,martial:5,survival:8,social:3,aggression:52,caution:70,boldness:42,origin:'battlefield'},
-    {name:'멜라스',role:'떠돌이 짐꾼',age:27,martial:6,survival:6,social:5,aggression:57,caution:48,boldness:61,origin:'road'}
+    {name:'에이라',role:'전장 수습꾼',age:22,martial:50,survival:80,social:30,statScale:100,aggression:52,caution:70,boldness:42,origin:'battlefield'},
+    {name:'멜라스',role:'떠돌이 짐꾼',age:27,martial:60,survival:60,social:50,statScale:100,aggression:57,caution:48,boldness:61,origin:'road'}
   ],
   heir:[
-    {name:'니케',role:'몰락한 병사의 동생',age:18,martial:5,survival:5,social:7,aggression:63,caution:44,boldness:69,origin:'home'},
-    {name:'테온',role:'항만 수습 호위',age:19,martial:4,survival:7,social:6,aggression:45,caution:62,boldness:48,origin:'harbor'}
+    {name:'니케',role:'몰락한 병사의 동생',age:18,martial:50,survival:50,social:70,statScale:100,aggression:63,caution:44,boldness:69,origin:'home'},
+    {name:'테온',role:'항만 수습 호위',age:19,martial:40,survival:70,social:60,statScale:100,aggression:45,caution:62,boldness:48,origin:'harbor'}
   ],
   wanderer:[
-    {name:'파온',role:'항구 밀수꾼',age:25,martial:5,survival:6,social:8,aggression:46,caution:58,boldness:55,origin:'harbor'},
-    {name:'멜라스',role:'떠돌이 짐꾼',age:27,martial:6,survival:6,social:5,aggression:57,caution:48,boldness:61,origin:'road'},
-    {name:'칼리스',role:'장물상 심부름꾼',age:21,martial:4,survival:6,social:8,aggression:41,caution:61,boldness:51,origin:'city'}
+    {name:'파온',role:'항구 밀수꾼',age:25,martial:50,survival:60,social:80,statScale:100,aggression:46,caution:58,boldness:55,origin:'harbor'},
+    {name:'멜라스',role:'떠돌이 짐꾼',age:27,martial:60,survival:60,social:50,statScale:100,aggression:57,caution:48,boldness:61,origin:'road'},
+    {name:'칼리스',role:'장물상 심부름꾼',age:21,martial:40,survival:60,social:80,statScale:100,aggression:41,caution:61,boldness:51,origin:'city'}
   ]
 };
 const CONTACT_ARCHETYPES_V30={
@@ -5167,7 +5167,7 @@ beginOwnerDeathTransition=function(p){
  showDefeatFateV32(fate,p);
 };
 const _successionV32=completeDeathSuccession;
-function rollSuccessorStatV32(){const r=ri(1,100);return r<=57?ri(2,5):r<=85?ri(6,8):r<=97?ri(9,11):ri(12,14);}
+function rollSuccessorStatV32(){const r=ri(1,100);return Math.min(100,10*(r<=57?ri(2,5):r<=85?ri(6,8):r<=97?ri(9,11):ri(12,14)));}
 completeDeathSuccession=function(sc,old,p){
  _successionV32(sc,old,p);
  // The new owner does not inherit the old owner's armor and inventory; randomized dice stock.

@@ -110,9 +110,30 @@ function v48RecordMainChapter(c,result,path){
     title:c.title,result:String(result||''),path:String(path||''),owner:state.owner.name,
     year:state.year,month:state.month,origin:'v48'});
 }
+// Known legacy generators authored personal abilities in ten-point units.
+// Identity plus the complete legacy integer tuple is required; magnitude alone
+// is not evidence. Explicit 100-point owners (including weak owners) are untouched.
+const V48_LEGACY_OWNER_IDENTITIES = new Set(["이름 없는 선원|이타카의 수병", "테온|항만 수습 호위", "에이라|전장 수습꾼", "도리스|어부의 딸", "멜라스|떠돌이 짐꾼", "니케|몰락한 병사의 동생", "파온|항구 밀수꾼", "이아손|연안 어선의 갑판원", "칼리스|장물상 심부름꾼", "아리스|이타카의 정찰병", "칼리오|섬의 사냥꾼", "리오스|청동 장인의 제자", "세라|피난민 길잡이", "오르펜|폐허의 탐사자", "다미아|유랑 이야기꾼"]);
+function v48NormalizeOwnerUnits(data){
+  const owner=data.owner,keys=['martial','survival','social'];
+  if(owner.statScale===100)return data;
+  const legacyTuple=keys.every(k=>Number.isInteger(owner[k])&&owner[k]>=0&&owner[k]<=14);
+  const legacy=legacyTuple && (owner.statScale===10 || (owner.statScale==null &&
+    V48_LEGACY_OWNER_IDENTITIES.has(owner.name+'|'+owner.role)));
+  if(legacy){
+    const roll=data.lastSuccessionRoll;
+    // The current roll belongs to this owner only when the source tuple agrees.
+    if(roll && keys.every(k=>roll[k]===owner[k])){
+      for(const key of keys)roll[key]=Math.min(100,roll[key]*10);
+    }
+    for(const key of keys)owner[key]=Math.min(100,owner[key]*10);
+    owner.statScale=100;
+  }
+  return data;
+}
 function v48PrepareLoad(raw){
   v48BackupRaw(raw);
-  const data=v48ValidateLoadedData(JSON.parse(raw));
+  const data=v48NormalizeOwnerUnits(v48ValidateLoadedData(JSON.parse(raw)));
   // Inner checkpoint recovery can replace the save AFTER the equipment pool's
   // outer preloader ran. Restore this actual payload before legacy initialization
   // recalculates the weapon or clamps owner HP against equipped armor.
