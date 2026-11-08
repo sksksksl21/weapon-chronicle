@@ -67,5 +67,22 @@ class UnifiedThemeV8Test(unittest.TestCase):
                 self.assertIn('wc-combat-theme-v8',source)
 
 
+    def test_portrait_combat_keeps_control_ids(self):
+        """Portrait HUD must retain the live battle inputs, not replace rules."""
+        combat_css=(ROOT/'src/ui/combat_theme_v8.css').read_text(encoding='utf8')
+        combat=(ROOT/'src/combat/story_combat.html').read_text(encoding='utf8')
+        self.assertIn('grid-template-areas:"header" "status" "arena" "hand" "actions"!important',combat_css)
+        self.assertIn('grid-template-areas:"boss boss" "hero round"',combat_css)
+        self.assertIn('grid-template-columns:repeat(2,minmax(0,1fr))!important',combat_css)
+        self.assertIn('.sceneInner .sprite.enemy[data-kind]',combat_css)
+        self.assertIn('.cardsPanel .odBtn.on',combat_css)
+        self.assertIn('body.storyMode .actions #execBtn',combat_css)
+        for control in ('heroName','enemyName','heroHp','enemyHp','cards',
+                        'overdriveBtn','resFill','battleDiscardBtn36','execBtn'):
+            self.assertIn('id="'+control+'"',combat)
+        self.assertIn('/* @include:combat_math_v1 */',combat)
+        self.assertIn('/* @include:legacy_combat_sources_v1 */',combat)
+
+
 if __name__=='__main__':
     unittest.main()
