@@ -19,6 +19,44 @@ class UnifiedThemeV8Test(unittest.TestCase):
         self.assertIn('WC_STATUS_SKILLDECK_V1',html)
         self.assertIn('const BASE_DECK=(()=>{',battle)
 
+    def test_approved_scene_is_actually_embedded_not_just_verified(self):
+        """A validated release changes the real generated game background."""
+        import base64
+        import hashlib
+        import json
+        import tempfile
+        from tools.build_sources import approved_scene_style
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            self.assertEqual(approved_scene_style(root),'')
+            directory=root/'assets'/'v2-managed'/'assets'
+            directory.mkdir(parents=True)
+            aid='asset_'+'a'*24
+            raw=b'\x89PNG\r\n\x1a\nreal-approved-scene-data'
+            (directory/(aid+'.png')).write_bytes(raw)
+            record={'schema_version':1,
+                    'assets':[{'asset_id':aid,'category':'background',
+                               'filename':'assets/'+aid+'.png',
+                               'media_type':'image/png','bytes':len(raw),
+                               'sha256':hashlib.sha256(raw).hexdigest()}]}
+            (directory.parent/'manifest.json').write_text(
+                json.dumps(record),encoding='utf-8')
+            css=approved_scene_style(root)
+            self.assertIn('<style id="wc-v2-approved-scene">',css)
+            self.assertIn(base64.b64encode(raw).decode('ascii'),css)
+            self.assertIn('background-image:',css)
+            (directory/(aid+'.png')).write_bytes(b'tampered')
+            with self.assertRaisesRegex(ValueError,'hash mismatch'):
+                approved_scene_style(root)
+
+    def test_managed_scene_is_read_in_both_live_dev_game_pages(self):
+        for page in ('play-dev.html','dev-play.html'):
+            source=(ROOT/page).read_text(encoding='utf-8')
+            self.assertIn('assets/v2-managed/manifest.json',source)
+            self.assertIn('wc-v2-approved-scene',source)
+            self.assertIn('crypto.subtle.digest("SHA-256"',source)
+            self.assertIn('return "";',source)
+
     def test_both_mobile_dev_previews_load_the_same_skins(self):
         for name in ('play-dev.html','dev-play.html'):
             with self.subTest(preview=name):
