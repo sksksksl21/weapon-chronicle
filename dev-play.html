@@ -77,6 +77,39 @@ try{
   const bodyEnd=page.lastIndexOf("</body>");
   if(bodyEnd<0)throw Error("테마 삽입 위치 오류");
   page=page.slice(0,bodyEnd)+'<style id="wc-unified-theme-v8">\n'+data["ui/unified_theme_v8.css"]+'\n</style>'+page.slice(bodyEnd);
+  async function managedArtSceneStyle(){
+    // Managed art is optional for legacy builds. If present, never render a
+    // file before checking the declared SHA. This preview is not an approval gate.
+    const manifestResponse=await fetch("./assets/v2-managed/manifest.json",{cache:"no-store"});
+    if(manifestResponse.status===404)return "";
+    if(!manifestResponse.ok)throw Error("승인 아트 목록 읽기 실패");
+    const manifest=await manifestResponse.json();
+    if(manifest.schema_version!==1||!Array.isArray(manifest.assets))
+      throw Error("승인 아트 목록 형식 오류");
+    const scenes=manifest.assets.filter(item=>item&&item.category==="background")
+      .sort((a,b)=>String(a.asset_id).localeCompare(String(b.asset_id)));
+    if(!scenes.length)return "";
+    const scene=scenes[0];
+    if(!/^assets\/asset_[a-f0-9]{24}\.(?:png|jpg|webp)$/.test(scene.filename)||
+       !["image/png","image/jpeg","image/webp"].includes(scene.media_type)||
+       !/^[a-f0-9]{64}$/.test(scene.sha256))
+      throw Error("승인 아트 이미지 주소 오류");
+    const response=await fetch("./assets/v2-managed/"+scene.filename,{cache:"no-store"});
+    if(!response.ok)throw Error("승인 아트 이미지 읽기 실패");
+    const bytes=await response.arrayBuffer();
+    if(bytes.byteLength!==scene.bytes)throw Error("승인 아트 이미지 크기 불일치");
+    const digest=Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",bytes)))
+      .map(byte=>byte.toString(16).padStart(2,"0")).join("");
+    if(digest!==scene.sha256)throw Error("승인 아트 이미지 해시 불일치");
+    const objectUrl=URL.createObjectURL(new Blob([bytes],{type:scene.media_type}));
+    return '<style id="wc-v2-approved-scene">.app{background-image:'+
+      'linear-gradient(180deg,rgba(5,19,26,.65),rgba(5,18,26,.88)),'+
+      'url("'+objectUrl+'")!important;background-size:cover!important;'+
+      'background-position:center!important;background-repeat:no-repeat!important}'+
+      '</style>';
+  }
+  const managedScene=await managedArtSceneStyle();
+  if(managedScene)page=page.replace("</body>",managedScene+"</body>");
   document.open();document.write(page);document.close();
 }catch(err){
   console.error("DEV play build failed",err);
