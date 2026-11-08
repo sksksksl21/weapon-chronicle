@@ -387,3 +387,124 @@ button:disabled{cursor:not-allowed}
 #overlay .historyEndingArt{margin:16px 0;max-width:100%}
 #overlay .historyEndingArt img{display:block;width:100%;height:auto;object-fit:contain}
 #overlay .historyEndingArt figcaption{color:var(--wc-ui-muted);line-height:1.6}
+
+
+/* Odyssey-facing visual refresh — 2026-11-08.
+ * Applied to the actual dev preview AND the built index.html, not a dashboard mock.
+ * The locked V2 image Art Bible is not accessible from this repository;
+ * therefore this is a source-backed interface finish, NOT an asset approval.
+ * 16/32-bit Mediterranean visual cues: deep Aegean ink, fired-clay highlights,
+ * bronze pixel edges and stepped panels. Preserve actor/layout/save mechanics.
+ */
+:root{
+  --wc-ui-bg:#061922;
+  --wc-ui-surface:#14343a;
+  --wc-ui-raised:#21434a;
+  --wc-ui-raised-hover:#2d5356;
+  --wc-ui-border:#9b7656;
+  --wc-ui-border-strong:#d0a66c;
+  --wc-ui-gold:#e5bd7c;
+  --wc-ui-gold-strong:#ffe0a2;
+  --wc-ui-text:#fff0d6;
+  --wc-ui-muted:#d4c5ae;
+  --wc-ui-radius:6px;
+  --wc-ui-shadow:0 0 0 2px #06151c,0 8px 0 #020d13,0 16px 28px #0008;
+  --ink:var(--wc-ui-text);
+  --muted:var(--wc-ui-muted);
+  --line:var(--wc-ui-border);
+  --paper:var(--wc-ui-surface);
+  --paper2:var(--wc-ui-raised);
+  --card:var(--wc-ui-raised);
+  --accent:#c17a51;
+  --accent2:var(--wc-ui-gold);
+  --shadow:var(--wc-ui-shadow);
+}
+html,body{
+  background:
+    radial-gradient(ellipse at 15% 8%,#245052 0,transparent 45%),
+    linear-gradient(155deg,#081e28,#041219 74%)!important;
+  color:var(--wc-ui-text);
+}
+.app .top{
+  background:
+    repeating-linear-gradient(90deg,transparent 0 21px,#d6ab6c13 21px 23px,transparent 23px 43px),
+    linear-gradient(180deg,#24515a,#102a32)!important;
+  border-bottom:3px double #dab47d!important;
+  box-shadow:inset 0 -5px #081d26;
+}
+.app .topline .title{
+  color:#ffe6a7!important;
+  text-shadow:2px 2px 0 #472c27;
+  letter-spacing:.055em;
+}
+.app .panel,.app .ownerFusion,.app .weaponShowcaseV39,
+.app .servicePanelV39,.app .actionHubV39,.app .actionHub,
+.app .wc41-owner,.app .wc41-weaponSummary,.app .wc41-services{
+  background:
+    linear-gradient(135deg,#d6b47b18 0 3%,transparent 3% 97%,#d6b47b18 97%),
+    linear-gradient(155deg,#28505a,#112c35 76%)!important;
+  border:2px solid #bd9864!important;
+  border-radius:6px!important;
+  box-shadow:inset 0 0 0 2px #0d2932,0 5px 0 #06131a,0 9px 20px #0007!important;
+}
+.app .wc41-ownerHeader,.app .wc41-weaponBody{border-color:#c29b68!important}
+.app .wc41-portrait,.app .portrait{
+  background:linear-gradient(155deg,#b58a5e,#243c42)!important;
+  border:3px double #e0be86!important;
+  border-radius:4px!important;
+  image-rendering:pixelated;
+}
+.app .wc41-serviceTile,.app .actionCategory,.app .actionOption,
+.app .serviceBtn,.app .quickBtn,.app .detailBtn{
+  background:
+    linear-gradient(135deg,#e8c78712 0 5px,transparent 5px),
+    linear-gradient(165deg,#31535a,#19343c)!important;
+  border:2px solid #a98a60!important;
+  border-radius:5px!important;
+  color:#fff0d6!important;
+  box-shadow:inset 0 2px #ffffff12,0 4px 0 #071a20!important;
+}
+.app .actionCategory.active,.app .actionOption.selected,
+.app .wc41-serviceTile:focus-visible{
+  border-color:#ffdb90!important;
+  background:linear-gradient(155deg,#754638,#30424a)!important;
+  box-shadow:inset 0 0 0 2px #efc58144,0 4px 0 #09141a!important;
+}
+.app .exec:not(:disabled){
+  background:linear-gradient(180deg,#f8d795,#c67e54)!important;
+  color:#252526!important;
+  border:2px solid #ffe4a7!important;
+  border-radius:5px!important;
+  box-shadow:inset 0 2px #fff0c0,0 4px 0 #6e3b2f!important;
+}
+.app .bottom{
+  background:linear-gradient(180deg,#173941,#0a212b)!important;
+  border-top:3px double #d2aa72!important;
+}
+#overlay.show:not(.storyFullscreen) .modal,
+#overlay .wc3-status .wc3-panel,#overlay .serviceCard40,
+#overlay .wc44-titleStrip{
+  background:linear-gradient(150deg,#31515a,#132e38 80%)!important;
+  border:2px solid #bd996b!important;
+  border-radius:6px!important;
+  box-shadow:inset 0 0 0 2px #17343e,0 8px 0 #081820!important;
+}
+#overlay .tabBtn,#overlay .invTab,#overlay .invNav32 button,
+#overlay .wc44-npcChoices button{
+  border-radius:4px!important;
+  border-width:2px!important;
+  min-height:44px!important;
+}
+#overlay .tabBtn.active,#overlay .invTab.active,#overlay .invNav32 button.on{
+  background:linear-gradient(155deg,#935740,#563b35)!important;
+  color:#fff1db!important;
+  border-color:#f6c681!important;
+}
+@media(max-width:390px){
+  .app .wc41-serviceGrid{gap:7px!important}
+  .app .wc41-serviceTile{min-height:112px!important}
+  .app .wc41-identity h2{font-size:19px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  .app .wc41-serviceTile,.app .exec{transition:none!important}
+}
