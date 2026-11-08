@@ -2149,17 +2149,67 @@ function bindStatusTabs(){document.querySelectorAll('[data-stab]').forEach(b=>b.
 
 function allPartIds(){return Object.values(PART_CATALOG).flatMap(items=>Object.keys(items));}
 function partDiscoveryCount(){const d=new Set(state.discoveredParts||[]);return {found:allPartIds().filter(id=>d.has(id)).length,total:allPartIds().length};}
+// Catalog presentation is read-only: do not call catalog.status/query/detail,
+// whose discovery synchronization writes to state. Definitions stay in the shared DB.
+function codexEscape(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function codexRows(){
+ const rows=[];
+ for(const slot of Object.keys(PART_LABELS))for(const [id,item] of Object.entries(PART_CATALOG[slot]||{}))rows.push({kind:'weapon',slot,id,item});
+ if(typeof OWNER_GEAR_CATALOG!=='undefined')for(const [id,item] of Object.entries(OWNER_GEAR_CATALOG))rows.push({kind:'armor',slot:item.slot,id,item});
+ return rows;
+}
+function codexStatus(row){
+ const {kind,slot,id,item}=row,template=item.templateId||id;
+ const count=kind==='weapon'?Number(state.weapon?.spareParts?.[id]||0)+Object.values(state.weapon?.parts||{}).filter(x=>x===id).length:Math.max(Number(state.ownerGearOwned?.[id]||0),Object.values(state.ownerEquipment||{}).includes(id)?1:0);
+ const ownedFamily=codexRows().some(x=>x.kind===kind&&x.slot===slot&&(x.item.templateId||x.id)===template&&(kind==='weapon'?Number(state.weapon?.spareParts?.[x.id]||0)>0||Object.values(state.weapon?.parts||{}).includes(x.id):Number(state.ownerGearOwned?.[x.id]||0)>0||Object.values(state.ownerEquipment||{}).includes(x.id)));
+ const discovered=ownedFamily||(state.catalogDiscovery||[]).includes(kind+':'+slot+':'+template)||(state.discoveredParts||[]).includes(template);
+ return {count,text:count?'보유 '+count+'개':ownedFamily?'보유 개체 있음':discovered?'발견 · 미보유':'미발견'};
+}
+function codexSlot(slot){return PART_LABELS[slot]||(typeof OWNER_GEAR_SLOTS!=='undefined'?OWNER_GEAR_SLOTS[slot]:null)||slot;}
+function codexRarity(row){return typeof WC_EQUIPMENT_POOL_V1!=='undefined'?WC_EQUIPMENT_POOL_V1.catalog.rarity(row.item.rarity):row.item.rarity||'common';}
+function codexStats(mods){return Object.entries(mods||{}).map(([k,v])=>codexEscape(k)+' '+codexEscape(v)).join(' · ')||'없음';}
+function codexSources(row){
+ const sources=[];
+ if(typeof WC_GAME_MODULES_V1!=='undefined')for(const service of ['merchant','economy']){const api=WC_GAME_MODULES_V1.get(service);if(api?.catalogSources)sources.push(...api.catalogSources(row));}
+ const lines=sources.map(x=>x.method==='purchase'?`${x.merchant==='smith'?'대장간':'방어구 상인'} · 순환 재고 · ${x.price??'?'}G · 획득 시 개별 옵션 결정`:x.method==='conditional-stock-reward'?'명시적 장비 보상에 따른 상점 입고 · 자동 전투 드롭 연결 없음':x.method);
+ if(row.item.cost&&!row.item.rolledInstance)lines.push('대장간 제작 · '+codexStats(row.item.cost)+(row.item.requiresSkill?' · 요구 기술 '+row.item.requiresSkill:'')+' · 제작 발견 조건 적용');
+ if(state.partOrigins?.[row.id])lines.push('발견 경로 · '+state.partOrigins[row.id]);
+ return '<p>'+lines.map(codexEscape).join('<br>')+(lines.length?'':'획득 경로 미확인 · 확정된 획득처 없음')+'</p><small>'+sources.map(x=>codexEscape(x.source)).join('<br>')+'</small>';
+}
+let equipmentCodexView={slot:'',rarity:'',search:'',selected:'',compare:''};
+let equipmentCodexUnsubscribe=null;
 function openPartCodex(){
-  const d=new Set(state.discoveredParts||[]),counts=partDiscoveryCount();
-  const groups=Object.keys(PART_LABELS).map(slot=>{
-    const rows=Object.entries(PART_CATALOG[slot]);const known=rows.filter(([id])=>d.has(id));const hidden=rows.length-known.length;
-    const cards=known.map(([id,it])=>{const origin=state.partOrigins?.[id];return `<div class="codexPart ${rarityFrameClass(id)}"><b>${it.name}</b><span>${it.material}<br>${it.note||''}${origin?`<br>발견 경로 · ${origin}`:''}</span></div>`;}).join('')+(hidden?`<div class="codexPart codexUnknown">미발견 ${hidden}종</div>`:'');
-    return `<div class="codexGroup"><div class="codexGroupHead"><b>${PART_LABELS[slot]}</b><span>${known.length}/${rows.length}</span></div><div class="codexParts">${cards}</div></div>`;
-  }).join('');
-  openModal(modalHead('부품 도감',`본 적이 있는 부품만 이름과 성능이 기록된다. 미발견 파츠는 개수만 표시한다. · ${counts.found}/${counts.total}`)+`<div class="codexGrid">${groups}</div>`);bindClose();
+ // Also serves the original inventory entrypoint when only the legacy runtime is loaded.
+ if(typeof document==='undefined'){
+  openModal(modalHead('장비 도감','미발견 장비도 조회할 수 있습니다.')+codexRows().map(r=>'<div><b>'+codexEscape(r.item.name)+'</b><p>'+codexEscape(r.item.note||r.item.desc||'')+'</p></div>').join(''));bindClose();return;
+ }
+ if(!equipmentCodexUnsubscribe&&typeof WC_GAME_MODULES_V1!=='undefined')equipmentCodexUnsubscribe=WC_GAME_MODULES_V1.events.subscribe('equipment-catalog:changed',()=>{if(document.querySelector('.equipmentCodex'))renderEquipmentCodex();});
+ renderEquipmentCodex();
+}
+function renderEquipmentCodex(){
+ const v=equipmentCodexView,all=codexRows(),e=codexEscape;
+ const tiers=typeof WC_EQUIPMENT_POOL_V1!=='undefined'?WC_EQUIPMENT_POOL_V1.catalog.tiers:[];
+ const rows=all.filter(r=>(!v.slot||r.slot===v.slot)&&(!v.rarity||codexRarity(r)===v.rarity)&&(!v.search||r.item.name.toLocaleLowerCase().includes(v.search.toLocaleLowerCase())));
+ const option=(id,label,current)=>`<option value="${e(id)}" ${id===current?'selected':''}>${e(label)}</option>`;
+ const selected=all.find(r=>r.id===v.selected);
+ let detail='';
+ if(selected){
+  const r=selected,it=r.item;
+  const candidates=all.filter(x=>x.kind===r.kind&&x.slot===r.slot);
+  const other=candidates.find(x=>x.id===v.compare);
+  const itemInfo=x=>`<h3>${e(x.item.name)}</h3><p>${e(x.item.desc||x.item.note||'')}</p><p>${e(codexStatus(x).text)}</p><h4>기본 스탯</h4><p>${codexStats((all.find(y=>y.id===(x.item.family||x.id)&&y.kind===x.kind&&y.slot===x.slot)?.item||x.item).mods)}</p><h4>정의 / 개체 스탯</h4><p>${codexStats(x.item.mods)}</p><h4>추가 옵션</h4><p>${e((x.item.options||[]).map(o=>o.name+' '+o.value).join(' · ')||'없음')}</p><h4>고유 효과</h4><p>${e(x.item.uniqueEffect?x.item.uniqueEffect.name+' · '+x.item.uniqueEffect.description+' · '+x.item.uniqueEffect.value:'없음')}</p><p>${e(x.item.passive||'')}</p>`;
+  const preview=x=>{try{return typeof equipmentPreviewHtml==='function'?equipmentPreviewHtml(x):'<p>실제 성능 계산기를 사용할 수 없습니다.</p>';}catch(error){return '<p>현재 조건에서 성능 계산 불가</p>';}};
+  detail=`<section class="codexDetail" aria-label="장비 상세"><h2>${e(it.name)}</h2><p>${e(codexSlot(r.slot))} · ${e(tiers.find(t=>t.id===codexRarity(r))?.name||codexRarity(r))} · ${e(codexStatus(r).text)}</p><p>${e(it.desc||it.note||'')}</p><p>${it.rolledInstance?'획득한 개별 인스턴스 · '+e(r.id):it.generated?'생성 규칙의 기준 예시 · 미보유 개체의 랜덤 옵션을 확정하지 않습니다.':'원본 장비 정의'}</p><h4>획득 방법 및 출처</h4>${codexSources(r)}<p>계산 조건: 현재 소유자·나머지 장비·강화 상태를 유지하고 선택 부위만 교체하는 실제 전투 계산입니다. 각 열은 현재 장착 → 후보의 최종 성능입니다. 두 후보는 같은 소유자 입력을 사용하며 방어구 교체에 따른 파생 능력 변화를 포함합니다.</p><label>같은 부위 비교<select id="codexCompare">${option('','비교 선택',v.compare)}${candidates.map(x=>option(x.id,x.item.name+' · '+codexStatus(x).text,v.compare)).join('')}</select></label><div class="codexComparison"><article>${itemInfo(r)}${preview(r)}</article>${other?'<article>'+itemInfo(other)+preview(other)+'</article>':''}</div></section>`;
+ }
+ openModal(modalHead('장비 도감','검 파츠 8부위 · 방어구 4부위 · 조회 전용')+`<div class="equipmentCodex"><div class="codexFilters"><label>이름 검색<input id="codexSearch" type="search" value="${e(v.search)}" placeholder="장비 이름"></label><label>장착 부위<select id="codexSlot">${option('','전체 부위',v.slot)}${[...new Set(all.map(r=>r.slot))].map(slot=>option(slot,codexSlot(slot),v.slot)).join('')}</select></label><label>등급<select id="codexRarity">${option('','전체 등급',v.rarity)}${tiers.map(t=>option(t.id,t.name,v.rarity)).join('')}</select></label><button id="codexReset" type="button">필터 초기화</button></div><p role="status">검색 결과 ${rows.length}개</p><div class="codexResults">${rows.map(r=>`<button type="button" data-codex-id="${e(r.id)}" aria-pressed="${r.id===v.selected}"><b>${e(r.item.name)}</b><span>${e(codexSlot(r.slot))} · ${e(tiers.find(t=>t.id===codexRarity(r))?.name||codexRarity(r))} · ${e(codexStatus(r).text)}</span></button>`).join('')||'<p>검색 결과가 없습니다. 검색어나 필터를 변경하세요.</p>'}</div>${detail}</div>`);
+ bindClose();
+ document.getElementById('codexSearch').oninput=event=>{const pos=event.target.selectionStart;v.search=event.target.value;renderEquipmentCodex();const input=document.getElementById('codexSearch');input.focus();if(input.setSelectionRange)input.setSelectionRange(pos,pos);};
+ for(const [id,key] of [['codexSlot','slot'],['codexRarity','rarity'],['codexCompare','compare']]){const el=document.getElementById(id);if(el)el.onchange=()=>{v[key]=el.value;renderEquipmentCodex();};}
+ document.getElementById('codexReset').onclick=()=>{v.slot='';v.rarity='';v.search='';renderEquipmentCodex();};
+ document.querySelectorAll('[data-codex-id]').forEach(button=>button.onclick=()=>{v.selected=button.dataset.codexId;v.compare='';renderEquipmentCodex();document.querySelector('.codexDetail')?.scrollIntoView({block:'start'});});
 }
 
-function inventoryTabs(active){return `<div class="inventoryTabs"><button class="invTab ${active==='consumable'?'active':''}" data-itab="consumable">소모품</button><button class="invTab ${active==='material'?'active':''}" data-itab="material">소재</button><button class="invTab ${active==='part'?'active':''}" data-itab="part">파츠</button><button class="invTab ${active==='record'?'active':''}" data-itab="record">서사</button></div>`;}
+function inventoryTabs(active){return `<button class="codexBtn" type="button" onclick="openPartCodex()">장비 도감 · 전체 장비 검색</button><div class="inventoryTabs"><button class="invTab ${active==='consumable'?'active':''}" data-itab="consumable">소모품</button><button class="invTab ${active==='material'?'active':''}" data-itab="material">소재</button><button class="invTab ${active==='part'?'active':''}" data-itab="part">파츠</button><button class="invTab ${active==='record'?'active':''}" data-itab="record">서사</button></div>`;}
 function bindInventoryTabs(){document.querySelectorAll('[data-itab]').forEach(b=>b.onclick=()=>openInventory(b.dataset.itab));bindClose();}
 function openInventory(tab='consumable'){
   let body='';
@@ -5078,11 +5128,11 @@ openInventory=function(tab='consumable'){
  const info=`<div class="invCapacity34"><b>${V35_BAG_TYPES[tab].name} · ${used}/${cap}칸 · 빈칸 ${empty}${overflow}</b><span>${tab==='consumable'||tab==='material'?'동종 품목은 한 슬롯에 중첩 · 새 종류만 빈 슬롯 필요':tab==='armor'?'미장착 장비만 1개당 한 슬롯 · 착용한 방어구 4부위는 제외':'장착 중인 검 부품 8부위는 제외 · 예비 부품은 개별 1칸'} </span></div>`;
  const equipped=tab==='armor'?v32InventoryRows('armor').filter(x=>x.equipped):tab==='part'?v32InventoryRows('part').filter(x=>x.equipped):[];
  const equippedView=equipped.length?`<div class="sectionMini">${tab==='armor'?'착용 장비':'검 장착 부품'} · 용량 차지 없음</div><div class="invGrid32">${equipped.map((r,i)=>`<button data-v35-equipped="${i}" class="invTile32" data-rarity="${r.rarity||'common'}"><span class="equippedMark">장착</span><span class="itemIcon">${v32Icon(r.id,tab)}</span><span class="invName">${r.name}</span></button>`).join('')}</div>`:'';
- openModal(modalHead('인벤토리','종류마다 독립된 가방. 장착품은 보관칸을 차지하지 않는다.')+nav+info+`<div class="invGrid32">${filled.join('')}</div>`+equippedView+`<div class="invFoot32"><span>빈칸은 점선으로 표시됩니다</span><button class="close" id="v35Records">서사 기록</button></div>`);
+ openModal(modalHead('인벤토리','종류마다 독립된 가방. 장착품은 보관칸을 차지하지 않는다.')+`<button class="codexBtn" type="button" id="equipmentCodexEntry">장비 도감 · 전체 장비 검색</button>`+nav+info+`<div class="invGrid32">${filled.join('')}</div>`+equippedView+`<div class="invFoot32"><span>빈칸은 점선으로 표시됩니다</span><button class="close" id="v35Records">서사 기록</button></div>`);
  document.querySelectorAll('[data-v35-tab]').forEach(b=>b.onclick=()=>openInventory(b.dataset.v35Tab));
  document.querySelectorAll('[data-v35-item]').forEach(b=>b.onclick=()=>v32InventoryDetail(rows[Number(b.dataset.v35Item)],tab));
  document.querySelectorAll('[data-v35-equipped]').forEach(b=>b.onclick=()=>v32InventoryDetail(equipped[Number(b.dataset.v35Equipped)],tab));
- $('v35Records').onclick=()=>_oldInventoryV32('record');bindClose();
+ $('equipmentCodexEntry').onclick=openPartCodex;$('v35Records').onclick=()=>_oldInventoryV32('record');bindClose();
 };
 
 // Defeat: the only probability draw is the 10/20/30/40 fate table, not the old

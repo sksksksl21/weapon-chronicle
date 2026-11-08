@@ -325,3 +325,21 @@ button:disabled{cursor:not-allowed}
   .app .wc41-serviceTile{min-height:106px!important}
   .app .wc41-identity h2{font-size:19px!important}
 }
+
+/* Equipment catalog: shared mobile theme, no gameplay controls. */
+.equipmentCodex{min-width:0;color:#eee0c9;font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+.codexFilters{display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px}
+.equipmentCodex label{display:flex;flex-direction:column;gap:5px;min-width:0}
+.equipmentCodex input,.equipmentCodex select,.equipmentCodex button{box-sizing:border-box;max-width:100%;min-width:0;min-height:44px;padding:10px;border:1px solid #94764e;border-radius:8px;background:#142234;color:#f1dfc0;font:inherit}
+.equipmentCodex input,.equipmentCodex select{width:100%;font-size:16px}
+.equipmentCodex button:focus-visible,.equipmentCodex input:focus-visible,.equipmentCodex select:focus-visible{outline:2px solid #e9c27b;outline-offset:2px}
+.codexResults{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:42vh;overflow:auto;margin:12px 0}
+.codexResults button{text-align:left;white-space:normal;overflow-wrap:anywhere}
+.codexResults button[aria-pressed=true]{outline:2px solid #e9c27b;outline-offset:-3px}
+.codexResults span{display:block;font-size:12px}
+.codexDetail{border-top:1px solid #94764e;padding-top:12px;scroll-margin-top:10px}
+.codexDetail h2,.codexDetail h3,.codexDetail h4{color:#f3d49c;margin:12px 0 6px}
+.codexComparison{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}
+.codexComparison article{min-width:0;border:1px solid #94764e;border-radius:10px;padding:10px}
+.equipmentCodex .partDelta{display:flex;flex-direction:column;font-size:13px;line-height:1.7}
+@media(max-width:520px){.codexFilters{grid-template-columns:repeat(2,minmax(0,1fr))}.codexFilters label:first-child{grid-column:1/-1}.codexResults,.codexComparison{grid-template-columns:minmax(0,1fr)}.equipmentCodex{font-size:14px}}
