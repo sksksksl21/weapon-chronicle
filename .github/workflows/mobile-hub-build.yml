@@ -11,6 +11,9 @@ on:
       - src/legacy/html_before_script.html
       - src/legacy/html_after_script.html
       - tools/build_sources.py
+      - tools/verify_baseline.py
+      - play-dev.html
+      - dev-play.html
   workflow_dispatch:
 permissions:
   contents: write
