@@ -160,3 +160,197 @@ html,body{background:#061922!important;color:var(--wc-ui-text)!important}
   border:2px solid #c7a16b!important;
   border-radius:6px!important;
 }
+
+
+
+/* Portrait battle layout: WC's existing combat engine, cards, overdrive and IDs remain intact.
+   Reference-inspired original composition, not a copied game UI or image asset. */
+.app{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  grid-template-rows:auto auto minmax(180px,1fr) minmax(205px,31dvh) auto!important;
+  grid-template-areas:"header" "status" "arena" "hand" "actions"!important;
+  gap:4px!important;
+  max-width:430px;
+  padding:4px 5px calc(5px + env(safe-area-inset-bottom))!important;
+  background:linear-gradient(180deg,#151c23,#080e15 65%,#17131a)!important;
+}
+.app>.topbar,.app>.status,.app>.cardsPanel{min-width:0;border-radius:4px!important}
+.topbar{min-height:25px;padding:4px 9px!important;background:#161e26!important}
+.topbar .title{font-size:11px!important;letter-spacing:.07em}
+.status{
+  max-height:clamp(118px,18dvh,155px);
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-width:thin;
+  padding:6px 8px!important;
+  background:linear-gradient(180deg,#22231f,#111b22)!important;
+  border-color:#c8a36b!important;
+}
+.statusGrid{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 70px!important;
+  grid-template-areas:"boss boss" "hero round";
+  gap:5px 8px!important;
+}
+.statusGrid>.side:first-child{grid-area:hero;min-width:0}
+.statusGrid>.side:last-child{grid-area:boss;min-width:0}
+.statusGrid>.stageOnly{grid-area:round;min-height:29px!important;align-self:end}
+.statusGrid>.side:last-child .nrow{
+  display:flex;justify-content:center;align-items:baseline;gap:7px;
+  min-width:0;flex-wrap:wrap;text-align:center;
+}
+.statusGrid>.side:last-child .nm{
+  font-size:15px!important;letter-spacing:.035em;color:#ffe2a8!important;
+}
+.statusGrid>.side:last-child .pow{font-size:9px!important;margin:0;color:#d6bfa2!important}
+.statusGrid>.side:last-child .bar{
+  height:22px!important;border-radius:2px!important;
+  border:1px solid #a48755!important;
+  box-shadow:0 0 0 2px #090d13,inset 0 0 5px #0008;
+}
+.statusGrid>.side:last-child .fill.enemy{
+  background:linear-gradient(180deg,#ef6051,#a6202d)!important;
+}
+.statusGrid>.side:first-child .nrow{
+  display:flex;align-items:center;justify-content:space-between;gap:5px;
+}
+.statusGrid>.side:first-child .nm{font-size:11px!important;color:#f5e6ca!important}
+.statusGrid>.side:first-child .pow{font-size:8px!important;margin:0}
+.statusGrid>.side:first-child .bar{height:15px!important;border-radius:3px!important}
+.statusGrid>.side:first-child .fill.hero{
+  background:linear-gradient(180deg,#66c9ae,#247c77)!important;
+}
+.statusGrid .barTxt{font-size:10px!important;font-variant-numeric:tabular-nums}
+.statusGrid>.stageOnly .turnNo{margin:1px 0 0;font-size:10px!important}
+.statusGrid>.stageOnly .stage{font-size:9px!important}
+.status .turnOdds{margin-top:7px!important;gap:5px}
+.status .oddCard{padding:5px!important;border-radius:4px!important}
+.status .oddAction .txt{font-size:9px}
+.status .aiMind{margin-top:4px!important}
+.sceneWrap{
+  min-height:0!important;height:100%!important;padding:3px!important;
+  border:1px solid #927249!important;background:#0b1419!important;overflow:hidden;
+}
+.sceneInner{
+  height:100%!important;min-height:0!important;
+  border:1px solid #836744!important;border-radius:2px!important;
+  background:#0a141c!important;box-shadow:inset 0 0 35px #0009!important;
+  overflow:hidden!important;
+}
+.sceneInner::after{
+  content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:linear-gradient(180deg,#050a1366,transparent 25%,transparent 70%,#09090b91),
+             linear-gradient(90deg,#04070a57,transparent 20%,transparent 80%,#04070a3d);
+}
+.sceneInner #actors{z-index:3}
+/* Maintain nonoverlapping actor lanes and unchanged hit/guard/defeat animation rules. */
+.sceneInner .sprite.hero{
+  left:2%!important;right:auto!important;bottom:3%!important;
+  width:30%!important;max-width:30%!important;height:59%!important;
+}
+.sceneInner .sprite.enemy,
+.sceneInner .sprite.enemy[data-kind],
+.sceneInner .sprite.enemy[data-kind^="v25_"]{
+  left:auto!important;right:1%!important;bottom:3%!important;
+  width:53%!important;max-width:53%!important;height:87%!important;
+}
+.sceneInner .sprite.enemy[data-kind="cyclops"],
+.sceneInner .sprite.enemy[data-kind^="v25_cyclops"]{
+  right:0!important;width:55%!important;max-width:55%!important;height:91%!important;
+}
+.sceneInner .sprite.enemy[data-kind="black_pudding"],
+.sceneInner .sprite.enemy[data-kind="cave_spider"]{
+  right:1%!important;width:53%!important;max-width:53%!important;height:73%!important;
+}
+.sceneInner .banner{
+  top:10px!important;left:50%;z-index:7;max-width:68%;
+  padding:5px 10px!important;border-radius:3px!important;
+  border-color:#b28c5f!important;background:#111b26d9!important;
+  color:#ffdfa3!important;white-space:normal;text-align:center;
+}
+.sceneInner #wc45Region{top:4px;right:6px;max-width:43%;font-size:8px}
+.sceneInner #enemyOmen{z-index:8}
+.sceneInner #interventionResult{z-index:9}
+.cardsPanel{
+  height:100%!important;min-height:0!important;
+  overflow-y:auto!important;overflow-x:hidden!important;
+  overscroll-behavior:contain;padding:7px!important;
+  background:linear-gradient(180deg,#20201f,#10161b)!important;
+  border-color:#c8a36b!important;scrollbar-width:thin;
+}
+.cardsHead .lh{font-size:12px!important;color:#f3d19a!important}
+.cardsHead .rh{font-size:8px!important}
+.cardsPanel .resLine{color:#e0c7a2!important}
+.cardsPanel .resGauge{height:10px;background:#090e14;border-color:#846d51}
+.cardsPanel .resGauge i{background:linear-gradient(90deg,#477ea4,#95c9e9)}
+.cardsPanel .overdriveBar{margin:4px 0 7px;gap:7px}
+.cardsPanel .odBtn{
+  min-height:34px;min-width:112px;padding:5px 9px;
+  background:linear-gradient(180deg,#473027,#231923)!important;
+  border:1px solid #cf9b65!important;border-radius:3px!important;
+  color:#ffe1ac!important;font-size:10px!important;
+}
+.cardsPanel .odBtn.on{
+  background:linear-gradient(180deg,#ae3e35,#4b1d28)!important;
+  border-color:#ffc27c!important;color:#fff2d4!important;
+  box-shadow:0 0 10px #ae443255;
+}
+.cardsPanel .odRisk{font-size:8px!important;color:#d3c5ac!important}
+.cardsPanel .cards{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:6px!important;
+}
+.cardsPanel .battleCardWrap36{min-width:0}
+.cardsPanel .cards .card{
+  width:100%;min-height:66px!important;padding:8px!important;
+  border-radius:4px!important;border:1px solid #87694a!important;
+  background:linear-gradient(160deg,#303037,#151a21)!important;
+}
+.cardsPanel .cards .card.sel{
+  border-color:#f6cc86!important;outline:1px solid #f6cc86!important;
+  background:linear-gradient(155deg,#57402f,#27303a)!important;
+}
+.cardsPanel .cards .card .name{font-size:11px!important;line-height:1.25!important}
+.cardsPanel .cards .card .type{font-size:8px!important}
+.cardsPanel .cards .card .eff{font-size:9px!important;line-height:1.25!important}
+.cardsPanel .battleItemsFold361,.cardsPanel .battleLogFold361{border-radius:4px!important}
+.actions{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) minmax(0,1.7fr)!important;
+  grid-template-rows:auto auto!important;
+  gap:3px 5px!important;min-height:0!important;
+}
+.actions #battlePhaseText{
+  grid-column:1/-1;grid-row:1;min-width:0;
+  color:#f3d7aa;font-size:9px;text-align:center;
+}
+.actions #resetBtn{grid-column:1;grid-row:2}
+.actions #execBtn{grid-column:2;grid-row:2}
+.actions .btn{min-height:43px!important;border-radius:3px!important;font-size:12px!important}
+.actions .btn.primary{
+  border-color:#e5bc7b!important;
+  background:linear-gradient(180deg,#c08b4d,#81512f)!important;
+  color:#fff3dc!important;
+}
+body.storyMode .actions{grid-template-columns:minmax(0,1fr)!important}
+body.storyMode .actions #execBtn{grid-column:1;grid-row:2}
+@media(max-height:740px){
+  .app{grid-template-rows:auto auto minmax(180px,1fr) minmax(172px,30dvh) auto!important}
+  .status{max-height:108px}
+  .sceneInner .sprite.hero{height:57%!important}
+  .cardsPanel .cards .card{min-height:60px!important}
+}
+@media(max-height:620px){
+  .app{grid-template-rows:0 auto minmax(160px,1fr) minmax(148px,28dvh) auto!important}
+  .status{max-height:80px}
+  .topbar{display:none!important}
+}
+@media(max-width:359px){
+  .statusGrid>.side:last-child .nm{font-size:13px!important}
+  .sceneInner .sprite.hero{width:28%!important;max-width:28%!important}
+  .sceneInner .sprite.enemy[data-kind]{width:52%!important;max-width:52%!important}
+  .cardsPanel .cards .card{padding:6px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  .cardsPanel .odBtn,.cardsPanel .cards .card{transition:none!important}
+}
