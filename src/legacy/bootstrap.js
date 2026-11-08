@@ -2,7 +2,7 @@
 // Register the late-bound UI before lifecycle execution locks registration.
 uiModuleRegistryV1();
 WC_GAME_MODULES_V1.register({
- id:'runtime-integration',dependencies:['combat','equipment','merchant','economy','save','story','ui'],
+ id:'runtime-integration',dependencies:['combat','equipment','equipment-catalog','merchant','economy','save','story','ui'],
  init(services){
   services.events.subscribe('combat:end',()=>services.require('ui').refresh());
   return Object.freeze({

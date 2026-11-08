@@ -4,11 +4,11 @@
   "private": true,
   "description": "Weapon Chronicle — Codex managed Odyssey life simulator",
   "scripts": {
-    "build": "python3 tools/build.py",
-    "check": "python3 tools/verify_baseline.py",
-    "dev": "python3 tools/build.py && python3 -m http.server 5173 --bind 0.0.0.0",
-    "test:smoke": "python3 tests/ui_smoke.py",
-    "test:regression": "python3 tests/regression.py && python3 tests/action_policy.py && python3 tests/combat_resource_transfer.py && python3 tests/owner_combat_personality.py && python3 tests/reward_pool.py && python3 tests/card_engraving.py && python3 tests/save_compat_additive.py",
+    "build": "python tools/build.py",
+    "check": "python tools/verify_baseline.py",
+    "dev": "python tools/build.py && python -m http.server 5173 --bind 0.0.0.0",
+    "test:smoke": "python tests/ui_smoke.py",
+    "test:regression": "python tests/regression.py && python tests/action_policy.py && python tests/combat_resource_transfer.py && python tests/owner_combat_personality.py && python tests/reward_pool.py && python tests/card_engraving.py && python tests/save_compat_additive.py",
     "test:story": "bash scripts/test-story.sh",
     "test:combat-math": "node tests/combat_math_v1.js",
     "test:combat-adapter": "node tests/legacy_combat_sources_v1.js",
@@ -16,9 +16,11 @@
     "test:live-combat": "node tests/live_combat_damage_v1.js",
     "test:status": "node tests/status_skilldeck_v1.js",
     "test:gear-rarity": "node tests/equipment_pool_v1.js",
+    "test:encyclopedia": "npm run build && npm run test:encyclopedia:source && npm run test:gear-rarity && python tests/regression.py",
+    "test:encyclopedia:source": "node --test tests/test_autopilot_156ac6c2e7e796ce.js tests/test_autopilot_dab742ab72ed8402.js tests/test_autopilot_7e0d5bc568c90de5.js",
     "test:merchant": "node tests/merchant_stock_v1.js",
     "test:direct-combat": "node tests/direct_combat_stats_v2.js",
-    "test:modules": "node tests/module_services_v1.js && node tests/merchant_stock_v1.js && python3 -m unittest discover -s tests -p test_module_manifest_v1.py"
+    "test:modules": "node tests/module_services_v1.js && node tests/merchant_stock_v1.js && python -m unittest discover -s tests -p test_module_manifest_v1.py"
   },
   "engines": {
     "node": ">=22"
