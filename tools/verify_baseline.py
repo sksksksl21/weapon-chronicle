@@ -27,6 +27,7 @@ async function check(blocked){
  vm.runInContext(fs.readFileSync('src/core/module_services_v1.js','utf8'),sandbox);
  const registry=vm.runInContext('WC_GAME_MODULES_V1',sandbox);
  registry.register('equipment',{});
+ registry.register('equipment-catalog',{query:()=>[],detail:()=>null});
  registry.register('merchant',{applyCombatReward:()=>trace.push('reward')});
  registry.register({id:'combat',init(){trace.push('combat');return {};}});
  registry.register('save',{});
