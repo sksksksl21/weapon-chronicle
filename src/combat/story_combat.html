@@ -1827,7 +1827,7 @@ function renderCards(){
     const wrap=document.createElement('div');wrap.className='battleCardWrap36';wrap.appendChild(d);
     const mark=document.createElement('button');mark.type='button';mark.className='discardMark36'+(discardChoice36===id?' active':'');
     mark.textContent=discardChoice36===id?'버림 선택됨':'버림 지정';
-    mark.disabled=phase!=='pre'||discardedThisTurn36||selectedPre.includes(id);
+    mark.disabled=!canDiscardBattleCard36(id);
     mark.onclick=()=>{discardChoice36=discardChoice36===id?null:id;render();};
     wrap.appendChild(mark);box.appendChild(wrap);
   }
