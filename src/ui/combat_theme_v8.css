@@ -109,3 +109,54 @@ button:focus-visible,.card:focus-visible,[tabindex]:focus-visible{
 @media(prefers-reduced-motion:reduce){
   .app button,.cards .card{transition:none!important}
 }
+
+
+/* Shared Odyssey interface finish: same material language as the hub.
+ * Combat numbers, actor scale, hitboxes and card outcomes are unchanged.
+ */
+:root{
+  --wc-ui-bg:#061922;--wc-ui-surface:#14343a;--wc-ui-raised:#21434a;
+  --wc-ui-border:#9b7656;--wc-ui-gold:#e5bd7c;
+  --wc-ui-text:#fff0d6;--wc-ui-muted:#d4c5ae;
+  --bg:var(--wc-ui-bg);--paper:var(--wc-ui-surface);
+  --frame:var(--wc-ui-border);--frame2:#bd9864;--ink:var(--wc-ui-text);
+}
+html,body{background:#061922!important;color:var(--wc-ui-text)!important}
+.app{
+  background:
+    radial-gradient(ellipse at 10% 5%,#285154,transparent 54%),
+    linear-gradient(150deg,#173b45,#051923)!important;
+  border:2px solid #cda56c!important;
+}
+.app>.panel,.cardsPanel{
+  background:linear-gradient(150deg,#2b5157,#132d36)!important;
+  border:2px solid #b79361!important;
+  border-radius:5px!important;
+  box-shadow:inset 0 0 0 2px #0b2930,0 5px 0 #06141b!important;
+}
+.topbar .title,.cardsHead .lh,.chronicleTitle{
+  color:#ffe4a5!important;
+  text-shadow:2px 2px #5e3933!important;
+}
+.topMini,.itemBtn,.actions .btn,.chronicleFoot button,
+.cards .card{
+  background:linear-gradient(155deg,#375861,#19333d)!important;
+  border:2px solid #b08c5f!important;
+  border-radius:5px!important;
+  box-shadow:inset 0 2px #ffffff14,0 3px 0 #07171f!important;
+}
+.cards .card.sel{
+  background:linear-gradient(150deg,#8b5940,#364b52)!important;
+  border-color:#f8d796!important;
+  outline:2px solid #f0c37b!important;
+}
+.actions .btn.primary{
+  background:linear-gradient(180deg,#f8d895,#c57d53)!important;
+  color:#20252b!important;
+  border:2px solid #ffe3a4!important;
+}
+.chronicleBook,.overlay .popup{
+  background:linear-gradient(160deg,#31535a,#142f38)!important;
+  border:2px solid #c7a16b!important;
+  border-radius:6px!important;
+}
