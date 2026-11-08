@@ -189,8 +189,11 @@ v47MainStory=function(node){
 openV47Epilogue=function(){
  const v=ensureV47();if(!v?.complete)return;
  const ending=v50HistoricalEnding();if(!ending)return;
+ // Reuse the story engine's embedded art; outcome selection is presentation only.
+ const artKey=({restored:'scene_rest',legacy:'scene_rest',council:'scene_contract',fracture:'scene_investigate',exile:'scene_explore'})[ending.key]||'scene_rest';
+ const art=typeof V37_CINEMATICS==='undefined'?'':V37_CINEMATICS[artKey];
  const h=v50EnsureHistory(),report=Object.entries(h.pivots).map(([key,value])=>{const d=Object.values(V50_PIVOTS).find(x=>x.key===key);return `· ${d?.title||key}: ${d?.effects[value]||value}`;}).join('\n');
- openModal(modalHead('Weapon Chronicle · 역사적 결말',ending.subtitle)+`<div class="storyScene"><div class="storyKicker">THE ODYSSEY · HISTORY</div><div class="storyTitle">${ending.title}</div><div class="storyText">${ending.body}\n\n${report||'이 세계는 이전 버전에서 이미 완결됐다. 새 선택은 소급하지 않는다.'}\n\n세계의 역사는 이 기록으로 확정됐다. 이후에도 검의 소유자와 월간 사건은 계속된다.</div><div class="storyChoices"><button class="choice" id="v50EndClose">다음 삶을 계속한다</button></div></div>`);
+ openModal(modalHead('Weapon Chronicle · 역사적 결말',ending.subtitle)+`<div class="storyScene"><div class="storyKicker">THE ODYSSEY · HISTORY</div><div class="storyTitle">${ending.title}</div><figure class="storyCinematic historyEndingArt"><img loading="eager" alt="${artKey==='scene_rest'||artKey==='scene_explore'?'오디세이 연안 풍경':artKey==='scene_investigate'?'트로이 전장의 기록과 방패 조각':'트로이 항만과 귀향길'}"${art?` src="${art}"`:''}><figcaption>THE ODYSSEY · HISTORY</figcaption></figure><div class="storyText">${ending.body}\n\n${report||'이 세계는 이전 버전에서 이미 완결됐다. 새 선택은 소급하지 않는다.'}\n\n세계의 역사는 이 기록으로 확정됐다. 이후에도 검의 소유자와 월간 사건은 계속된다.</div><div class="storyChoices"><button class="choice" id="v50EndClose">다음 삶을 계속한다</button></div></div>`);
  bindClose();$('v50EndClose').onclick=closeModal;
 };
 const _v50Render=render;

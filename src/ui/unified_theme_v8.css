@@ -212,6 +212,45 @@ button:disabled{cursor:not-allowed}
   color:var(--wc-ui-gold-strong)!important;
 }
 /* Story remains a full-screen cinematic, rather than becoming a card modal. */
+/* Shared by monthly scenes, historical endings and appended aftermath records.
+ * Keep text in document flow so the last paragraph and choices remain reachable. */
+#overlay .storyScene{min-width:0;max-width:100%;box-sizing:border-box}
+#overlay .storyText,#overlay .wc51Epilogue{
+  white-space:pre-wrap!important;
+  overflow-wrap:anywhere;
+  word-break:normal;
+  max-height:none!important;
+  overflow:visible!important;
+  font-size:clamp(15px,3.8vw,17px)!important;
+  line-height:1.85!important;
+  letter-spacing:normal!important;
+  color:var(--wc-ui-text)!important;
+}
+#overlay .wc51Epilogue{
+  margin:16px 0;
+  padding:14px 0;
+  border-top:1px solid var(--wc-ui-border);
+}
+#overlay .storyChoices{
+  grid-template-columns:minmax(0,1fr)!important;
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+#overlay .storyChoices button{
+  min-width:0;
+  min-height:48px;
+  height:auto;
+  white-space:normal!important;
+  overflow-wrap:anywhere;
+  text-align:left;
+  line-height:1.55;
+  padding:12px 14px;
+}
+#overlay .storyChoices button b{font-size:15px!important;line-height:1.55}
+#overlay .storyChoices button span{font-size:13px!important;line-height:1.6}
+#overlay .storyChoices button:focus-visible{
+  outline:2px solid var(--wc-ui-gold-strong);
+  outline-offset:2px;
+}
 #overlay.storyFullscreen .modalHead{
   border-bottom-color:var(--wc-ui-border)!important;
 }
@@ -343,3 +382,8 @@ button:disabled{cursor:not-allowed}
 .codexComparison article{min-width:0;border:1px solid #94764e;border-radius:10px;padding:10px}
 .equipmentCodex .partDelta{display:flex;flex-direction:column;font-size:13px;line-height:1.7}
 @media(max-width:520px){.codexFilters{grid-template-columns:repeat(2,minmax(0,1fr))}.codexFilters label:first-child{grid-column:1/-1}.codexResults,.codexComparison{grid-template-columns:minmax(0,1fr)}.equipmentCodex{font-size:14px}}
+
+/* Historical ending art stays in flow above the complete record. */
+#overlay .historyEndingArt{margin:16px 0;max-width:100%}
+#overlay .historyEndingArt img{display:block;width:100%;height:auto;object-fit:contain}
+#overlay .historyEndingArt figcaption{color:var(--wc-ui-muted);line-height:1.6}
