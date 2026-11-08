@@ -2037,9 +2037,11 @@ function renderWeakness(){
   if(txt){s.textContent=txt;s.className='enemyState show';}
   else{s.textContent='';s.className='enemyState';}
 }
-function renderOverdrive(){ $('overdriveBtn').hidden=true; $('overdriveRisk').textContent='매 턴 시작 시 손패 빈칸 1장 보충 · 사용/버림 합계 턴당 1장'; }
-function renderCombo(){ const b=$('comboBar'); b.className='comboBar'; b.textContent='MEMORY · 사용/버림 턴당 1장 · 덱 소진 시 버린 카드 순환'; }
-function toggleOverdrive(){ return; } // One intervention per turn has no two-card override.
+// Overdrive extends the existing paid intervention budget for this turn only.
+// The resonance gauge/costs and the retained overload resolver remain authoritative.
+function renderOverdrive(){ const b=$('overdriveBtn'); b.hidden=false; b.disabled=phase!=='pre'||coreLockedThisTurn||hero.hp<=0||cardUses>0||usedThisTurn.length>0; b.textContent='OVERDRIVE · '+(overdriveArmed?'ON':'OFF'); b.className='odBtn'+(overdriveArmed?' on':''); $('overdriveRisk').textContent=coreLockedThisTurn?'CORE LOCK · 이번 턴 개입 불가':overdriveArmed?'이번 턴 개입 최대 2회 · 카드별 공명 소비 · 과부하 '+Math.round(currentOverdriveRisk())+'%':'이번 턴 개입 1회 · OVERDRIVE로 최대 2회'; }
+function renderCombo(){ const b=$('comboBar'),c=currentCombo(); b.className='comboBar'; b.textContent=c?'CHAIN · '+c.name+' · '+c.desc:'MEMORY · 사용 '+cardUses+'/'+maxCardUses+' · 덱 소진 시 버린 카드 순환'; }
+function toggleOverdrive(){ if(phase!=='pre'||coreLockedThisTurn||hero.hp<=0||cardUses>0||usedThisTurn.length>0) return; overdriveArmed=!overdriveArmed; maxCardUses=overdriveArmed?2:1; selectedPre=selectedPre.slice(0,maxCardUses); render(); }
 function exposeEnemy(){ if(enemy.exposed) return; enemy.exposed=true; showBanner(weakness().name+'!'); log(weakness().desc+` — 다음 ${hero.name} 행동에 약점 보너스.`,'warn'); render(); }
 function consumeExposure(){ if(enemy.exposed){enemy.exposed=false;log('약점 노출 종료.','muted');} }
 function checkOverdriveRisk(){ if(!overdriveArmed||overdriveRolled||cardUses<2) return; overdriveRolled=true; const risk=currentOverdriveRisk(),r=roll100(); if(r<=risk){coreLockedTurns=1;showBanner('CORE 과부하');log('OVERDRIVE 과부하 '+risk+'% 실패 ('+r+') — 다음 턴 Core LOCK.','bad');} else log('OVERDRIVE 안정화 ('+r+' > '+risk+').','good'); }
@@ -2279,7 +2281,7 @@ function useCard(id){
     const idx=selectedPre.indexOf(id);
     if(idx>=0) selectedPre.splice(idx,1);
     else{
-      const limit=1;
+      const limit=maxCardUses-cardUses;
       if(selectedPre.length<limit) selectedPre.push(id);
       else if(limit===1) selectedPre=[id];
       else selectedPre[1]=id;
@@ -2370,7 +2372,7 @@ function useCard(id){
 }
 function commitPreCard(){
   if(!selectedPre.length) return;
-  selectedPre.slice(0,1).forEach(id=>{
+  selectedPre.slice(0,Math.max(0,maxCardUses-cardUses)).forEach(id=>{
     if(!canUseCard(id)) return;
     const c=CARD_DB[id];
     if(!spendResonance(id)){ log(`공명 부족 — ${c.name}`, 'bad'); return; }
@@ -2538,8 +2540,9 @@ function startTurn(){
 }
 async function executeTurn(){
   if(phase!=='pre') return;
+  commitPreCard();
   phase='heroResolve';
-  commitPreCard(); heroMissPenaltyNext=0; render();
+  heroMissPenaltyNext=0; render();
   if(heroPlan==='defend'){ showBanner('방어'); heroSprite().classList.add('guard'); await flashShield('hero'); await resolveEnemyPhase(); heroSprite().classList.remove('guard'); return; }
   if(heroPlan==='dodge'){ showBanner('회피'); heroSprite().classList.add('dodge','hero'); await sleep(170); heroSprite().classList.remove('dodge','hero'); await resolveEnemyPhase(); return; }
   const r=roll100(); pending={heroRoll:r}; await resolveHeroRoll(r,true);
@@ -2876,8 +2879,7 @@ async function endTurn(){
   }finally{finishingExchange=false;}
 }
 function pickRewardChoices(){
-  // Overdrive is disabled: keep its legacy definition but never offer a no-op reward.
-  const eligible=Object.keys(MEMORY_POOL).filter(k=>k!=='cooling');
+  const eligible=Object.keys(MEMORY_POOL);
   const pool=eligible.filter(k=>!memoriesTaken.includes(k));
   rewardChoices=shuffle(pool.slice()).slice(0,3);
   if(rewardChoices.length<3)shuffle(eligible.slice()).forEach(k=>{
@@ -2888,6 +2890,7 @@ function renderRewardChoices(){ const box=$('rewardChoices'); box.innerHTML=''; 
 function chooseMemory(key){ const m=MEMORY_POOL[key]; if(!m)return; m.apply(); if(!memoriesTaken.includes(key))memoriesTaken.push(key); addChronicle('choice',m.name,'전투 뒤 Core에 남길 기억으로 선택했다. '+m.desc,4); $('rewardBox').className='rewardBox'; log('새 기억 획득 — '+m.name,'good'); nextStage(); }
 function stageVictory(){
   phase='done';
+  overdriveArmed=false;overdriveRolled=false;maxCardUses=0;
   render();
   wcCommitCardMastery();
   showBanner('전투 승리');
@@ -2962,6 +2965,7 @@ function nextStage(){
 }
 function runEnd(){
   phase='done';
+  overdriveArmed=false;overdriveRolled=false;maxCardUses=0;
   render();
   wcCommitCardMastery();
   showBanner('패배');
@@ -3197,6 +3201,57 @@ button:focus-visible,.card:focus-visible,[tabindex]:focus-visible{
 }
 @media(prefers-reduced-motion:reduce){
   .app button,.cards .card{transition:none!important}
+}
+
+
+/* Shared Odyssey interface finish: same material language as the hub.
+ * Combat numbers, actor scale, hitboxes and card outcomes are unchanged.
+ */
+:root{
+  --wc-ui-bg:#061922;--wc-ui-surface:#14343a;--wc-ui-raised:#21434a;
+  --wc-ui-border:#9b7656;--wc-ui-gold:#e5bd7c;
+  --wc-ui-text:#fff0d6;--wc-ui-muted:#d4c5ae;
+  --bg:var(--wc-ui-bg);--paper:var(--wc-ui-surface);
+  --frame:var(--wc-ui-border);--frame2:#bd9864;--ink:var(--wc-ui-text);
+}
+html,body{background:#061922!important;color:var(--wc-ui-text)!important}
+.app{
+  background:
+    radial-gradient(ellipse at 10% 5%,#285154,transparent 54%),
+    linear-gradient(150deg,#173b45,#051923)!important;
+  border:2px solid #cda56c!important;
+}
+.app>.panel,.cardsPanel{
+  background:linear-gradient(150deg,#2b5157,#132d36)!important;
+  border:2px solid #b79361!important;
+  border-radius:5px!important;
+  box-shadow:inset 0 0 0 2px #0b2930,0 5px 0 #06141b!important;
+}
+.topbar .title,.cardsHead .lh,.chronicleTitle{
+  color:#ffe4a5!important;
+  text-shadow:2px 2px #5e3933!important;
+}
+.topMini,.itemBtn,.actions .btn,.chronicleFoot button,
+.cards .card{
+  background:linear-gradient(155deg,#375861,#19333d)!important;
+  border:2px solid #b08c5f!important;
+  border-radius:5px!important;
+  box-shadow:inset 0 2px #ffffff14,0 3px 0 #07171f!important;
+}
+.cards .card.sel{
+  background:linear-gradient(150deg,#8b5940,#364b52)!important;
+  border-color:#f8d796!important;
+  outline:2px solid #f0c37b!important;
+}
+.actions .btn.primary{
+  background:linear-gradient(180deg,#f8d895,#c57d53)!important;
+  color:#20252b!important;
+  border:2px solid #ffe3a4!important;
+}
+.chronicleBook,.overlay .popup{
+  background:linear-gradient(160deg,#31535a,#142f38)!important;
+  border:2px solid #c7a16b!important;
+  border-radius:6px!important;
 }
 
 </style>
