@@ -141,7 +141,15 @@ function installStyle(){
  document.head.appendChild(el);
 }
 installStyle();
-return Object.freeze({buildStock,upgradeOldStock,tierFor,validRow,applyCombatReward});
+// buildStock selects only wc5 rules and offers their independently rolled wc6 copies.
+function catalogSources({kind,slot,id,item}){
+ const template=item.templateId||id;
+ if(!new RegExp("^wc5_"+slot+"_[0-3]_(common|rare|unique|legendary|chronicle)$").test(template))return [];
+ return [{method:"purchase",source:"core/merchant_stock_v1.js:buildStock",
+  merchant:kind==="armor"?"armor-seller":"smith",templateId:template,
+  price:item.shopPrice||item.price,availability:"rotating-stock",independentRoll:true}];
+}
+return Object.freeze({catalogSources,buildStock,upgradeOldStock,tierFor,validRow,applyCombatReward});
 })();
 // The merchant owns the stock; the separate economy module owns reward events.
 if(typeof WC_GAME_MODULES_V1!=="undefined")

@@ -9,7 +9,12 @@ function applyEquipmentReward(reward){
  if(typeof WC_GAME_MODULES_V1==="undefined")return false;
  return WC_GAME_MODULES_V1.require("merchant").applyCombatReward(reward);
 }
-const api=Object.freeze({applyEquipmentReward});
+function catalogSources({kind,slot,id}){
+ return [{method:"conditional-stock-reward",source:"core/economy_rewards_v1.js:applyEquipmentReward",
+  payloadKind:"equipment-loot",destination:kind==="armor"?"marketV24.armor":"smithPartStock",
+  itemId:id,slot,condition:"Explicit validated payload only; no automatic equipment drop producer"}];
+}
+const api=Object.freeze({applyEquipmentReward,catalogSources});
 if(typeof WC_GAME_MODULES_V1!=="undefined")
  WC_GAME_MODULES_V1.register({
   id:"economy",

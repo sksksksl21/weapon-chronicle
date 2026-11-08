@@ -152,10 +152,10 @@ function ownerFinalDetail(item){
 }
 function formatDetail(item,noFinal){
  if(!item)return "";
- const tier=TIERS.find(t=>t.id===item.rarity);
+ const tier=TIERS.find(t=>t.id===catalogRarity(item.rarity));
  const options=(item.options||[]).map(o=>o.name+" +"+o.value);
  const unique=item.uniqueEffect;
- return '<div class="wc5-quality"><b class="wc5-grade wc5-grade-'+(item.rarity||"common")+'">'+
+ return '<div class="wc5-quality"><b class="wc5-grade wc5-grade-'+(catalogRarity(item.rarity))+'">'+
   (tier?.name||item.rarity||"노멀")+'</b>'+
   (item.rolledInstance?'<p>개체별 무작위 옵션 · 동일 종류라도 획득할 때마다 능력치가 달라집니다.</p>':'')+
   (!item.generated?'<p>기존 원본 아이템 · 원래 능력치 유지 (신규 등급 옵션 체계는 생성형 변형에 적용)</p>':
@@ -311,9 +311,85 @@ if(typeof partDeltaHtml==="function"){
   return original.call(this,slot,id,...args)+formatDetail(PART_CATALOG[slot]?.[id]);
  };
 }
-return Object.freeze({TIERS,W_SLOTS,A_SLOTS,expand,buildItem,formatDetail,result,randomFrom,
+// Read-through catalog: definitions stay in the original ID-keyed catalogs.
+// No discovery state, inventory, save fields or random draws are owned here.
+function catalogRarity(rarity){return rarity==="beyond"?"chronicle":TIERS.some(t=>t.id===rarity)?rarity:"common";}
+function catalogEntry({kind,slot,id}={}){
+ if(kind==="armor"){
+  const item=OWNER_GEAR_CATALOG[id];
+  return item&&A_SLOTS.includes(item.slot)&&(!slot||slot===item.slot)?{kind,slot:item.slot,id,item}:null;
+ }
+ if(kind==="weapon"&&W_SLOTS.includes(slot)){
+  const item=PART_CATALOG[slot]?.[id];
+  return item?{kind,slot,id,item}:null;
+ }
+ return null;
+}
+function catalogSources(entry){
+ const sources=[];
+ if(typeof WC_GAME_MODULES_V1!=="undefined"){
+  for(const service of ["merchant","economy"]){
+   const api=WC_GAME_MODULES_V1.get(service);
+   if(typeof api?.catalogSources==="function")sources.push(...api.catalogSources(entry));
+  }
+ }
+ const {kind,item}=entry;
+ if(kind==="weapon"&&item.cost&&!item.rolledInstance)
+  sources.push({method:"craft",source:"legacy/game_runtime.js:openSmithCraft",
+   requirements:{cost:{...item.cost},skill:item.requiresSkill||null,discovery:true}});
+ return sources;
+}
+function catalogDetail(candidate={},context={}){
+ const entry=catalogEntry(candidate);
+ if(!entry)return null;
+ const {kind,slot,id,item}=entry;
+ const templateId=item.templateId||(item.generated?id:null);
+ const familyId=item.family||id;
+ const base=(kind==="weapon"?PART_CATALOG[slot]:OWNER_GEAR_CATALOG)[familyId]||item;
+ const clone=value=>value==null?value:JSON.parse(JSON.stringify(value));
+ const sources=catalogSources(entry);
+ let performance=null;
+ if(typeof WC_DIRECT_COMBAT_V2!=="undefined"){
+  const direct=WC_DIRECT_COMBAT_V2.migrateLegacyPart(item.mods||{},kind,slot);
+  performance={direct,contribution:context.owner?
+   WC_DIRECT_COMBAT_V2.itemEffects(direct,{kind,slot,owner:context.owner}):null,
+   // Caller supplies the SAME calculator input as combat, including owner/base.
+   // Replace only this slot; calculate owns rounding, scaling and clamping.
+   final:context.loadout?WC_DIRECT_COMBAT_V2.calculate({...context.loadout,
+    [kind==="armor"?"armor":"parts"]:{...context.loadout[kind==="armor"?"armor":"parts"],[slot]:direct}}):null,
+   preview:null};
+  if(context.current===true&&typeof WC_COMBAT_MODULE_V1!=="undefined")
+   performance.preview=WC_COMBAT_MODULE_V1.previewEquipment({kind,slot,id});
+ }
+ return {id,kind,slot,name:item.name,rarity:catalogRarity(item.rarity),originalRarity:item.rarity,
+  description:item.desc||item.note||"",familyId,templateId,
+  generationRule:item.generated?"equipment_pool_v1:buildItem":null,
+  definition:base,baseStats:clone(base.mods||{}),
+  instance:{id,rolled:!!item.rolledInstance,seed:item.instanceSeed||null,
+   stats:clone(item.mods||{}),options:clone(item.options||[]),uniqueEffect:clone(item.uniqueEffect||null),
+   passive:clone(item.passive||null)},
+  sources,sourceStatus:sources.length?"linked":"unverified",performance};
+}
+function queryCatalog({kind,slot,rarity,search=""}={}){
+ const rows=[];
+ for(const partSlot of W_SLOTS)for(const id of Object.keys(PART_CATALOG[partSlot]||{}))
+  rows.push({kind:"weapon",slot:partSlot,id});
+ for(const [id,item] of Object.entries(OWNER_GEAR_CATALOG))if(A_SLOTS.includes(item.slot))
+  rows.push({kind:"armor",slot:item.slot,id});
+ const term=String(search).toLocaleLowerCase();
+ return rows.filter(row=>(!kind||row.kind===kind)&&(!slot||row.slot===slot))
+  .map(row=>catalogDetail(row)).filter(row=>(!rarity||row.rarity===catalogRarity(rarity))&&
+   (!term||[row.id,row.name,row.description,row.familyId].some(v=>String(v).toLocaleLowerCase().includes(term))));
+}
+const catalog=Object.freeze({query:queryCatalog,detail:catalogDetail,rarity:catalogRarity,
+ weaponSlots:Object.freeze([...W_SLOTS]),armorSlots:Object.freeze([...A_SLOTS]),
+ tiers:Object.freeze(TIERS.map(t=>Object.freeze({id:t.id,name:t.name})))});
+return Object.freeze({TIERS,W_SLOTS,A_SLOTS,expand,buildItem,formatDetail,result,randomFrom,catalog,
  rollCopy,restoreCopy,restoreFromSave,rarityClass,decorateCardHTML,decorateModalCards});
 })();
 // Expose one stable equipment API to dependent modules; no duplicate catalog.
 if(typeof WC_GAME_MODULES_V1!=="undefined")
   WC_GAME_MODULES_V1.register("equipment",WC_EQUIPMENT_POOL_V1);
+
+if(typeof WC_GAME_MODULES_V1!=="undefined")
+ WC_GAME_MODULES_V1.register("equipment-catalog",WC_EQUIPMENT_POOL_V1.catalog);

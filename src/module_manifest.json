@@ -109,10 +109,12 @@
     },
     {
       "id": "equipment",
+      "provides": ["equipment", "equipment-catalog"],
       "path": "core/equipment_pool_v1.js",
       "requires": [
         "module-services",
-        "legacy-runtime"
+        "legacy-runtime",
+        "combat-direct-stats"
       ],
       "domain": "equipment"
     },
