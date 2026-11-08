@@ -1,5 +1,6 @@
 """One ordered source manifest and exact-position legacy includes."""
 from base64 import b64encode
+from hashlib import sha256
 import json
 from pathlib import Path, PurePosixPath
 
@@ -55,6 +56,55 @@ def load_module_manifest(root):
 
 
 SCRIPT_PARTS=load_module_manifest(Path(__file__).resolve().parents[1])
+
+
+def approved_scene_style(root):
+    """Render a V2-approved background image, not merely verify/copy it.
+
+    tools/build.py checks the live V2 art approval BEFORE invoking compose.
+    This helper independently verifies bytes to avoid silently rendering a
+    mismatched or malformed asset when compose is called elsewhere. No visual
+    replacement is claimed when no approved background is supplied.
+    """
+    pack = root/'assets'/'v2-managed'
+    if not pack.exists():
+        return ''
+    manifest = json.loads((pack/'manifest.json').read_text(encoding='utf8'))
+    if manifest.get('schema_version') != 1:
+        raise ValueError('Invalid approved art manifest')
+    entries = manifest.get('assets')
+    if not isinstance(entries,list):
+        raise ValueError('Invalid approved art entries')
+    scenes = [x for x in entries if isinstance(x,dict)
+              and x.get('category') == 'background']
+    if not scenes:
+        return ''
+    entry = sorted(scenes,key=lambda x:x.get('asset_id',''))[0]
+    filename = entry.get('filename')
+    mime = entry.get('media_type')
+    if (not isinstance(filename,str) or
+            not __import__('re').fullmatch(r'assets/asset_[a-f0-9]{24}\.(?:png|jpg|webp)',filename)
+            or mime not in ('image/png','image/jpeg','image/webp')):
+        raise ValueError('Invalid approved scene filename')
+    image = pack/filename
+    if image.is_symlink() or not image.is_file():
+        raise ValueError('Approved scene file missing')
+    raw = image.read_bytes()
+    if (len(raw) != entry.get('bytes') or
+            sha256(raw).hexdigest() != entry.get('sha256')):
+        raise ValueError('Approved scene hash mismatch')
+    encoded = b64encode(raw).decode('ascii')
+    uri = 'data:'+mime+';base64,'+encoded
+    return ('\n<style id="wc-v2-approved-scene">'
+            '\n/* SHA-matched V2 managed background; no gameplay changes */'
+            '\n.app{background-image:'
+            'linear-gradient(180deg,rgba(5,19,26,.65),rgba(5,18,26,.88)),'
+            'url("'+uri+'")!important;'
+            'background-size:cover!important;'
+            'background-position:center!important;'
+            'background-repeat:no-repeat!important;}'
+            '\n</style>\n')
+
 
 
 def compose(root):
@@ -113,4 +163,8 @@ def compose(root):
                         + theme + '\n</style>\n</body>', 1)
     html = ((source / 'legacy/html_before_script.html').read_text(encoding='utf8')
             + '<script>\n' + js + '\n</script>' + tail)
+    scene = approved_scene_style(root)
+    if scene:
+        assert html.count('</body>') == 1
+        html = html.replace('</body>',scene+'</body>',1)
     return html, js, combat
