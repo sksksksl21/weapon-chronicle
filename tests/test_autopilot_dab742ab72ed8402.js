@@ -29,8 +29,8 @@ test('equipment codex exposes undiscovered equipment without changing inventory 
   const context = vm.createContext({
     state,
     PART_LABELS: {
-      blade: 'Blade', guard: 'Guard', grip: 'Grip', pommel: 'Pommel',
-      fuller: 'Fuller', edge: 'Edge', core: 'Core', scabbard: 'Scabbard'
+      blade: 'Blade', guard: 'Guard', tang: 'Tang', grip: 'Grip',
+      wrap: 'Wrap', pommel: 'Pommel', seat: 'Seat', scabbard: 'Scabbard'
     },
     openModal: function (content) { html = content; },
     modalHead: function (title, description) { return title + description; },
@@ -43,14 +43,21 @@ test('equipment codex exposes undiscovered equipment without changing inventory 
       removeItem: function (key) { saveWrites += 1; delete saved[key]; }
     }
   });
-  vm.runInContext(section('const PART_CATALOG={', 'function partRarity('), context);
-  vm.runInContext(section('function allPartIds(){', 'function inventoryTabs('), context);
-  vm.runInContext('openPartCodex();', context);
+  let runtimeError;
+  try {
+    vm.runInContext(section('const PART_CATALOG={', 'function partRarity('), context);
+    vm.runInContext(section('function allPartIds(){', 'function inventoryTabs('), context);
+    vm.runInContext('openPartCodex();', context);
+  } catch (error) {
+    runtimeError = String(error);
+  }
+  assert.equal(runtimeError, undefined, 'Actual codex entrypoint must render: ' + (runtimeError || ''));
 
   assert.equal(JSON.stringify(state), before, 'Browsing must preserve discovery, currency and equipment');
   assert.equal(saveWrites, 0, 'Browsing must not write saves or remove a recovery checkpoint');
   assert.equal(JSON.stringify(saved), savedBefore, 'Durable saves must remain unchanged');
   assert.ok(html.includes('단조 철 장검날'), 'The actual modal must render the discovered starter blade');
+  // Necessary a1 behavior; this VM harness does not establish mobile layout or comparison coverage (a2).
   assert.ok(html.includes('넓은 청동 절단날'), 'Undiscovered equipment must remain individually accessible in the codex instead of being reduced to a hidden count');
   assert.ok(html.includes('강한 절단력과 견고함 대신 정밀·조작성을 크게 포기한다.'), 'Undiscovered equipment must expose its option tradeoffs');
 });
