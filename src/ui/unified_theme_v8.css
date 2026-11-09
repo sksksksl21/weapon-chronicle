@@ -508,3 +508,8 @@ html,body{
 @media(prefers-reduced-motion:reduce){
   .app .wc41-serviceTile,.app .exec{transition:none!important}
 }
+/* CH.1's saved choice sentences remain readable after chapter settlement. */
+.chapterStoryRecap{width:100%;min-height:44px;margin:8px 0;padding:10px 12px;text-align:left;white-space:normal;color:#f2d49e;background:#142232;border:1px solid #9c7c50;border-radius:10px}
+.chapterStoryRecap[hidden]{display:none!important}
+.wcScene1Story{overflow-wrap:anywhere;text-align:left}
+.wcScene1Story li{padding:8px 4px;white-space:pre-line}

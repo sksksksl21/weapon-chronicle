@@ -153,8 +153,14 @@ const WC_SCENE_CARDS_V1=(()=>{
    ${error?`<div class="wcScene1Error" role="alert">${esc(error)}</div>`:''}
   </div>`;
  }
- function show(){
-  if(!live||!active())return false;
+ // Read only the durable, resolved sentences; never regenerate from current data
+ // or the current owner (which can change after this chapter).
+ function recap(){
+  const r=run();
+  return engine.valid&&engine.isRun(r)&&['ending','done'].includes(r.status)?r.picks.map(p=>p.result):null;
+ }
+ function show(completed=false){
+  if(!live||(!active()&&!(completed&&run()?.status==='done'&&recap())))return false;
   const r=run();let html='';
   if(r.status==='card'||r.status==='result'){
    const c=engine.card(r.card);
@@ -171,11 +177,11 @@ const WC_SCENE_CARDS_V1=(()=>{
    html=shell(c.background,c.kicker,c.title,castHtml(c),`<div class="storyText wcScene1Text">${esc(text)}</div>${lower}`,(r.status==='card'?'card:':'result:')+r.card);
   }else{
    const e=engine.data.ending,eff=engine.effects(r);
-   const lines=r.picks.map((p,i)=>`<li data-scene-story="${i}">${esc(p.result)}</li>`).join('');
+   const lines=recap().map((text,i)=>`<li data-scene-story="${i}">${esc(text)}</li>`).join('');
    const gains=[eff.gold?`GOLD ${eff.gold>0?'+':''}${eff.gold}`:'',eff.mind?`정신 ${eff.mind>0?'+':''}${eff.mind}`:''].filter(Boolean).join(' · ');
    html=shell(e.background,e.kicker,e.title,'',`<ol class="wcScene1Story">${lines}</ol><div class="storyText wcScene1Text">${esc(engine.fill(e.closing,owner()))}</div>
      ${gains?`<div class="wcScene1Gain">선택의 대가: ${esc(gains)}</div>`:''}
-     <div class="storyChoices wcScene1Choices"><button class="choice" type="button" data-scene-finish="1"><b>${esc(e.button)}</b></button></div>`,'ending');
+     <div class="storyChoices wcScene1Choices">${r.status==='done'?'<button class="choice" type="button" data-scene-recap-close="1"><b>연대기로 돌아가기</b></button>':`<button class="choice" type="button" data-scene-finish="1"><b>${esc(e.button)}</b></button>`}</div>`,r.status==='done'?'recap':'ending');
   }
   openModal(html);
   $('overlay')?.classList.add('storyFullscreen');
@@ -184,6 +190,7 @@ const WC_SCENE_CARDS_V1=(()=>{
   m.querySelector('[data-scene-next]')?.addEventListener('click',()=>next());
   m.querySelector('[data-scene-finish]')?.addEventListener('click',()=>finish());
   m.querySelector('[data-scene-retry]')?.addEventListener('click',()=>retryStart());
+  m.querySelector('[data-scene-recap-close]')?.addEventListener('click',()=>closeModal());
   return true;
  }
  function pick(choiceId){
@@ -269,7 +276,7 @@ const WC_SCENE_CARDS_V1=(()=>{
 .wcScene1Error{margin:10px 0;padding:9px;border:1px solid #c0634f;border-radius:8px;background:#3a1612;color:#ffd9cf}`;
   document.head.appendChild(st);
  }
- const api=Object.freeze({engine,valid:engine.valid,noStoredGame,startNewGame,resume,show,pick,next,finish,retryStart,
+ const api=Object.freeze({engine,valid:engine.valid,noStoredGame,startNewGame,resume,show,pick,next,finish,retryStart,recap,showRecap:()=>show(true),
   active,view:()=>live?{run:run()?clone(run()):null,error,unsaved}:null});
  if(typeof window!=='undefined')window.WC_SCENE_CARDS_V1=api;
  return api;

@@ -109,6 +109,36 @@ assert.equal(broken(d=>{d.cards[0].characters=[];}),false);
 assert.equal(broken(d=>{d.cards[3].choices[0].approach="c";}),false);
 assert.equal(broken(d=>{d.cards[2].choices[1].effects={gold:9999};}),false);
 
+// Exercise the real recap renderer after a completed JSON save/load. It must
+// use stored sentences, even after the owner changes, without a save or reward.
+for(const end of ends){
+ const saved=JSON.parse(JSON.stringify({...end,status:'done'}));
+ let html='',writes=0,closed=0;
+ const sandbox={console,state:{sceneChapterV1:saved,owner:{name:'후대 소유자'},year:2,month:1},
+  document:{getElementById:()=>true},
+  $:id=>id==='overlay'?{classList:{add(){}}}:{querySelectorAll:()=>[],querySelector:()=>({addEventListener(){}})},
+  openModal:value=>{html=value;},closeModal:()=>{closed++;},saveGame:()=>{writes++;return true;}};
+ vm.createContext(sandbox);
+ vm.runInContext(source.replace(MARKER,'const WC_CH1_SCENES_JSON_V1='+JSON.stringify(DATA)+';')+'\nglobalThis.API=WC_SCENE_CARDS_V1;',sandbox);
+ const api=sandbox.API;
+ assert.equal(api.active(),false);
+ assert.equal(api.resume(),false,'completed recap must not block normal play on startup');
+ assert.equal(api.showRecap(),true);
+ assert.match(html,/data-scene-step="recap"/);
+ assert.match(html,/data-scene-recap-close/);
+ assert.doesNotMatch(html,/data-scene-finish/);
+ const actual=[...html.matchAll(/data-scene-story="\d+">([^<]*)<\/li>/g)].map(m=>m[1]);
+ const escapeText=text=>text.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ assert.deepEqual(actual,saved.picks.map(p=>escapeText(p.result)));
+ assert.ok(!html.includes('후대 소유자는'),'saved prose must retain original owner');
+ assert.equal(api.finish(),false,'cannot settle completed chapter twice');
+ assert.equal(writes,0,'reading never saves or settles');
+ assert.equal(JSON.stringify(sandbox.state.sceneChapterV1),JSON.stringify(saved));
+ // Returned text arrays cannot mutate the saved record.
+ api.recap().pop();
+ assert.equal(api.recap().length,saved.picks.length);
+}
+
 // The offline bundle embeds the data (no runtime fetch) once rebuilt.
 const built=fs.readFileSync(path.join(root,"index.html"),"utf8");
 assert.ok(built.includes("const WC_CH1_SCENES_JSON_V1={"),"index.html embeds scene data; run npm run build");
