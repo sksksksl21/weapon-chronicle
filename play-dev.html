@@ -39,7 +39,7 @@ small{display:block;color:#a7b3c4;margin-top:8px}button{font:inherit;border-radi
     throw Error("레거시/시작 모듈 순서 오류");
   const supporting=[
     "legacy/html_before_script.html","legacy/html_after_script.html",
-    "combat/story_combat.html","story/main_chapters_v47.js",
+    "combat/story_combat.html","story/main_chapters_v47.js","story/chapter1_scenes_v1.json",
     "ui/unified_theme_v8.css","ui/combat_theme_v8.css"
   ];
   const paths=[...new Set([...scriptParts,...supporting])];
@@ -82,7 +82,10 @@ small{display:block;color:#a7b3c4;margin-top:8px}button{font:inherit;border-radi
     let scripts=scriptParts.map(path=>files[path]);
     const substitutions=[
       ["/* @include:combat-document */","const COMBAT_DOC_B64="+JSON.stringify(combatB64)+";"],
-      ["/* @include:main-chapters-v47 */",files["story/main_chapters_v47.js"].replace(/\n$/,"")]
+      ["/* @include:main-chapters-v47 */",files["story/main_chapters_v47.js"].replace(/\n$/,"")],
+      // Same embedding as tools/build_sources.py: card data stays JSON, the game never fetches it.
+      ["/* @include:chapter1-scenes-json */","const WC_CH1_SCENES_JSON_V1="+
+        JSON.stringify(JSON.parse(files["story/chapter1_scenes_v1.json"])).replace(/</g,"\\u003c")+";"]
     ];
     for(const [marker,value] of substitutions){
       let hits=0;

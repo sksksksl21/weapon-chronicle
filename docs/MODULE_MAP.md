@@ -49,7 +49,7 @@
 | 전투 핵심 | `combat_math_v1.js`, `direct_combat_stats_v2.js` | 수치 계산은 단일 출처, 사용자가 확정한 최신 스탯 적용 | 일부 분리 |
 | 전투 연결 | `direct_combat_runtime_v2.js`, `live_combat_handoff_v1.js` | 소유자/장비 계산 → iframe 입력 → 전투 결과 | 일부 분리, 실사용 확인 필요 |
 | 전투 화면/카드 | `combat/story_combat.html` | 전투 표시·카드 사용·판정·적 AI 분리 | 추가 분리 필요 |
-| 스토리/대화 | `story/main_chapters_v47.js`, `history_branch_v50.js`, `act1_history_v52.js` | 콘텐츠 DB → 분기 조건 → 결과/기록 | 일부 분리 |
+| 스토리/대화 | `story/main_chapters_v47.js`, `history_branch_v50.js`, `act1_history_v52.js`, `scene_cards_v1.js` (+ `chapter1_scenes_v1.json` 1장 장면 카드 데이터, 빌드 시 내장) | 콘텐츠 DB → 분기 조건 → 결과/기록 | 일부 분리 |
 | 월간 행동/의뢰/탐험/조사 | 레거시 월간 진행·미션 후보 함수 | 행동 제안 → 결과 → 보상/위험 → 다음 달 | 추가 분리 필요 |
 | 적·난이도 | 레거시 적 데이터와 `combat/story_combat.html` | 적 원본 DB → 난이도 계산 → 전투 표시 | 추가 분리 필요 |
 | 저장·복원 | `save_ledger_v48.js`, `action_checkpoint_v482.js`, `checkpoint_v483.js` | 단일 저장·보상 중복 방지·정책 A | 부분 구현 |

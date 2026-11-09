@@ -14,13 +14,20 @@ WC_GAME_MODULES_V1.register({
 const WC_RUNTIME_READY_V1=(async()=>{
  // Initialize save hooks and reward/story subscriptions before restoring state.
  await WC_GAME_MODULES_V1.initialize();
+// Scene cards replace the first monthly board only for a game with no stored save.
+const wcSceneCards=typeof WC_SCENE_CARDS_V1!=='undefined'?WC_SCENE_CARDS_V1:null;
+const wcNewGame=!!wcSceneCards&&wcSceneCards.noStoredGame();
 v48EnsureState();
 const v483Loaded=loadGame();
  if(v483Loaded!==null){
   if(v483Loaded){
    if(!state.monthFacts?.length)genMonth();
    else{WC_GAME_MODULES_V1.require('ui').refresh();addLog('???? ???? ????.');}
-  }else genMonth();
+   if(wcSceneCards)wcSceneCards.resume();
+  }else{
+   genMonth();
+   if(wcNewGame)wcSceneCards.startNewGame();
+  }
  }
  return WC_GAME_MODULES_V1;
 })();

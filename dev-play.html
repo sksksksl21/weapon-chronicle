@@ -41,7 +41,7 @@ try{
   if(manifest.modules[0]?.id!=="legacy-runtime"||
      manifest.modules.at(-1)?.id!=="bootstrap")
     throw Error("레거시/시작 모듈 순서 오류");
-  const paths=["combat/story_combat.html","story/main_chapters_v47.js",
+  const paths=["combat/story_combat.html","story/main_chapters_v47.js","story/chapter1_scenes_v1.json",
     "legacy/html_before_script.html","legacy/html_after_script.html",
     "ui/unified_theme_v8.css","ui/combat_theme_v8.css",...SCRIPT_PARTS];
   const contents=await Promise.all(paths.map(fetchText));
@@ -67,7 +67,10 @@ try{
   let scripts=SCRIPT_PARTS.map(p=>data[p]);
   const includes={
     "/* @include:combat-document */":'const COMBAT_DOC_B64="'+docB64+'";',
-    "/* @include:main-chapters-v47 */":data["story/main_chapters_v47.js"].replace(/\n$/,"")
+    "/* @include:main-chapters-v47 */":data["story/main_chapters_v47.js"].replace(/\n$/,""),
+    // Same embedding as tools/build_sources.py ($ escaped for String.replace).
+    "/* @include:chapter1-scenes-json */":"const WC_CH1_SCENES_JSON_V1="+
+      JSON.stringify(JSON.parse(data["story/chapter1_scenes_v1.json"])).replace(/</g,"\\u003c").replace(/\$/g,"\\u0024")+";"
   };
   for(const [marker,content] of Object.entries(includes)){
     if(scripts.reduce((n,s)=>n+s.split(marker).length-1,0)!==1)throw Error("조립 토큰 오류: "+marker);

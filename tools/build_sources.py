@@ -108,6 +108,20 @@ def approved_scene_style(root):
 
 
 
+def scene_cards_include(source):
+    """Embed chapter-1 scene card JSON as one JS constant (offline, no fetch).
+
+    The browser module validates the card graph again; escaping here keeps the
+    data from closing the surrounding inline script element."""
+    data = json.loads((source / 'story/chapter1_scenes_v1.json').read_text(encoding='utf8'))
+    if data.get('schema') != 1 or not isinstance(data.get('cards'), list):
+        raise ValueError('Unsupported chapter-1 scene card data')
+    text = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
+    for raw, escaped in (('<', '\\u003c'), ('\u2028', '\\u2028'), ('\u2029', '\\u2029')):
+        text = text.replace(raw, escaped)
+    return 'const WC_CH1_SCENES_JSON_V1=' + text + ';'
+
+
 def compose(root):
     source = root / 'src'
     combat_text = (source / 'combat/story_combat.html').read_text(encoding='utf8')
@@ -143,6 +157,7 @@ def compose(root):
     includes = {
         '/* @include:combat-document */': 'const COMBAT_DOC_B64="' + b64encode(combat).decode('ascii') + '";',
         '/* @include:main-chapters-v47 */': (source / 'story/main_chapters_v47.js').read_text(encoding='utf8').removesuffix('\n'),
+        '/* @include:chapter1-scenes-json */': scene_cards_include(source),
     }
     scripts = [(source / p).read_text(encoding='utf8') for p in SCRIPT_PARTS]
     # The status module no longer starts the registry while bootstrap is

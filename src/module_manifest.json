@@ -65,6 +65,15 @@
       "domain": "story"
     },
     {
+      "id": "scene-cards",
+      "path": "story/scene_cards_v1.js",
+      "requires": [
+        "act1-history",
+        "save-ledger"
+      ],
+      "domain": "story"
+    },
+    {
       "id": "combat-math",
       "path": "core/combat_math_v1.js",
       "requires": [
@@ -153,7 +162,8 @@
         "economy",
         "combat-handoff",
         "checkpoint",
-        "act1-history"
+        "act1-history",
+        "scene-cards"
       ],
       "domain": "bootstrap"
     }

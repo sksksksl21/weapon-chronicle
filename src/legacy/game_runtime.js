@@ -4049,7 +4049,8 @@ function completeAct1ChapterV25(ch,result,patch={}){
   ms.history.push({node:c.node,choice:`v25_ch${ch}_${result}`,year:state.year,month:state.month,v25Chapter:ch});
   if(ch<8){ms.node=ACT1_CHAPTERS_V25[ch].node;ms.act1ResearchOpened[ch+1]=absMonth()+1;}
   else{ms.node='1-09';ms.act1Complete=true;ms.prototypeEnd=true;ms.chapter=3;}
-  ms.gate=null;state.monthCandidateCache={};saveGame();
+  // Report durability so callers (scene cards) can roll back on a failed save.
+  ms.gate=null;state.monthCandidateCache={};return saveGame();
 }
 const ACT1_MAIN_TEXT_V25={
  1:{kicker:'트로이 · 마지막 부두',intro:`불탄 성벽 뒤에서 연기는 아직 올라오고 있었다. 승리한 병사들은 웃었지만 부두의 얼굴은 달랐다. 집으로 돌아갈 배는 한정되어 있었고 전리품을 노리는 사람들은 주인 없는 짐을 먼저 골랐다.\n\n조사에서 확인한 빈자리를 향해 움직이는 순간, 칼을 든 무리가 선창 길을 막았다. 그들의 눈은 소유자보다 그가 들고 있는 짐과 검을 먼저 훑었다.`,a:'부상자와 짐을 한곳에 묶고 좁은 선창으로 간다',b:'빈손인 척 흩어졌다가 배 앞에서 다시 모인다',afterA:`선창은 좁았지만 뒤를 지키기 쉬웠다. 문제는 약탈대가 이미 출구 쪽을 차지했다는 점이었다.`,afterB:`사람은 흩어졌지만 검은 눈에 띄었다. 약탈대장은 그가 마지막 사람이라는 것을 알아보고 직접 길을 막았다.`},

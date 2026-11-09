@@ -1,0 +1,137 @@
+{
+  "schema": 1,
+  "id": "act1_ch1_scene_cards",
+  "chapter": 1,
+  "title": "전쟁이 끝난 날",
+  "start": "ch1_ashes",
+  "note": "Act I CH.1 as ordered scene cards. Text uses {owner} and {owner은/는}-style particles. Choice effects are applied once, only when the chapter is closed. 'approach' on the final card feeds the existing v5.2 departure pivot (a=sheltered, b=dispersed).",
+  "cards": [
+    {
+      "id": "ch1_ashes",
+      "kicker": "트로이 · 불탄 성벽",
+      "title": "검이 깨어난 아침",
+      "background": "action:contract",
+      "characters": [
+        {"id": "owner", "name": "{owner}", "role": "검을 쥔 소유자"},
+        {"id": "sword", "name": "Legend Core", "role": "검"}
+      ],
+      "text": "불탄 성벽 뒤에서 연기는 아직 올라오고 있었다. 승리한 병사들은 웃었지만 부두로 가는 길의 얼굴은 달랐다. 집으로 돌아갈 배는 한정되어 있었고, 전리품을 노리는 사람들은 주인 없는 짐부터 골랐다.\n\n{owner}의 손에 들린 검은 처음으로 자신을 쥔 손의 떨림을 기억했다. 부두까지 가는 길은 둘이었다.",
+      "choices": [
+        {
+          "id": "refugees",
+          "label": "피난민 행렬을 따라 성 밖 숲길로 간다",
+          "result": "{owner은/는} 피난민 행렬에 섞여 성문을 빠져나갔다. 느렸지만 누구도 혼자 남지 않았다.",
+          "next": "ch1_map"
+        },
+        {
+          "id": "breach",
+          "label": "검을 망토 속에 감추고 무너진 성벽 틈으로 빠진다",
+          "result": "{owner은/는} 검을 감춘 채 무너진 성벽 틈을 혼자 지났다. 빨랐지만 등 뒤의 비명은 오래 남았다.",
+          "next": "ch1_map",
+          "flag": "alone_start"
+        }
+      ]
+    },
+    {
+      "id": "ch1_map",
+      "kicker": "성 밖 · 갈림길",
+      "title": "부두로 가는 두 길",
+      "background": "action:investigate",
+      "characters": [
+        {"id": "owner", "name": "{owner}", "role": "검을 쥔 소유자"},
+        {"id": "veteran", "name": "노병 아스토르", "role": "길을 아는 퇴역병"}
+      ],
+      "text": "젖은 지도 한 장을 펼친 노병이 손가락으로 두 길을 짚었다. \"해안 길은 약탈대가 지키고, 숲 사냥길은 덫이 깔려 있지. 어느 쪽이든 해가 지기 전에 부두에 닿아야 해.\"\n\n검은 지도보다 노병의 망설임을 더 오래 보았다.",
+      "choices": [
+        {
+          "id": "hunt_path",
+          "label": "사람 발자국이 남은 숲 사냥길을 택한다",
+          "result": "{owner은/는} 사람의 흔적이 남은 숲 사냥길을 골랐다. 얼어붙은 낙엽 밑에서 쇠 냄새가 났다.",
+          "next": "ch1_hunter"
+        },
+        {
+          "id": "coast_path",
+          "label": "약탈대의 횃불을 피해 해안 절벽 아래로 돈다",
+          "result": "{owner은/는} 횃불을 피해 절벽 아래로 돌았다. 길은 결국 숲 사냥길과 다시 만났다.",
+          "next": "ch1_hunter",
+          "effects": {"mind": -2}
+        }
+      ]
+    },
+    {
+      "id": "ch1_hunter",
+      "kicker": "숲 사냥길 · 사건",
+      "title": "덫에 걸린 사냥꾼",
+      "background": "action:explore",
+      "characters": [
+        {"id": "owner", "name": "{owner}", "role": "검을 쥔 소유자"},
+        {"id": "hunter", "name": "사냥꾼 하일로스", "role": "덫에 다리가 걸린 사냥꾼"}
+      ],
+      "text": "바위 틈 사이에서 쇠사슬이 철컥거렸다. 짐승을 잡으려고 놓은 쇠덫에 한 사냥꾼의 다리가 물려 있었다. 피가 진흙을 검게 적셨다.\n\n\"…도와줄 거면 빨리. 피 냄새를 맡고 늑대가 와.\"\n\n멀리서 짐승의 울음이 들렸다. 부두까지 남은 시간은 많지 않았다.",
+      "choices": [
+        {
+          "id": "free",
+          "label": "덫을 풀어 준다",
+          "result": "{owner은/는} 검날을 지렛대 삼아 덫을 벌려 사냥꾼 하일로스를 구했다. 하일로스는 다리를 절며 일어나 고개를 끄덕였다. \"빚진 거다.\"",
+          "next": "ch1_dock",
+          "flag": "hunter_freed"
+        },
+        {
+          "id": "bargain",
+          "label": "가진 걸 내놓으면 풀어 주겠다고 한다",
+          "result": "{owner은/는} 사냥꾼의 은화 주머니를 받고서야 덫을 풀었다. 하일로스는 아무 말 없이 숲으로 사라졌다.",
+          "next": "ch1_dock",
+          "flag": "hunter_paid",
+          "effects": {"gold": 4}
+        },
+        {
+          "id": "pass",
+          "label": "그냥 지나친다",
+          "result": "{owner은/는} 덫에 걸린 사냥꾼을 두고 지나쳤다. 등 뒤에서 늑대의 울음과 사람의 비명이 겹쳤다.",
+          "next": "ch1_dock",
+          "flag": "hunter_left",
+          "effects": {"mind": -5}
+        }
+      ]
+    },
+    {
+      "id": "ch1_dock",
+      "kicker": "트로이 · 마지막 부두",
+      "title": "약탈대가 막은 선창",
+      "background": "service:smith",
+      "characters": [
+        {"id": "owner", "name": "{owner}", "role": "검을 쥔 소유자"},
+        {"id": "reaver", "name": "전리품 약탈대장", "role": "선창을 막은 약탈자"}
+      ],
+      "text": "해가 기울 무렵 마지막 부두가 보였다. 칼을 든 무리가 선창 길을 막았고, 약탈대장의 눈은 사람보다 {owner}의 짐과 검을 먼저 훑었다.\n\n폭풍을 앞둔 바다 위에서 마지막 귀향선이 밧줄을 풀기 시작했다.",
+      "conditional": [
+        {"flag": "hunter_freed", "text": "그때 숲 쪽에서 화살 한 대가 날아와 약탈대장의 발밑에 꽂혔다. 다리를 절던 하일로스가 활을 겨누고 있었다. \"빚 갚는다!\""},
+        {"flag": "hunter_paid", "text": "약탈대 뒤편에서 낯익은 은화 주머니가 짤랑였다. 숲으로 사라졌던 사냥꾼이 이쪽을 보지 않고 길을 비켰다."},
+        {"flag": "hunter_left", "text": "약탈대 한 명의 허리에 피 묻은 쇠덫이 매달려 있었다. 검은 그 덫을 알아보았다."}
+      ],
+      "choices": [
+        {
+          "id": "shelter",
+          "label": "부상자와 짐을 한곳에 묶고 좁은 선창으로 밀고 간다",
+          "result": "{owner은/는} 부상자와 짐을 묶어 좁은 선창으로 밀고 나갔다. 귀향선에 오른 사람은 많았지만 식량 자루 몇 개가 바다에 떨어졌다.",
+          "next": "END",
+          "approach": "a"
+        },
+        {
+          "id": "scatter",
+          "label": "빈손인 척 흩어졌다가 배 앞에서 다시 모인다",
+          "result": "{owner은/는} 사람들을 흩어지게 한 뒤 배 앞에서 다시 모았다. 짐은 지켰지만 끝내 합류하지 못한 이름이 남았다.",
+          "next": "END",
+          "approach": "b"
+        }
+      ]
+    }
+  ],
+  "ending": {
+    "title": "이번 장의 이야기",
+    "background": "service:visit",
+    "kicker": "제1장 · CH.1 완료",
+    "closing": "폭풍이 지나간 뒤 귀향선은 트로이의 연기를 등지고 바다로 나아갔다. 사람은 매번 선택했고, 검은 그 결과만 기억했다.",
+    "button": "이번 장을 마친다"
+  }
+}

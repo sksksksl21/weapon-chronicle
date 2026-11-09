@@ -19,6 +19,7 @@
     "test:encyclopedia": "npm run build && npm run test:encyclopedia:source && npm run test:gear-rarity && python tests/regression.py",
     "test:encyclopedia:source": "node --test tests/test_autopilot_156ac6c2e7e796ce.js tests/test_autopilot_dab742ab72ed8402.js tests/test_autopilot_7e0d5bc568c90de5.js",
     "test:merchant": "node tests/merchant_stock_v1.js",
+    "test:scene-cards": "node tests/scene_cards_v1.js && python tests/scene_cards_browser_v1.py",
     "test:direct-combat": "node tests/direct_combat_stats_v2.js",
     "test:modules": "node tests/module_services_v1.js && node tests/merchant_stock_v1.js && python -m unittest discover -s tests -p test_module_manifest_v1.py"
   },
