@@ -8,6 +8,23 @@ const root=path.join(__dirname,"..");
 const DATA=JSON.parse(fs.readFileSync(path.join(root,"src/story/chapter1_scenes_v1.json"),"utf8"));
 const MARKER="/* @include:chapter1-scenes-json */";
 const source=fs.readFileSync(path.join(root,"src/story/scene_cards_v1.js"),"utf8");
+// Exercise both real modal-close layers: a backdrop must keep the current scene
+// and its fullscreen layout, but completing the chapter must allow dismissal.
+const runtime=fs.readFileSync(path.join(root,"src/legacy/game_runtime.js"),"utf8");
+const closeBase=runtime.slice(runtime.indexOf('function closeModal(){'),runtime.indexOf('function modalHead('));
+const closeLayer=runtime.match(/const _closeModalV37Base=closeModal;\s*closeModal=function\(\).*?\};/)[0];
+let active=true,scene=true;
+const classes=new Set(['show','storyFullscreen']);
+const modalContext={WC_SCENE_CARDS_V1:{active:()=>active},
+ $:id=>id==='modal'?{querySelector:()=>scene}:{classList:{remove:c=>classes.delete(c)}}};
+vm.createContext(modalContext);
+vm.runInContext(closeBase+closeLayer,modalContext);
+modalContext.closeModal();
+assert.deepEqual([...classes],['show','storyFullscreen'],'active scene cannot be dismissed');
+active=false;modalContext.closeModal();
+assert.equal(classes.size,0,'finished chapter can leave fullscreen');
+classes.add('show');scene=false;active=true;modalContext.closeModal();
+assert.equal(classes.size,0,'ordinary hub panels remain dismissible');
 assert.equal(source.split(MARKER).length,2,"one JSON include marker");
 function load(data){
  const sandbox={console:{error(){},warn(){}}};
@@ -67,6 +84,15 @@ assert.throws(()=>E.choose(E.choose(freed,"shelter","x"),"shelter","x"),/not wai
 assert.throws(()=>E.choose(freed,"nope","x"),/no such choice/);
 assert.throws(()=>E.advance(freed),/no result/);
 assert.equal(E.isRun({...freed,card:"missing"}),false);
+assert.equal(E.isRun({...freed,picks:[...freed.picks,freed.picks[0]]}),false,"reject duplicated picks");
+assert.equal(E.isRun({...freed,picks:freed.picks.slice(1)}),false,"reject skipped cards");
+assert.equal(E.isRun({...E.begin(),status:"ending",card:null}),false,"cannot close without a route");
+assert.equal(E.isRun({...E.begin(),card:"ch1_hunter"}),false,"cannot jump ahead in a save");
+assert.equal(E.isRun({...freed,status:"result"}),false,"result must belong to the current card");
+for(const end of ends){
+ assert.equal(E.isRun(JSON.parse(JSON.stringify(end))),true,"complete route survives JSON save");
+ assert.equal(E.isRun({...end,status:"done"}),true,"closed route remains valid");
+}
 // Korean particles follow the owner's name.
 assert.equal(E.fill("{owner은/는} 갔다","도리스"),"도리스는 갔다");
 assert.equal(E.fill("{owner은/는} 갔다","테온"),"테온은 갔다");

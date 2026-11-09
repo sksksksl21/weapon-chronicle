@@ -14,7 +14,10 @@ from playwright.sync_api import sync_playwright
 ROOT = Path(__file__).resolve().parents[1]
 HTML = (ROOT / 'index.html').read_text(encoding='utf8')
 MARKER = 'v48EnsureState();\nconst v483Loaded=loadGame();'
-PROBE = """window.__sc={key:SAVE_KEY,s:()=>JSON.parse(JSON.stringify({
+PROBE = """window.__sc={key:SAVE_KEY,
+ rest:()=>{const a=actionCandidatesForPolicy('rest')[0];chooseActionCandidate('rest',a.key);startStory();},
+ s:()=>JSON.parse(JSON.stringify({
+ year:state.year,month:state.month,hp:state.hp,parts:state.weapon.parts,armor:state.owner.armor,
  gold:state.gold,mind:state.mind,owner:state.owner.name,node:state.mainStory?.node,
  results:state.mainStory?.act1ChapterResults||[],departure:v52Act1Pivot('departure'),
  scene:state.sceneChapterV1===undefined?'(none)':state.sceneChapterV1}))};"""
@@ -81,6 +84,9 @@ with sync_playwright() as p:
     check(card.locator('.wcScene1Text').inner_text().strip() != '', 'empty body')
     check(card.locator('[data-scene-choice]').count() == 2, 'choice count')
     check(stored(page)['sceneChapterV1']['status'] == 'card', 'new game scene progress not saved')
+    page.evaluate("document.getElementById('overlay').click()")
+    check(step(page) == 'card:ch1_ashes', 'backdrop dismissed the active chapter')
+    check('storyFullscreen' in page.locator('#overlay').get_attribute('class'), 'backdrop removed fullscreen layout')
     owner = page.evaluate('__sc.s().owner')
     pick(page, 'refugees')
     check(step(page) == 'result:ch1_ashes', 'result not shown after a choice')
@@ -104,6 +110,11 @@ with sync_playwright() as p:
     pick(page, 'free')
     check(step(page) == 'result:ch1_hunter', 'retry after failure did not apply')
     check('빚진 거다' in page.locator('.wcScene1Result').inner_text(), 'hunter result sentence')
+    confirmed = page.evaluate('__sc.s()')
+    boot(page)
+    check(step(page) == 'result:ch1_hunter', 'confirmed hunter result not restored')
+    check(page.evaluate('__sc.s()') == confirmed, 'reload changed confirmed choice or resources')
+    check(len(stored(page)['sceneChapterV1']['picks']) == 3, 'reload duplicated hunter pick')
     fail(page, True)
     advance(page)
     check(step(page) == 'result:ch1_hunter', 'failed save moved to next card')
@@ -185,6 +196,26 @@ with sync_playwright() as p:
     boot(page)
     check(step(page) is None, 'old save was forced into scene cards')
     check(page.evaluate('__sc.s().scene') == '(none)', 'old save gained scene progress')
+    original = page.evaluate('__sc.s()')
+    check(original['gold'] == legacy['gold'] and original['owner'] == legacy['owner']['name'], 'old save lost owner/gold')
+    check(original['parts'] == legacy['weapon']['parts'], 'old save changed equipped sword parts')
+    check(original['node'] == '1-01', 'old save changed story position')
+    page.evaluate('__sc.rest()')
+    for _ in range(32):
+        if page.locator('#nextMonth').count():
+            page.locator('#nextMonth').click()
+            break
+        buttons = page.locator('#storyChoices button')
+        check(buttons.count() > 0, 'old save cannot continue a monthly action')
+        buttons.first.click()
+    else:
+        raise AssertionError('old save rest action did not complete')
+    continued = page.evaluate('__sc.s()')
+    check((continued['year'], continued['month']) != (original['year'], original['month']), 'old save calendar did not advance')
+    check(continued['scene'] == '(none)', 'monthly action created scene progress on old save')
+    boot(page)
+    check(page.evaluate('__sc.s()') == continued, 'continued old save did not roundtrip')
+    check(step(page) is None, 'continued old save reopened scene cards')
     page.close()
     browser.close()
 print('PASS: chapter-1 scene cards in browser (new game, hunter routes, save failure retry, reconnect, old save)')

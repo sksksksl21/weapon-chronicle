@@ -67,10 +67,18 @@ function wcSceneEngineV1(data){
  }
  function isRun(run){
   if(!run||typeof run!=='object'||run.v!==1||run.chapter!==data.id||!Array.isArray(run.picks))return false;
-  if(!run.picks.every(p=>p&&choiceOf(p.card,p.choice)))return false;
-  if(run.status==='card')return !!card(run.card);
-  if(run.status==='result')return !!card(run.card)&&run.picks.at(-1)?.card===run.card;
-  return run.status==='ending'||run.status==='done';
+  // Validate the actual route, not just individual IDs. A repeated or out-of-order
+  // pick must never become another reward when a saved chapter is closed.
+  let expected=data.start;
+  for(const p of run.picks){
+   if(!p||p.card!==expected)return false;
+   const x=choiceOf(p.card,p.choice);
+   if(!x||!isText(p.label)||!isText(p.result))return false;
+   expected=x.next;
+  }
+  if(run.status==='card')return expected!=='END'&&run.card===expected&&!!card(run.card);
+  if(run.status==='result')return run.picks.length>0&&run.picks.at(-1).card===run.card;
+  return (run.status==='ending'||run.status==='done')&&expected==='END'&&run.card===null;
  }
  function choose(run,choiceId,owner){
   if(!isRun(run)||run.status!=='card')throw new Error('Scene card is not waiting for a choice');

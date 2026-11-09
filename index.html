@@ -2932,7 +2932,12 @@ function wcStatusSnapshotPanel(modal){
   }
  }
 }
-function closeModal(){$("overlay").classList.remove("show");}
+function closeModal(){
+ // Chapter-one scenes are the current action, not a dismissible hub panel.
+ // Keep backdrop clicks from exposing monthly actions before the chapter closes.
+ if(typeof WC_SCENE_CARDS_V1!=='undefined'&&WC_SCENE_CARDS_V1.active()&&$('modal')?.querySelector('.wcScene1'))return false;
+ $("overlay").classList.remove("show");
+}
 function modalHead(title,desc=""){return `<div class="modalHead"><b>${title}</b><button class="close" id="closeModal">닫기</button></div>${desc?`<div class="modalDesc">${desc}</div>`:""}`;}
 function bindClose(){$("closeModal")?.addEventListener("click",closeModal);}
 
@@ -6513,7 +6518,7 @@ openModal=function(markup){
   $('overlay')?.classList.toggle('storyFullscreen',isResult);
 };
 const _closeModalV37Base=closeModal;
-closeModal=function(){_closeModalV37Base();$('overlay')?.classList.remove('storyFullscreen');};
+closeModal=function(){if(_closeModalV37Base()===false)return false;$('overlay')?.classList.remove('storyFullscreen');};
 function v37UnlockOptions(choices){
   const ctx=state.storyCtx,mode=state.policy;
   if(!ctx||!Array.isArray(choices)||choices.length<2||!['contract','explore','investigate','rest','sail'].includes(mode))return [];
@@ -8256,10 +8261,18 @@ function wcSceneEngineV1(data){
  }
  function isRun(run){
   if(!run||typeof run!=='object'||run.v!==1||run.chapter!==data.id||!Array.isArray(run.picks))return false;
-  if(!run.picks.every(p=>p&&choiceOf(p.card,p.choice)))return false;
-  if(run.status==='card')return !!card(run.card);
-  if(run.status==='result')return !!card(run.card)&&run.picks.at(-1)?.card===run.card;
-  return run.status==='ending'||run.status==='done';
+  // Validate the actual route, not just individual IDs. A repeated or out-of-order
+  // pick must never become another reward when a saved chapter is closed.
+  let expected=data.start;
+  for(const p of run.picks){
+   if(!p||p.card!==expected)return false;
+   const x=choiceOf(p.card,p.choice);
+   if(!x||!isText(p.label)||!isText(p.result))return false;
+   expected=x.next;
+  }
+  if(run.status==='card')return expected!=='END'&&run.card===expected&&!!card(run.card);
+  if(run.status==='result')return run.picks.length>0&&run.picks.at(-1).card===run.card;
+  return (run.status==='ending'||run.status==='done')&&expected==='END'&&run.card===null;
  }
  function choose(run,choiceId,owner){
   if(!isRun(run)||run.status!=='card')throw new Error('Scene card is not waiting for a choice');

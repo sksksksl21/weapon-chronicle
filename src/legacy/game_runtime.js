@@ -2085,7 +2085,12 @@ function wcStatusSnapshotPanel(modal){
   }
  }
 }
-function closeModal(){$("overlay").classList.remove("show");}
+function closeModal(){
+ // Chapter-one scenes are the current action, not a dismissible hub panel.
+ // Keep backdrop clicks from exposing monthly actions before the chapter closes.
+ if(typeof WC_SCENE_CARDS_V1!=='undefined'&&WC_SCENE_CARDS_V1.active()&&$('modal')?.querySelector('.wcScene1'))return false;
+ $("overlay").classList.remove("show");
+}
 function modalHead(title,desc=""){return `<div class="modalHead"><b>${title}</b><button class="close" id="closeModal">닫기</button></div>${desc?`<div class="modalDesc">${desc}</div>`:""}`;}
 function bindClose(){$("closeModal")?.addEventListener("click",closeModal);}
 
@@ -5666,7 +5671,7 @@ openModal=function(markup){
   $('overlay')?.classList.toggle('storyFullscreen',isResult);
 };
 const _closeModalV37Base=closeModal;
-closeModal=function(){_closeModalV37Base();$('overlay')?.classList.remove('storyFullscreen');};
+closeModal=function(){if(_closeModalV37Base()===false)return false;$('overlay')?.classList.remove('storyFullscreen');};
 function v37UnlockOptions(choices){
   const ctx=state.storyCtx,mode=state.policy;
   if(!ctx||!Array.isArray(choices)||choices.length<2||!['contract','explore','investigate','rest','sail'].includes(mode))return [];
